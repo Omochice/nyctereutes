@@ -43,6 +43,7 @@
             disable = [
               # keep-sorted start
               "depguard" # requires an explicit import policy to be useful
+              "exhaustruct" # test fixtures and go-flags structs init only some fields
               "godoclint" # forces godoc comments to restate the symbol name
               "gomodguard" # deprecated in v2.12, superseded by gomodguard_v2
               "nlreturn" # blank-line-before-return style, overlaps wsl
@@ -51,6 +52,7 @@
               "paralleltest" # t.Parallel() adds little to this small suite
               "revive" # forces restating doc comments on every export
               "tagalign" # struct-tag alignment belongs to formatting
+              "tagliatelle" # JSON tags mirror GitLab's snake_case API
               "testpackage" # white-box tests are intentional here
               "wsl" # opinionated whitespace/cuddling rules
               "wsl_v5" # successor of wsl, same opinionated whitespace rules
