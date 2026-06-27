@@ -31,9 +31,19 @@ func (c *infraCommand) Execute(args []string) error {
 	return errNotImplemented
 }
 
+type helpCommand struct {
+	inout *cli.ProcInout
+}
+
+func (c *helpCommand) Execute(args []string) error {
+	fmt.Fprintln(c.inout.Stderr, "not implemented")
+	return errNotImplemented
+}
+
 type options struct {
 	Dep   *depCommand   `command:"dep" description:"manage dependencies"`
 	Infra *infraCommand `command:"infra" description:"manage infrastructure"`
+	Help  *helpCommand  `command:"help" description:"show help"`
 }
 
 // MainCommand parses args, dispatches to the requested subcommand, and reports
@@ -42,6 +52,7 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 	opts := &options{
 		Dep:   &depCommand{inout: inout},
 		Infra: &infraCommand{inout: inout},
+		Help:  &helpCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash)
 	parser.Name = "nyctereutes"
