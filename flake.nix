@@ -132,6 +132,7 @@
           inherit (gitHooks) shellHook;
         };
         formatter = treefmt.config.build.wrapper;
+        packages.default = nyctereutes;
         # keep-sorted end
       }
     );
