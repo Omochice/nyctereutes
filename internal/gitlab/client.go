@@ -71,6 +71,11 @@ func (c *Client) SearchMRs(ctx context.Context, params SearchParams) ([]types.MR
 	}
 
 	c.fillStatuses(ctx, allMRs)
+	// fillStatuses swallows per-MR errors, so a cancelled context would
+	// otherwise surface as a silently partial result; report it instead.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return allMRs, nil
 }
 
