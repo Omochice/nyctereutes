@@ -1,4 +1,4 @@
-// Wires the command-line subcommands onto the cli plumbing.
+// Package nyctereutes wires the command-line subcommands onto the cli plumbing.
 package nyctereutes
 
 import (
@@ -17,8 +17,8 @@ type stubCommand struct {
 	inout *cli.ProcInout
 }
 
-func (c *stubCommand) Execute(args []string) error {
-	fmt.Fprintln(c.inout.Stderr, "not implemented")
+func (c *stubCommand) Execute(_ []string) error {
+	_, _ = fmt.Fprintln(c.inout.Stderr, "not implemented")
 	return errNotImplemented
 }
 
@@ -28,6 +28,8 @@ type options struct {
 	Help  *stubCommand `command:"help" description:"show help"`
 }
 
+// MainCommand parses args, dispatches the matched subcommand, and returns the
+// process exit code.
 func MainCommand(args []string, inout *cli.ProcInout) int {
 	opts := &options{
 		Dep:   &stubCommand{inout: inout},
@@ -43,10 +45,10 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 		}
 		var flagsErr *flags.Error
 		if errors.As(err, &flagsErr) && flagsErr.Type == flags.ErrHelp {
-			fmt.Fprintln(inout.Stdout, flagsErr.Message)
+			_, _ = fmt.Fprintln(inout.Stdout, flagsErr.Message)
 			return 0
 		}
-		fmt.Fprintln(inout.Stderr, err)
+		_, _ = fmt.Fprintln(inout.Stderr, err)
 		parser.WriteHelp(inout.Stderr)
 		return 1
 	}
