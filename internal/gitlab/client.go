@@ -104,12 +104,12 @@ func scopeEndpoints(params SearchParams) []string {
 	if len(params.Repos) > 0 {
 		endpoints := make([]string, 0, len(params.Repos))
 		for _, repo := range params.Repos {
-			endpoints = append(endpoints, "projects/"+url.QueryEscape(repo)+"/merge_requests")
+			endpoints = append(endpoints, "projects/"+url.PathEscape(repo)+"/merge_requests")
 		}
 		return endpoints
 	}
 	if params.Group != "" {
-		return []string{"groups/" + url.QueryEscape(params.Group) + "/merge_requests"}
+		return []string{"groups/" + url.PathEscape(params.Group) + "/merge_requests"}
 	}
 	return []string{"merge_requests?scope=all"}
 }
