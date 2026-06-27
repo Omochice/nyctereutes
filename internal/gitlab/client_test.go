@@ -27,7 +27,7 @@ func TestSearchMRsConvertsResultsAndFetchesStatus(t *testing.T) {
 	})
 
 	mrs, err := NewClient(runner).SearchMRs(context.Background(), SearchParams{
-		Authors: []string{"renovate-bot"},
+		Authors: []string{DefaultAuthor},
 	})
 	if err != nil {
 		t.Fatalf("SearchMRs() error = %v", err)
@@ -36,18 +36,18 @@ func TestSearchMRsConvertsResultsAndFetchesStatus(t *testing.T) {
 	if len(mrs) != 1 {
 		t.Fatalf("got %d MRs, want 1", len(mrs))
 	}
-	mr := mrs[0]
-	if mr.IID != 12 || mr.ProjectID != 7 {
-		t.Errorf("IID/ProjectID = %d/%d, want 12/7", mr.IID, mr.ProjectID)
+	got := mrs[0]
+	if got.IID != 12 || got.ProjectID != 7 {
+		t.Errorf("IID/ProjectID = %d/%d, want 12/7", got.IID, got.ProjectID)
 	}
-	if mr.Project != "g/proj" {
-		t.Errorf("Project = %q, want %q", mr.Project, "g/proj")
+	if got.Project != "g/proj" {
+		t.Errorf("Project = %q, want %q", got.Project, "g/proj")
 	}
-	if mr.CIStatus != "success" {
-		t.Errorf("CIStatus = %q, want %q", mr.CIStatus, "success")
+	if got.CIStatus != "success" {
+		t.Errorf("CIStatus = %q, want %q", got.CIStatus, "success")
 	}
-	if mr.UnmergeableReason != "" {
-		t.Errorf("UnmergeableReason = %q, want empty", mr.UnmergeableReason)
+	if got.UnmergeableReason != "" {
+		t.Errorf("UnmergeableReason = %q, want empty", got.UnmergeableReason)
 	}
 }
 
@@ -86,23 +86,19 @@ func TestSearchMRsRequestsConfiguredAuthor(t *testing.T) {
 		if detailPath.MatchString(path) {
 			return []byte(`{}`), nil
 		}
-		if i := strings.Index(path, "author_username="); i >= 0 {
-			rest := path[i+len("author_username="):]
-			if amp := strings.IndexByte(rest, '&'); amp >= 0 {
-				rest = rest[:amp]
-			}
-			sawAuthor = rest
+		if _, after, found := strings.Cut(path, "author_username="); found {
+			sawAuthor, _, _ = strings.Cut(after, "&")
 		}
 		return []byte(`[]`), nil
 	})
 
 	_, err := NewClient(runner).SearchMRs(context.Background(), SearchParams{
-		Authors: []string{"renovate-bot"},
+		Authors: []string{DefaultAuthor},
 	})
 	if err != nil {
 		t.Fatalf("SearchMRs() error = %v", err)
 	}
-	if sawAuthor != "renovate-bot" {
-		t.Errorf("author_username query = %q, want %q", sawAuthor, "renovate-bot")
+	if sawAuthor != DefaultAuthor {
+		t.Errorf("author_username query = %q, want %q", sawAuthor, DefaultAuthor)
 	}
 }

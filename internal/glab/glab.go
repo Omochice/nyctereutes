@@ -30,7 +30,9 @@ type ExecRunner struct{}
 // Run executes "glab <args...>". On failure the error includes glab's stderr so
 // the underlying cause (for example a missing login) is surfaced verbatim.
 func (ExecRunner) Run(ctx context.Context, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "glab", args...)
+	// glab is a fixed trusted binary; passing dynamic args to it is this
+	// package's entire purpose.
+	cmd := exec.CommandContext(ctx, "glab", args...) //nolint:gosec // G204: args are intended dynamic glab arguments
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

@@ -7,7 +7,7 @@ import "strings"
 // empties.
 func SplitList(value string) []string {
 	var items []string
-	for _, part := range strings.Split(value, ",") {
+	for part := range strings.SplitSeq(value, ",") {
 		if part = strings.TrimSpace(part); part != "" {
 			items = append(items, part)
 		}

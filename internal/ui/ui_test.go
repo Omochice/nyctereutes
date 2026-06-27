@@ -9,16 +9,21 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
+const (
+	projProj = "g/proj"
+	projA    = "g/a"
+)
+
 func TestDisplayListRendersTable(t *testing.T) {
 	var buf bytes.Buffer
 	mrs := []types.MR{
-		{IID: 12, Project: "g/proj", Title: "Bump lodash from 1.0.0 to 2.0.0"},
+		{IID: 12, Project: projProj, Title: "Bump lodash from 1.0.0 to 2.0.0"},
 	}
 	if err := New(&buf, mrs, false).DisplayList(mrs); err != nil {
 		t.Fatalf("DisplayList() error = %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"PROJECT", "MR", "TITLE", "g/proj", "!12", "Bump lodash"} {
+	for _, want := range []string{"PROJECT", "MR", "TITLE", projProj, "!12", "Bump lodash"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("DisplayList output missing %q\n%s", want, out)
 		}
@@ -27,7 +32,7 @@ func TestDisplayListRendersTable(t *testing.T) {
 
 func TestDisplayListJSON(t *testing.T) {
 	var buf bytes.Buffer
-	mrs := []types.MR{{IID: 12, Project: "g/proj", Title: "t"}}
+	mrs := []types.MR{{IID: 12, Project: projProj, Title: "t"}}
 	if err := New(&buf, mrs, true).DisplayList(mrs); err != nil {
 		t.Fatalf("DisplayList() error = %v", err)
 	}
@@ -44,7 +49,7 @@ func TestDisplayGroupsSortedAlphabetically(t *testing.T) {
 	var buf bytes.Buffer
 	groups := map[string][]types.MR{
 		"zlib@1.0.0":  {{IID: 1, Project: "g/z", URL: "u1"}},
-		"alpha@2.0.0": {{IID: 2, Project: "g/a", URL: "u2"}},
+		"alpha@2.0.0": {{IID: 2, Project: projA, URL: "u2"}},
 	}
 	if err := NewFromGroups(&buf, groups, false).DisplayGroups(groups); err != nil {
 		t.Fatalf("DisplayGroups() error = %v", err)
@@ -58,7 +63,7 @@ func TestDisplayGroupsSortedAlphabetically(t *testing.T) {
 func TestPrintActionMultiProjectPrefix(t *testing.T) {
 	var buf bytes.Buffer
 	mrs := []types.MR{
-		{IID: 12, Project: "g/a"},
+		{IID: 12, Project: projA},
 		{IID: 13, Project: "g/b"},
 	}
 	u := New(&buf, mrs, false)
@@ -71,7 +76,7 @@ func TestPrintActionMultiProjectPrefix(t *testing.T) {
 
 func TestPrintActionSingleProjectNoPrefix(t *testing.T) {
 	var buf bytes.Buffer
-	mrs := []types.MR{{IID: 12, Project: "g/a"}}
+	mrs := []types.MR{{IID: 12, Project: projA}}
 	u := New(&buf, mrs, false)
 	u.PrintAction("approve", mrs[0])
 	out := buf.String()

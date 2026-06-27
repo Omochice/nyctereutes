@@ -2,7 +2,10 @@ package gitlab
 
 import "testing"
 
-func strptr(s string) *string { return &s }
+const (
+	cfgBot  = "cfg-bot"
+	cfgRepo = "g/cfg"
+)
 
 func TestResolveAuthors(t *testing.T) {
 	tests := []struct {
@@ -12,9 +15,9 @@ func TestResolveAuthors(t *testing.T) {
 		want      string
 	}{
 		{name: "default when unset", author: nil, cfgAuthor: "", want: DefaultAuthor},
-		{name: "flag wins", author: strptr("flag-bot"), cfgAuthor: "cfg-bot", want: "flag-bot"},
-		{name: "config when flag unset", author: nil, cfgAuthor: "cfg-bot", want: "cfg-bot"},
-		{name: "empty flag is explicit", author: strptr(""), cfgAuthor: "cfg-bot", want: ""},
+		{name: "flag wins", author: new("flag-bot"), cfgAuthor: cfgBot, want: "flag-bot"},
+		{name: "config when flag unset", author: nil, cfgAuthor: cfgBot, want: cfgBot},
+		{name: "empty flag is explicit", author: new(""), cfgAuthor: cfgBot, want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -28,7 +31,7 @@ func TestResolveAuthors(t *testing.T) {
 
 func TestResolveScope(t *testing.T) {
 	t.Run("flag repo wins over config", func(t *testing.T) {
-		group, repos := ResolveScope(strptr("g/x, g/y"), nil, []string{"g/cfg"})
+		group, repos := ResolveScope(new("g/x, g/y"), nil, []string{cfgRepo})
 		if group != "" {
 			t.Errorf("group = %q, want empty", group)
 		}
@@ -38,14 +41,14 @@ func TestResolveScope(t *testing.T) {
 	})
 
 	t.Run("config repo when flag unset", func(t *testing.T) {
-		_, repos := ResolveScope(nil, nil, []string{"g/cfg"})
-		if len(repos) != 1 || repos[0] != "g/cfg" {
-			t.Errorf("repos = %v, want [g/cfg]", repos)
+		_, repos := ResolveScope(nil, nil, []string{cfgRepo})
+		if len(repos) != 1 || repos[0] != cfgRepo {
+			t.Errorf("repos = %v, want [%s]", repos, cfgRepo)
 		}
 	})
 
 	t.Run("group-path flag is passed through", func(t *testing.T) {
-		group, _ := ResolveScope(nil, strptr("grp/sub"), nil)
+		group, _ := ResolveScope(nil, new("grp/sub"), nil)
 		if group != "grp/sub" {
 			t.Errorf("group = %q, want %q", group, "grp/sub")
 		}

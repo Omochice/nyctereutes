@@ -4,6 +4,10 @@ package parser
 
 import "regexp"
 
+// submatchCount is the length of a successful FindStringSubmatch result: the
+// whole match plus the package and version capture groups.
+const submatchCount = 3
+
 type PackageUpdate struct {
 	Package   string
 	ToVersion string
@@ -11,6 +15,8 @@ type PackageUpdate struct {
 
 // patterns are tried in order; the first match wins. They move from the most
 // specific dependency-bot phrasing to a permissive catch-all.
+//
+//nolint:gochecknoglobals // immutable compiled patterns shared as package data
 var patterns = []*regexp.Regexp{
 	// "Bump/Update PACKAGE from X to VERSION" (Dependabot/Renovate "from...to").
 	regexp.MustCompile(`(?i)(?:bump|update)[:\s]+([^\s]+)\s+from\s+[^\s]+\s+to\s+v?(\d+\.\d+(?:\.\d+)?)`),
@@ -42,11 +48,12 @@ func ParseTitle(title string, customPatterns []*regexp.Regexp) PackageUpdate {
 }
 
 func match(re *regexp.Regexp, title string) (PackageUpdate, bool) {
-	m := re.FindStringSubmatch(title)
-	if len(m) != 3 {
-		return PackageUpdate{}, false
+	groups := re.FindStringSubmatch(title)
+	if len(groups) != submatchCount {
+		var none PackageUpdate
+		return none, false
 	}
-	return PackageUpdate{Package: m[1], ToVersion: m[2]}, true
+	return PackageUpdate{Package: groups[1], ToVersion: groups[2]}, true
 }
 
 // GroupKey is the "package@version" key used to bucket updates of the same

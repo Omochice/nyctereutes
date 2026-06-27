@@ -15,6 +15,13 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
+const (
+	maxWorkers      = 10
+	perPage         = 100
+	defaultLimit    = 200
+	pipelineSuccess = "success"
+)
+
 type Client struct {
 	runner glab.Runner
 }
@@ -33,7 +40,8 @@ type SearchParams struct {
 	Reviewer string
 }
 
-// rawMR is the subset of the GitLab merge request API we consume.
+// rawMR is the subset of the GitLab merge request API we consume. The JSON tags
+// are snake_case because they mirror GitLab's API, not this tool's conventions.
 type rawMR struct {
 	IID       int    `json:"iid"`
 	ProjectID int    `json:"project_id"`
@@ -43,6 +51,14 @@ type rawMR struct {
 	} `json:"author"`
 	WebURL string `json:"web_url"`
 	SHA    string `json:"sha"`
+}
+
+// MRStatus carries the mergeability signals read from one detail request.
+type MRStatus struct {
+	// Pipeline is normalized to success, pending, failure, or empty (no pipeline).
+	Pipeline string
+	// UnmergeableReason names the blocker, or is empty when the MR is mergeable.
+	UnmergeableReason string
 }
 
 // SearchMRs finds open merge requests matching params. Multiple authors are
@@ -74,22 +90,31 @@ func (c *Client) SearchMRs(ctx context.Context, params SearchParams) ([]types.MR
 	// fillStatuses swallows per-MR errors, so a cancelled context would
 	// otherwise surface as a silently partial result; report it instead.
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("search canceled: %w", err)
 	}
 	return allMRs, nil
+}
+
+// GetMRStatus reads the head pipeline status and mergeability from one request.
+func (c *Client) GetMRStatus(ctx context.Context, projectID, iid int) (MRStatus, error) {
+	path := fmt.Sprintf("projects/%d/merge_requests/%d", projectID, iid)
+	out, err := c.runner.Run(ctx, "api", path)
+	if err != nil {
+		return MRStatus{}, fmt.Errorf("failed to get MR status: %w", err)
+	}
+	return parseMRStatus(out)
 }
 
 // fillStatuses populates each MR's status concurrently. A failed status fetch
 // leaves the MR's status fields zero rather than aborting the whole search.
 func (c *Client) fillStatuses(ctx context.Context, mrs []types.MR) {
-	const maxWorkers = 10
-	var wg sync.WaitGroup
+	var waitGroup sync.WaitGroup
 	semaphore := make(chan struct{}, maxWorkers)
 
-	for i := range mrs {
-		wg.Add(1)
+	for index := range mrs {
+		waitGroup.Add(1)
 		go func(idx int) {
-			defer wg.Done()
+			defer waitGroup.Done()
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
@@ -98,31 +123,15 @@ func (c *Client) fillStatuses(ctx context.Context, mrs []types.MR) {
 				mrs[idx].CIStatus = status.Pipeline
 				mrs[idx].UnmergeableReason = status.UnmergeableReason
 			}
-		}(i)
+		}(index)
 	}
-	wg.Wait()
-}
-
-// scopeEndpoints returns the API endpoints for the scope: explicit repos win
-// over a group, and with neither, all accessible MRs are queried.
-func scopeEndpoints(params SearchParams) []string {
-	if len(params.Repos) > 0 {
-		endpoints := make([]string, 0, len(params.Repos))
-		for _, repo := range params.Repos {
-			endpoints = append(endpoints, "projects/"+url.PathEscape(repo)+"/merge_requests")
-		}
-		return endpoints
-	}
-	if params.Group != "" {
-		return []string{"groups/" + url.PathEscape(params.Group) + "/merge_requests"}
-	}
-	return []string{"merge_requests?scope=all"}
+	waitGroup.Wait()
 }
 
 func (c *Client) searchMRsForAuthor(ctx context.Context, params SearchParams, author string) ([]types.MR, error) {
 	limit := params.Limit
 	if limit <= 0 {
-		limit = 200
+		limit = defaultLimit
 	}
 
 	var mrs []types.MR
@@ -142,30 +151,16 @@ func (c *Client) searchMRsForAuthor(ctx context.Context, params SearchParams, au
 
 // fetchMRs pages through a single endpoint. Pagination is done by hand (rather
 // than glab's --paginate) so each response is one JSON array we can decode.
-func (c *Client) fetchMRs(ctx context.Context, endpoint string, params SearchParams, author string, limit int) ([]types.MR, error) {
-	const perPage = 100
-
+func (c *Client) fetchMRs(
+	ctx context.Context,
+	endpoint string,
+	params SearchParams,
+	author string,
+	limit int,
+) ([]types.MR, error) {
 	var mrs []types.MR
 	for page := 1; len(mrs) < limit; page++ {
-		q := url.Values{}
-		q.Set("state", "opened")
-		q.Set("per_page", strconv.Itoa(perPage))
-		q.Set("page", strconv.Itoa(page))
-		if params.Label != "" {
-			q.Set("labels", params.Label)
-		}
-		if author != "" {
-			q.Set("author_username", author)
-		}
-		if params.Reviewer != "" {
-			q.Set("reviewer_username", params.Reviewer)
-		}
-
-		sep := "?"
-		if strings.Contains(endpoint, "?") {
-			sep = "&"
-		}
-		path := endpoint + sep + q.Encode()
+		path := buildPath(endpoint, searchQuery(params, author, page))
 
 		out, err := c.runner.Run(ctx, "api", path)
 		if err != nil {
@@ -177,16 +172,8 @@ func (c *Client) fetchMRs(ctx context.Context, endpoint string, params SearchPar
 			return nil, fmt.Errorf("failed to parse search results: %w", err)
 		}
 
-		for _, r := range raw {
-			mrs = append(mrs, types.MR{
-				IID:       r.IID,
-				ProjectID: r.ProjectID,
-				Title:     r.Title,
-				Author:    r.Author.Username,
-				Project:   projectPathFromURL(r.WebURL),
-				URL:       r.WebURL,
-				HeadSHA:   r.SHA,
-			})
+		for _, entry := range raw {
+			mrs = append(mrs, toMR(entry))
 		}
 
 		if len(raw) < perPage {
@@ -200,35 +187,73 @@ func (c *Client) fetchMRs(ctx context.Context, endpoint string, params SearchPar
 	return mrs, nil
 }
 
+// scopeEndpoints returns the API endpoints for the scope: explicit repos win
+// over a group, and with neither, all accessible MRs are queried.
+func scopeEndpoints(params SearchParams) []string {
+	if len(params.Repos) > 0 {
+		endpoints := make([]string, 0, len(params.Repos))
+		for _, repo := range params.Repos {
+			endpoints = append(endpoints, "projects/"+url.PathEscape(repo)+"/merge_requests")
+		}
+		return endpoints
+	}
+	if params.Group != "" {
+		return []string{"groups/" + url.PathEscape(params.Group) + "/merge_requests"}
+	}
+	return []string{"merge_requests?scope=all"}
+}
+
+func searchQuery(params SearchParams, author string, page int) url.Values {
+	query := url.Values{}
+	query.Set("state", "opened")
+	query.Set("per_page", strconv.Itoa(perPage))
+	query.Set("page", strconv.Itoa(page))
+	if params.Label != "" {
+		query.Set("labels", params.Label)
+	}
+	if author != "" {
+		query.Set("author_username", author)
+	}
+	if params.Reviewer != "" {
+		query.Set("reviewer_username", params.Reviewer)
+	}
+	return query
+}
+
+func buildPath(endpoint string, query url.Values) string {
+	sep := "?"
+	if strings.Contains(endpoint, "?") {
+		sep = "&"
+	}
+	return endpoint + sep + query.Encode()
+}
+
+func toMR(raw rawMR) types.MR {
+	return types.MR{
+		IID:               raw.IID,
+		ProjectID:         raw.ProjectID,
+		Title:             raw.Title,
+		Author:            raw.Author.Username,
+		Project:           projectPathFromURL(raw.WebURL),
+		URL:               raw.WebURL,
+		HeadSHA:           raw.SHA,
+		CIStatus:          "",
+		UnmergeableReason: "",
+	}
+}
+
 // projectPathFromURL extracts GROUP/PROJECT from a merge request web URL, e.g.
 // https://gitlab.com/group/sub/project/-/merge_requests/12 -> group/sub/project.
 func projectPathFromURL(webURL string) string {
-	u, err := url.Parse(webURL)
+	parsed, err := url.Parse(webURL)
 	if err != nil {
 		return ""
 	}
-	path := strings.TrimPrefix(u.Path, "/")
-	if idx := strings.Index(path, "/-/merge_requests"); idx >= 0 {
-		return path[:idx]
+	path := strings.TrimPrefix(parsed.Path, "/")
+	if before, _, found := strings.Cut(path, "/-/merge_requests"); found {
+		return before
 	}
 	return path
-}
-
-type MRStatus struct {
-	// Pipeline is normalized to success, pending, failure, or empty (no pipeline).
-	Pipeline string
-	// UnmergeableReason names the blocker, or is empty when the MR is mergeable.
-	UnmergeableReason string
-}
-
-// GetMRStatus reads the head pipeline status and mergeability from one request.
-func (c *Client) GetMRStatus(ctx context.Context, projectID, iid int) (MRStatus, error) {
-	path := fmt.Sprintf("projects/%d/merge_requests/%d", projectID, iid)
-	out, err := c.runner.Run(ctx, "api", path)
-	if err != nil {
-		return MRStatus{}, err
-	}
-	return parseMRStatus(out)
 }
 
 func parseMRStatus(data []byte) (MRStatus, error) {
@@ -263,8 +288,8 @@ func unmergeableReason(hasConflicts bool, detailedMergeStatus string) string {
 
 func normalizePipelineStatus(status string) string {
 	switch status {
-	case "success", "skipped":
-		return "success"
+	case pipelineSuccess, "skipped":
+		return pipelineSuccess
 	case "failed", "canceled":
 		return "failure"
 	case "":

@@ -13,6 +13,9 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
+// tabPadding is the cell padding passed to tabwriter.
+const tabPadding = 2
+
 // UI renders to w. multiProject controls whether action messages are prefixed
 // with the project path (only meaningful when MRs span several projects).
 type UI struct {
@@ -32,7 +35,7 @@ func NewFromGroups(w io.Writer, groups map[string][]types.MR, jsonOut bool) *UI 
 }
 
 func newTabWriter(w io.Writer) *tabwriter.Writer {
-	return tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	return tabwriter.NewWriter(w, 0, 0, tabPadding, ' ', 0)
 }
 
 func (u *UI) DisplayList(mrs []types.MR) error {
@@ -43,12 +46,12 @@ func (u *UI) DisplayList(mrs []types.MR) error {
 		return nil
 	}
 
-	tw := newTabWriter(u.w)
-	fmt.Fprintln(tw, "PROJECT\tMR\tTITLE")
+	tabWriter := newTabWriter(u.w)
+	_, _ = fmt.Fprintln(tabWriter, "PROJECT\tMR\tTITLE")
 	for _, mr := range mrs {
-		fmt.Fprintf(tw, "%s\t!%d\t%s\n", mr.Project, mr.IID, mr.Title)
+		_, _ = fmt.Fprintf(tabWriter, "%s\t!%d\t%s\n", mr.Project, mr.IID, mr.Title)
 	}
-	return tw.Flush()
+	return flush(tabWriter)
 }
 
 // DisplayGroups sorts groups alphabetically and MRs within a group by project
@@ -59,13 +62,13 @@ func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 	}
 
 	keys := make([]string, 0, len(groups))
-	for k := range groups {
-		keys = append(keys, k)
+	for key := range groups {
+		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
-	tw := newTabWriter(u.w)
-	fmt.Fprintln(tw, "GROUP\tPROJECT\tMR\tURL")
+	tabWriter := newTabWriter(u.w)
+	_, _ = fmt.Fprintln(tabWriter, "GROUP\tPROJECT\tMR\tURL")
 	for _, key := range keys {
 		groupMRs := append([]types.MR(nil), groups[key]...)
 		sort.Slice(groupMRs, func(i, j int) bool {
@@ -75,16 +78,16 @@ func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 			return groupMRs[i].IID < groupMRs[j].IID
 		})
 
-		for i, mr := range groupMRs {
+		for i, groupMR := range groupMRs {
 			groupCell := ""
 			if i == 0 {
 				groupCell = key
 			}
-			parts := strings.Split(mr.Project, "/")
-			fmt.Fprintf(tw, "%s\t%s\t!%d\t%s\n", groupCell, parts[len(parts)-1], mr.IID, mr.URL)
+			parts := strings.Split(groupMR.Project, "/")
+			_, _ = fmt.Fprintf(tabWriter, "%s\t%s\t!%d\t%s\n", groupCell, parts[len(parts)-1], groupMR.IID, groupMR.URL)
 		}
 	}
-	return tw.Flush()
+	return flush(tabWriter)
 }
 
 // PrintAction prints a standardized action message for an MR, prefixed with the
@@ -94,11 +97,11 @@ func (u *UI) PrintAction(action string, mr types.MR, details ...string) {
 	if len(details) > 0 {
 		message += ": " + details[0]
 	}
-	fmt.Fprintf(u.w, "%s%s\n", u.prefix(mr), message)
+	_, _ = fmt.Fprintf(u.w, "%s%s\n", u.prefix(mr), message)
 }
 
 func (u *UI) PrintError(action string, mr types.MR, err error) {
-	fmt.Fprintf(u.w, "%sfailed to %s !%d: %v\n", u.prefix(mr), action, mr.IID, err)
+	_, _ = fmt.Fprintf(u.w, "%sfailed to %s !%d: %v\n", u.prefix(mr), action, mr.IID, err)
 }
 
 func (u *UI) prefix(mr types.MR) string {
@@ -113,8 +116,17 @@ func (u *UI) writeJSON(v any) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	_, err = fmt.Fprintln(u.w, string(data))
-	return err
+	if _, err := fmt.Fprintln(u.w, string(data)); err != nil {
+		return fmt.Errorf("failed to write JSON: %w", err)
+	}
+	return nil
+}
+
+func flush(tabWriter *tabwriter.Writer) error {
+	if err := tabWriter.Flush(); err != nil {
+		return fmt.Errorf("failed to flush table: %w", err)
+	}
+	return nil
 }
 
 func isMultiProject(mrs []types.MR) bool {

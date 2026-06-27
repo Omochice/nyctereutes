@@ -2,6 +2,7 @@ package nyctereutes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Omochice/nyctereutes/cli"
@@ -10,6 +11,11 @@ import (
 	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/internal/types"
 	"github.com/Omochice/nyctereutes/internal/ui"
+)
+
+var (
+	errInvalidMergeMethod = errors.New("invalid merge method")
+	errGroupNotFound      = errors.New("group not found")
 )
 
 // scopeFlags are the search-scope flags shared by list, approve and merge.
@@ -21,7 +27,7 @@ type scopeFlags struct {
 	Label     string  `long:"label" description:"MR label to filter"`
 	GroupPath *string `long:"group-path" description:"Target GitLab group/subgroup full path"`
 	Reviewer  string  `long:"reviewer" description:"Filter MRs by reviewer username"`
-	Limit     int     `long:"limit" default:"200" description:"Max MRs to fetch per author across the targeted scope"`
+	Limit     int     `long:"limit" default:"200" description:"Max MRs to fetch per author across the scope"`
 }
 
 func (s scopeFlags) resolve(ctx context.Context, runner glab.Runner) (gitlab.SearchParams, []string) {
@@ -57,50 +63,58 @@ func newDepCommand(inout *cli.ProcInout, runner glab.Runner) *depCommand {
 
 // Execute runs when "dep" is invoked with no subcommand. It is reserved for a
 // future TUI; for now it reports that it is not implemented.
-func (c *depCommand) Execute(args []string) error {
-	fmt.Fprintln(c.inout.Stderr, "not implemented")
+func (c *depCommand) Execute(_ []string) error {
+	_, _ = fmt.Fprintln(c.inout.Stderr, "not implemented")
 	return errNotImplemented
 }
 
 type depListCommand struct {
+	scopeFlags
+
 	inout  *cli.ProcInout
 	runner glab.Runner
 
-	scopeFlags
 	Group bool `long:"group" description:"Group MRs by package@version"`
 	JSON  bool `long:"json" description:"Output as JSON"`
 }
 
-func (c *depListCommand) Execute(args []string) error {
+func (c *depListCommand) Execute(_ []string) error {
 	ctx := context.Background()
 	params, patterns := c.resolve(ctx, c.runner)
 
 	mrs, err := gitlab.NewClient(c.runner).SearchMRs(ctx, params)
 	if err != nil {
-		return err
+		return fmt.Errorf("search MRs: %w", err)
 	}
 	if len(mrs) == 0 {
-		fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
+		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
 		return nil
 	}
 
 	if c.Group {
 		groups := gitlab.GroupMRs(mrs, patterns)
-		return ui.NewFromGroups(c.inout.Stdout, groups, c.JSON).DisplayGroups(groups)
+		if err := ui.NewFromGroups(c.inout.Stdout, groups, c.JSON).DisplayGroups(groups); err != nil {
+			return fmt.Errorf("display groups: %w", err)
+		}
+		return nil
 	}
-	return ui.New(c.inout.Stdout, mrs, c.JSON).DisplayList(mrs)
+	if err := ui.New(c.inout.Stdout, mrs, c.JSON).DisplayList(mrs); err != nil {
+		return fmt.Errorf("display list: %w", err)
+	}
+	return nil
 }
 
 type depApproveCommand struct {
+	scopeFlags
+
 	inout  *cli.ProcInout
 	runner glab.Runner
 
-	scopeFlags
 	Group  string `long:"group" required:"true" description:"Group key (package@version)"`
 	DryRun bool   `long:"dry-run" description:"Print actions without executing"`
 }
 
-func (c *depApproveCommand) Execute(args []string) error {
+func (c *depApproveCommand) Execute(_ []string) error {
 	ctx := context.Background()
 	mrs, err := selectGroup(ctx, c.runner, c.scopeFlags, c.Group)
 	if err != nil {
@@ -108,29 +122,30 @@ func (c *depApproveCommand) Execute(args []string) error {
 	}
 
 	client := gitlab.NewClient(c.runner)
-	u := ui.New(c.inout.Stdout, mrs, false)
-	applyAction(u, mrs, c.DryRun, "approve", func(mr types.MR) error {
+	view := ui.New(c.inout.Stdout, mrs, false)
+	applyAction(view, mrs, c.DryRun, "approve", func(mr types.MR) error {
 		return client.ApproveMR(ctx, mr.Project, mr.IID)
 	})
 	return nil
 }
 
 type depMergeCommand struct {
+	scopeFlags
+
 	inout  *cli.ProcInout
 	runner glab.Runner
 
-	scopeFlags
 	Group  string `long:"group" required:"true" description:"Group key (package@version)"`
 	DryRun bool   `long:"dry-run" description:"Print actions without executing"`
 	Method string `long:"method" default:"squash" description:"Merge method: merge, squash, or rebase"`
 	// RequireChecks is a pointer because go-flags bool flags cannot default to
 	// true; nil means unset, which this command treats as enabled.
-	RequireChecks *bool `long:"require-checks" description:"Merge only when the pipeline succeeds (GitLab auto-merge); defaults to true, disable with --require-checks=false"`
+	RequireChecks *bool `long:"require-checks" description:"Auto-merge when the pipeline succeeds (default true)"`
 }
 
-func (c *depMergeCommand) Execute(args []string) error {
+func (c *depMergeCommand) Execute(_ []string) error {
 	if c.Method != "merge" && c.Method != "squash" && c.Method != "rebase" {
-		return fmt.Errorf("invalid merge method: %s (must be 'merge', 'squash', or 'rebase')", c.Method)
+		return fmt.Errorf("%w %q (must be 'merge', 'squash', or 'rebase')", errInvalidMergeMethod, c.Method)
 	}
 
 	requireChecks := c.RequireChecks == nil || *c.RequireChecks
@@ -149,8 +164,8 @@ func (c *depMergeCommand) Execute(args []string) error {
 	}
 
 	client := gitlab.NewClient(c.runner)
-	u := ui.New(c.inout.Stdout, mrs, false)
-	applyAction(u, mrs, c.DryRun, "merge", func(mr types.MR) error {
+	view := ui.New(c.inout.Stdout, mrs, false)
+	applyAction(view, mrs, c.DryRun, "merge", func(mr types.MR) error {
 		return client.MergeMR(ctx, mr.Project, mr.IID, c.Method, requireChecks)
 	}, successDetails...)
 	return nil
@@ -158,17 +173,24 @@ func (c *depMergeCommand) Execute(args []string) error {
 
 // applyAction runs action against each MR, printing a consistent dry-run,
 // success, or per-MR error line and continuing past individual failures.
-func applyAction(u *ui.UI, mrs []types.MR, dryRun bool, verb string, action func(types.MR) error, successDetails ...string) {
-	for _, mr := range mrs {
+func applyAction(
+	view *ui.UI,
+	mrs []types.MR,
+	dryRun bool,
+	verb string,
+	action func(types.MR) error,
+	successDetails ...string,
+) {
+	for _, mergeRequest := range mrs {
 		if dryRun {
-			u.PrintAction("[dry-run] "+verb, mr)
+			view.PrintAction("[dry-run] "+verb, mergeRequest)
 			continue
 		}
-		if err := action(mr); err != nil {
-			u.PrintError(verb, mr, err)
+		if err := action(mergeRequest); err != nil {
+			view.PrintError(verb, mergeRequest, err)
 			continue
 		}
-		u.PrintAction(verb, mr, successDetails...)
+		view.PrintAction(verb, mergeRequest, successDetails...)
 	}
 }
 
@@ -179,12 +201,12 @@ func selectGroup(ctx context.Context, runner glab.Runner, scope scopeFlags, key 
 	params, patterns := scope.resolve(ctx, runner)
 	mrs, err := gitlab.NewClient(runner).SearchMRs(ctx, params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("search MRs: %w", err)
 	}
 	groups := gitlab.GroupMRs(mrs, patterns)
 	selected, ok := groups[key]
 	if !ok {
-		return nil, fmt.Errorf("group %q not found", key)
+		return nil, fmt.Errorf("%w: %q", errGroupNotFound, key)
 	}
 	return selected, nil
 }
