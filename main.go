@@ -1,4 +1,3 @@
-// Command nyctereutes is the entry point that dispatches the CLI subcommands.
 package main
 
 import (

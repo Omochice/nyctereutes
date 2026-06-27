@@ -1,5 +1,5 @@
-// Package cli provides the minimal plumbing shared by every nyctereutes
-// command: injectable process streams and the entry-point runner.
+// Minimal plumbing shared by every nyctereutes command: injectable process
+// streams and the entry-point runner.
 package cli
 
 import (

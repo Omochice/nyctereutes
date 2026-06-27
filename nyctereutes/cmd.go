@@ -1,4 +1,4 @@
-// Package nyctereutes wires the command-line subcommands onto the cli plumbing.
+// Wires the command-line subcommands onto the cli plumbing.
 package nyctereutes
 
 import (
