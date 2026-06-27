@@ -22,14 +22,11 @@ var patterns = []*regexp.Regexp{
 
 // ParseTitle extracts the package and target version from a merge request title.
 // Custom patterns are tried before the built-in ones, so a project can override
-// parsing for its own title conventions. When nothing matches, both fields are
-// "unknown".
-func ParseTitle(title string, customPatterns []string) PackageUpdate {
-	for _, p := range customPatterns {
-		re, err := regexp.Compile(p)
-		if err != nil {
-			continue
-		}
+// parsing for its own title conventions; callers pass them pre-compiled so the
+// regexps are built once rather than per title. When nothing matches, both
+// fields are "unknown".
+func ParseTitle(title string, customPatterns []*regexp.Regexp) PackageUpdate {
+	for _, re := range customPatterns {
 		if u, ok := match(re, title); ok {
 			return u
 		}

@@ -1,6 +1,9 @@
 package parser
 
-import "testing"
+import (
+	"regexp"
+	"testing"
+)
 
 func TestParseTitle(t *testing.T) {
 	tests := []struct {
@@ -43,7 +46,7 @@ func TestParseTitle(t *testing.T) {
 func TestParseTitleCustomPatternsTakePrecedence(t *testing.T) {
 	// A custom pattern matches a title that the default patterns would parse
 	// differently, proving custom patterns are tried first.
-	custom := []string{`(?i)renovate:\s+(\S+)\s+->\s+(\S+)`}
+	custom := []*regexp.Regexp{regexp.MustCompile(`(?i)renovate:\s+(\S+)\s+->\s+(\S+)`)}
 	got := ParseTitle("renovate: my-pkg -> 2.0.0", custom).GroupKey()
 	if want := "my-pkg@2.0.0"; got != want {
 		t.Errorf("ParseTitle with custom pattern = %q, want %q", got, want)
