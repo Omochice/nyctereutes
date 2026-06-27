@@ -8,7 +8,7 @@ import (
 	"github.com/Omochice/nyctereutes/cli"
 )
 
-func run(args []string) (exit int, stdout, stderr string) {
+func run(args []string) (exit int, stderr string) {
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 	exit = MainCommand(args, &cli.ProcInout{
@@ -16,11 +16,11 @@ func run(args []string) (exit int, stdout, stderr string) {
 		Stdout: outBuf,
 		Stderr: errBuf,
 	})
-	return exit, outBuf.String(), errBuf.String()
+	return exit, errBuf.String()
 }
 
 func TestDepIsNotImplemented(t *testing.T) {
-	exit, _, stderr := run([]string{"dep"})
+	exit, stderr := run([]string{"dep"})
 
 	if exit != 1 {
 		t.Errorf("want exit status 1, got %d", exit)
@@ -31,7 +31,7 @@ func TestDepIsNotImplemented(t *testing.T) {
 }
 
 func TestInfraIsNotImplemented(t *testing.T) {
-	exit, _, stderr := run([]string{"infra"})
+	exit, stderr := run([]string{"infra"})
 
 	if exit != 1 {
 		t.Errorf("want exit status 1, got %d", exit)
@@ -42,7 +42,7 @@ func TestInfraIsNotImplemented(t *testing.T) {
 }
 
 func TestHelpIsNotImplemented(t *testing.T) {
-	exit, _, stderr := run([]string{"help"})
+	exit, stderr := run([]string{"help"})
 
 	if exit != 1 {
 		t.Errorf("want exit status 1, got %d", exit)
@@ -53,7 +53,7 @@ func TestHelpIsNotImplemented(t *testing.T) {
 }
 
 func TestNoSubcommandReportsError(t *testing.T) {
-	exit, _, stderr := run([]string{})
+	exit, stderr := run([]string{})
 
 	if exit != 1 {
 		t.Errorf("want exit status 1, got %d", exit)
@@ -64,7 +64,7 @@ func TestNoSubcommandReportsError(t *testing.T) {
 }
 
 func TestUnknownSubcommandReportsError(t *testing.T) {
-	exit, _, stderr := run([]string{"nope"})
+	exit, stderr := run([]string{"nope"})
 
 	if exit != 1 {
 		t.Errorf("want exit status 1, got %d", exit)

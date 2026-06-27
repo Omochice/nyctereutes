@@ -36,6 +36,28 @@
             nur-packages.overlays.default
           ];
         };
+        golangciConfig = (pkgs.formats.yaml { }).generate "golangci.yaml" {
+          version = "2";
+          linters = {
+            default = "all";
+            disable = [
+              # keep-sorted start
+              "depguard" # requires an explicit import policy to be useful
+              "godoclint" # forces godoc comments to restate the symbol name
+              "gomodguard" # deprecated in v2.12, superseded by gomodguard_v2
+              "nlreturn" # blank-line-before-return style, overlaps wsl
+              "noinlineerr" # forbids the idiomatic inline error check
+              "nonamedreturns" # named returns are used deliberately in tests
+              "paralleltest" # t.Parallel() adds little to this small suite
+              "revive" # forces restating doc comments on every export
+              "tagalign" # struct-tag alignment belongs to formatting
+              "testpackage" # white-box tests are intentional here
+              "wsl" # opinionated whitespace/cuddling rules
+              "wsl_v5" # successor of wsl, same opinionated whitespace rules
+              # keep-sorted end
+            ];
+          };
+        };
         treefmt = treefmt-nix.lib.evalModule pkgs (
           { ... }:
           let
@@ -63,6 +85,8 @@
             ];
             programs = {
               # keep-sorted start block=yes
+              gofumpt.enable = true;
+              goimports.enable = true;
               keep-sorted.enable = true;
               nixfmt.enable = true;
               rumdl-format.enable = true;
@@ -86,6 +110,29 @@
           src = self;
           vendorHash = "sha256-W6XVd68MS0ungMgam8jefYMVhyiN6/DB+bliFzs2rdk=";
         };
+        # Run golangci-lint by reusing buildGoModule's module fetching so the
+        # dependency type information is available inside the sealed
+        # `nix flake check` sandbox, where the git-hooks runner cannot reach
+        # the network.
+        golangci-lint-check = nyctereutes.overrideAttrs (previousAttrs: {
+          pname = "${previousAttrs.pname}-golangci-lint";
+          nativeBuildInputs = (previousAttrs.nativeBuildInputs or [ ]) ++ [
+            pkgs.golangci-lint
+          ];
+          doCheck = false;
+          buildPhase = ''
+            runHook preBuild
+            export HOME="$TMPDIR"
+            export GOLANGCI_LINT_CACHE="$TMPDIR/golangci-lint-cache"
+            golangci-lint run --config ${golangciConfig} ./...
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            touch "$out"
+            runHook postInstall
+          '';
+        });
         gitHooks = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -123,10 +170,12 @@
         # keep-sorted start block=yes
         checks = {
           git-hooks = gitHooks;
+          golangci-lint = golangci-lint-check;
           inherit nyctereutes;
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
+            pkgs.golangci-lint
             treefmt.config.build.wrapper
           ];
           inherit (gitHooks) shellHook;
