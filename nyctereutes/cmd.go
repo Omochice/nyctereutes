@@ -13,46 +13,30 @@ import (
 // errNotImplemented marks a subcommand whose real behavior is still a stub.
 var errNotImplemented = errors.New("not implemented")
 
-type depCommand struct {
+// stubCommand is a subcommand whose real behavior is not implemented yet. Every
+// skeleton subcommand shares this single concept until it gains its own logic.
+type stubCommand struct {
 	inout *cli.ProcInout
 }
 
-func (c *depCommand) Execute(args []string) error {
-	fmt.Fprintln(c.inout.Stderr, "not implemented")
-	return errNotImplemented
-}
-
-type infraCommand struct {
-	inout *cli.ProcInout
-}
-
-func (c *infraCommand) Execute(args []string) error {
-	fmt.Fprintln(c.inout.Stderr, "not implemented")
-	return errNotImplemented
-}
-
-type helpCommand struct {
-	inout *cli.ProcInout
-}
-
-func (c *helpCommand) Execute(args []string) error {
+func (c *stubCommand) Execute(args []string) error {
 	fmt.Fprintln(c.inout.Stderr, "not implemented")
 	return errNotImplemented
 }
 
 type options struct {
-	Dep   *depCommand   `command:"dep" description:"manage dependencies"`
-	Infra *infraCommand `command:"infra" description:"manage infrastructure"`
-	Help  *helpCommand  `command:"help" description:"show help"`
+	Dep   *stubCommand `command:"dep" description:"manage dependencies"`
+	Infra *stubCommand `command:"infra" description:"manage infrastructure"`
+	Help  *stubCommand `command:"help" description:"show help"`
 }
 
 // MainCommand parses args, dispatches to the requested subcommand, and reports
 // the process exit status.
 func MainCommand(args []string, inout *cli.ProcInout) int {
 	opts := &options{
-		Dep:   &depCommand{inout: inout},
-		Infra: &infraCommand{inout: inout},
-		Help:  &helpCommand{inout: inout},
+		Dep:   &stubCommand{inout: inout},
+		Infra: &stubCommand{inout: inout},
+		Help:  &stubCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash)
 	parser.Name = "nyctereutes"
