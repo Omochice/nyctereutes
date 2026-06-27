@@ -21,7 +21,7 @@ type scopeFlags struct {
 	Label     string  `long:"label" description:"MR label to filter"`
 	GroupPath *string `long:"group-path" description:"Target GitLab group/subgroup full path"`
 	Reviewer  string  `long:"reviewer" description:"Filter MRs by reviewer username"`
-	Limit     int     `long:"limit" default:"200" description:"Max MRs to fetch per project"`
+	Limit     int     `long:"limit" default:"200" description:"Max MRs to fetch per author across the targeted scope"`
 }
 
 func (s scopeFlags) resolve(ctx context.Context, runner glab.Runner) (gitlab.SearchParams, []string) {
