@@ -27,7 +27,6 @@ func New(w io.Writer, mrs []types.MR, jsonOut bool) *UI {
 	return &UI{w: w, multiProject: isMultiProject(mrs), json: jsonOut}
 }
 
-// NewFromGroups builds a UI for grouped MRs.
 func NewFromGroups(w io.Writer, groups map[string][]types.MR, jsonOut bool) *UI {
 	return &UI{w: w, multiProject: isMultiProjectGroups(groups), json: jsonOut}
 }
@@ -36,7 +35,6 @@ func newTabWriter(w io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 }
 
-// DisplayList prints MRs as a flat PROJECT/MR/TITLE table, or as JSON.
 func (u *UI) DisplayList(mrs []types.MR) error {
 	if u.json {
 		return u.writeJSON(mrs)
@@ -53,8 +51,8 @@ func (u *UI) DisplayList(mrs []types.MR) error {
 	return tw.Flush()
 }
 
-// DisplayGroups prints MRs grouped by package@version, groups in alphabetical
-// order and MRs within a group sorted by project then IID, or as JSON.
+// DisplayGroups sorts groups alphabetically and MRs within a group by project
+// then IID, so output is stable across runs.
 func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 	if u.json {
 		return u.writeJSON(groups)
@@ -99,7 +97,6 @@ func (u *UI) PrintAction(action string, mr types.MR, details ...string) {
 	fmt.Fprintf(u.w, "%s%s\n", u.prefix(mr), message)
 }
 
-// PrintError prints a standardized failure message for an MR action.
 func (u *UI) PrintError(action string, mr types.MR, err error) {
 	fmt.Fprintf(u.w, "%sfailed to %s !%d: %v\n", u.prefix(mr), action, mr.IID, err)
 }

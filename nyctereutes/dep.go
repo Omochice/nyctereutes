@@ -24,8 +24,6 @@ type scopeFlags struct {
 	Limit     int     `long:"limit" default:"200" description:"Max MRs to fetch per project"`
 }
 
-// resolve turns the flags and glab config into search parameters and the custom
-// title patterns used for grouping.
 func (s scopeFlags) resolve(ctx context.Context, runner glab.Runner) (gitlab.SearchParams, []string) {
 	cfg, _ := config.Load(ctx, runner)
 	group, repos := gitlab.ResolveScope(s.Repo, s.GroupPath, cfg.Repos)

@@ -17,7 +17,6 @@ type Config struct {
 	Author   string   // dep.author (default dependency bot username)
 }
 
-// Load reads dep.repo, dep.patterns and dep.author through the given Runner.
 func Load(ctx context.Context, runner glab.Runner) (*Config, error) {
 	return &Config{
 		Repos:    splitList(get(ctx, runner, "dep.repo")),

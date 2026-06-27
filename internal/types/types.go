@@ -16,7 +16,7 @@ type MR struct {
 	Author    string `json:"author"`
 	Project   string `json:"project"` // GROUP/PROJECT full path
 	URL       string `json:"url"`
-	HeadSHA   string `json:"-"`         // head commit SHA
+	HeadSHA   string `json:"-"`
 	CIStatus  string `json:"ci_status"` // success, pending, failure, or empty
 	// UnmergeableReason is empty when the MR is mergeable; otherwise it names
 	// the structural blocker (for example a conflict).

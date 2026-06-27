@@ -35,7 +35,6 @@ func ResolveScope(repo *string, groupPath *string, cfgRepos []string) (group str
 	return group, repos
 }
 
-// cleanList splits a comma-separated value, trimming blanks.
 func cleanList(value string) []string {
 	var items []string
 	for _, part := range strings.Split(value, ",") {

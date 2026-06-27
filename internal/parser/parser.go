@@ -4,7 +4,6 @@ package parser
 
 import "regexp"
 
-// PackageUpdate is the dependency name and target version parsed from a title.
 type PackageUpdate struct {
 	Package   string
 	ToVersion string

@@ -15,27 +15,25 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
-// Client talks to GitLab through the glab CLI.
 type Client struct {
 	runner glab.Runner
 }
 
-// NewClient returns a Client backed by the given Runner.
 func NewClient(runner glab.Runner) *Client {
 	return &Client{runner: runner}
 }
 
 // SearchParams describes the filters used to find dependency merge requests.
 type SearchParams struct {
-	Group    string   // GitLab group/subgroup full path; empty means all accessible projects
-	Repos    []string // explicit project paths (GROUP/PROJECT); takes precedence over Group
+	Group    string   // empty means all accessible projects
+	Repos    []string // explicit project paths; take precedence over Group
 	Label    string
 	Authors  []string
 	Limit    int
 	Reviewer string
 }
 
-// rawMR mirrors the subset of the GitLab merge request API we consume.
+// rawMR is the subset of the GitLab merge request API we consume.
 type rawMR struct {
 	IID       int    `json:"iid"`
 	ProjectID int    `json:"project_id"`
@@ -47,10 +45,9 @@ type rawMR struct {
 	SHA    string `json:"sha"`
 }
 
-// SearchMRs finds open merge requests matching params. When multiple authors are
-// given it runs one search per author and merges the results, deduplicating by
-// project!IID. Each MR's pipeline and mergeability status is then fetched
-// concurrently.
+// SearchMRs finds open merge requests matching params. Multiple authors are
+// searched one at a time and merged, deduplicating by project!IID; each MR's
+// pipeline and mergeability status is then fetched concurrently.
 func (c *Client) SearchMRs(ctx context.Context, params SearchParams) ([]types.MR, error) {
 	authors := params.Authors
 	if len(authors) == 0 {
@@ -77,9 +74,8 @@ func (c *Client) SearchMRs(ctx context.Context, params SearchParams) ([]types.MR
 	return allMRs, nil
 }
 
-// fillStatuses fetches each MR's pipeline and mergeability state concurrently
-// with a bounded worker pool. Status fetch failures leave the MR's status
-// fields at their zero values rather than aborting the whole search.
+// fillStatuses populates each MR's status concurrently. A failed status fetch
+// leaves the MR's status fields zero rather than aborting the whole search.
 func (c *Client) fillStatuses(ctx context.Context, mrs []types.MR) {
 	const maxWorkers = 10
 	var wg sync.WaitGroup
@@ -102,8 +98,8 @@ func (c *Client) fillStatuses(ctx context.Context, mrs []types.MR) {
 	wg.Wait()
 }
 
-// scopeEndpoints returns the API endpoints to query for the given scope.
-// Explicit repos win over a group; with neither, all accessible MRs are queried.
+// scopeEndpoints returns the API endpoints for the scope: explicit repos win
+// over a group, and with neither, all accessible MRs are queried.
 func scopeEndpoints(params SearchParams) []string {
 	if len(params.Repos) > 0 {
 		endpoints := make([]string, 0, len(params.Repos))
@@ -139,9 +135,8 @@ func (c *Client) searchMRsForAuthor(ctx context.Context, params SearchParams, au
 	return mrs, nil
 }
 
-// fetchMRs pages through a single endpoint until limit is reached or the results
-// are exhausted. Pagination is done manually (rather than glab's --paginate) so
-// each response is a single JSON array we can decode.
+// fetchMRs pages through a single endpoint. Pagination is done by hand (rather
+// than glab's --paginate) so each response is one JSON array we can decode.
 func (c *Client) fetchMRs(ctx context.Context, endpoint string, params SearchParams, author string, limit int) ([]types.MR, error) {
 	const perPage = 100
 
@@ -214,19 +209,14 @@ func projectPathFromURL(webURL string) string {
 	return path
 }
 
-// MRStatus carries the mergeability signals read from a merge request's detail
-// endpoint in a single request.
 type MRStatus struct {
-	// Pipeline is the head pipeline status, normalized to success, pending,
-	// failure, or empty when there is no pipeline.
+	// Pipeline is normalized to success, pending, failure, or empty (no pipeline).
 	Pipeline string
-	// UnmergeableReason names why the MR cannot currently be merged, or is empty
-	// when the MR is mergeable.
+	// UnmergeableReason names the blocker, or is empty when the MR is mergeable.
 	UnmergeableReason string
 }
 
-// GetMRStatus returns the mergeability status of a merge request, reading both
-// the head pipeline status and the mergeability state from one detail request.
+// GetMRStatus reads the head pipeline status and mergeability from one request.
 func (c *Client) GetMRStatus(ctx context.Context, projectID, iid int) (MRStatus, error) {
 	path := fmt.Sprintf("projects/%d/merge_requests/%d", projectID, iid)
 	out, err := c.runner.Run(ctx, "api", path)
@@ -253,10 +243,9 @@ func parseMRStatus(data []byte) (MRStatus, error) {
 	}, nil
 }
 
-// unmergeableReason reports why the MR cannot be merged, or "" when it can. Only
-// structural blockers count here (CI and approval state are gated elsewhere): a
-// conflict, or "need_rebase", which on fast-forward projects means the branch
-// trails its target.
+// unmergeableReason reports only structural blockers; CI and approval state are
+// gated elsewhere. need_rebase means the branch trails its target on a
+// fast-forward project.
 func unmergeableReason(hasConflicts bool, detailedMergeStatus string) string {
 	switch {
 	case hasConflicts || detailedMergeStatus == "conflict":
@@ -267,8 +256,6 @@ func unmergeableReason(hasConflicts bool, detailedMergeStatus string) string {
 	return ""
 }
 
-// normalizePipelineStatus maps GitLab pipeline statuses onto the three states
-// the UI renders. An empty input (no pipeline) stays empty.
 func normalizePipelineStatus(status string) string {
 	switch status {
 	case "success", "skipped":
