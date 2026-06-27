@@ -12,6 +12,10 @@
       url = "github:Omochice/nur-packages";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -21,6 +25,7 @@
       treefmt-nix,
       flake-utils,
       nur-packages,
+      git-hooks,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -75,60 +80,50 @@
             };
           }
         );
-        devPackages = rec {
-          # keep-sorted start block=yes
-          actions = with pkgs; [
-            actionlint
-            ghalint
-            zizmor
-          ];
-          # keep-sorted end
-          default = [
-            treefmt.config.build.wrapper
-          ]
-          ++ actions;
+        gitHooks = git-hooks.lib.${system}.run {
+          src = self;
+          hooks = {
+            # keep-sorted start block=yes
+            actionlint.enable = true;
+            ghalint = {
+              enable = true;
+              name = "ghalint";
+              entry = "${pkgs.ghalint}/bin/ghalint run";
+              files = "^\\.github/workflows/.*$";
+              pass_filenames = false;
+            };
+            renovate-config-validator = {
+              enable = true;
+              name = "renovate-config-validator";
+              entry = "${pkgs.renovate}/bin/renovate-config-validator --strict";
+              files = "^renovate\\.json5$";
+            };
+            treefmt = {
+              enable = true;
+              packageOverrides.treefmt = treefmt.config.build.wrapper;
+            };
+            zizmor = {
+              enable = true;
+              name = "zizmor";
+              entry = "${pkgs.zizmor}/bin/zizmor .github/workflows .github/actions";
+              files = "^\\.github/(workflows|actions)/.*$";
+              pass_filenames = false;
+            };
+            # keep-sorted end
+          };
         };
       in
       {
         # keep-sorted start block=yes
         checks = {
-          # keep-sorted start
-          actions =
-            pkgs.runCommand "check-actions"
-              {
-                buildInputs = with pkgs; [
-                  actionlint
-                  ghalint
-                  zizmor
-                ];
-                src = self;
-              }
-              ''
-                cd $src
-                actionlint .github/**/*.{yaml,yml}
-                ghalint run
-                zizmor .github/workflows .github/actions
-                touch $out
-              '';
-          formatting = treefmt.config.build.check self;
-          renovate =
-            pkgs.runCommand "validate-renovate-config"
-              {
-                buildInputs = with pkgs; [
-                  renovate
-                ];
-                src = self;
-              }
-              ''
-                cd $src
-                renovate-config-validator --strict renovate.json5
-                touch $out
-              '';
-          # keep-sorted end
+          git-hooks = gitHooks;
         };
-        devShells = pkgs.lib.pipe devPackages [
-          (pkgs.lib.attrsets.mapAttrs (name: buildInputs: pkgs.mkShell { inherit buildInputs; }))
-        ];
+        devShells.default = pkgs.mkShell {
+          buildInputs = gitHooks.enabledPackages ++ [
+            treefmt.config.build.wrapper
+          ];
+          inherit (gitHooks) shellHook;
+        };
         formatter = treefmt.config.build.wrapper;
         # keep-sorted end
       }
