@@ -28,8 +28,6 @@ type options struct {
 	Help  *stubCommand `command:"help" description:"show help"`
 }
 
-// MainCommand parses args, dispatches the matched subcommand, and returns the
-// process exit code.
 func MainCommand(args []string, inout *cli.ProcInout) int {
 	opts := &options{
 		Dep:   &stubCommand{inout: inout},
