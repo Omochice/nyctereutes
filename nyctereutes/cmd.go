@@ -1,4 +1,4 @@
-// Package nyctereutes wires the command-line subcommands onto the cli plumbing.
+// Wires the command-line subcommands onto the cli plumbing.
 package nyctereutes
 
 import (
@@ -10,11 +10,9 @@ import (
 	"github.com/Omochice/nyctereutes/cli"
 )
 
-// errNotImplemented marks a subcommand whose real behavior is still a stub.
 var errNotImplemented = errors.New("not implemented")
 
-// stubCommand is a subcommand whose real behavior is not implemented yet. Every
-// skeleton subcommand shares this single concept until it gains its own logic.
+// Shared stand-in for every subcommand not yet implemented.
 type stubCommand struct {
 	inout *cli.ProcInout
 }
@@ -30,8 +28,6 @@ type options struct {
 	Help  *stubCommand `command:"help" description:"show help"`
 }
 
-// MainCommand parses args, dispatches to the requested subcommand, and reports
-// the process exit status.
 func MainCommand(args []string, inout *cli.ProcInout) int {
 	opts := &options{
 		Dep:   &stubCommand{inout: inout},
