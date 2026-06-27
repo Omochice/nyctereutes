@@ -109,17 +109,9 @@ func (c *depApproveCommand) Execute(args []string) error {
 
 	client := gitlab.NewClient(c.runner)
 	u := ui.New(c.inout.Stdout, mrs, false)
-	for _, mr := range mrs {
-		if c.DryRun {
-			u.PrintAction("approve", mr)
-			continue
-		}
-		if err := client.ApproveMR(ctx, mr.Project, mr.IID); err != nil {
-			u.PrintError("approve", mr, err)
-			continue
-		}
-		u.PrintAction("approve", mr)
-	}
+	applyAction(u, mrs, c.DryRun, "approve", func(mr types.MR) error {
+		return client.ApproveMR(ctx, mr.Project, mr.IID)
+	})
 	return nil
 }
 
@@ -149,26 +141,35 @@ func (c *depMergeCommand) Execute(args []string) error {
 		return err
 	}
 
+	// With --require-checks, GitLab merges each MR once its pipeline succeeds
+	// (native auto-merge) rather than this tool gating it.
+	var successDetails []string
+	if requireChecks {
+		successDetails = []string{"auto-merge when pipeline succeeds"}
+	}
+
 	client := gitlab.NewClient(c.runner)
 	u := ui.New(c.inout.Stdout, mrs, false)
-	for _, mr := range mrs {
-		if c.DryRun {
-			u.PrintAction("[dry-run] merge", mr)
-			continue
-		}
-		// With --require-checks, GitLab merges the MR once its pipeline succeeds
-		// (native auto-merge) rather than this tool gating it.
-		if err := client.MergeMR(ctx, mr.Project, mr.IID, c.Method, requireChecks); err != nil {
-			u.PrintError("merge", mr, err)
-			continue
-		}
-		if requireChecks {
-			u.PrintAction("merge", mr, "auto-merge when pipeline succeeds")
-		} else {
-			u.PrintAction("merge", mr)
-		}
-	}
+	applyAction(u, mrs, c.DryRun, "merge", func(mr types.MR) error {
+		return client.MergeMR(ctx, mr.Project, mr.IID, c.Method, requireChecks)
+	}, successDetails...)
 	return nil
+}
+
+// applyAction runs action against each MR, printing a consistent dry-run,
+// success, or per-MR error line and continuing past individual failures.
+func applyAction(u *ui.UI, mrs []types.MR, dryRun bool, verb string, action func(types.MR) error, successDetails ...string) {
+	for _, mr := range mrs {
+		if dryRun {
+			u.PrintAction("[dry-run] "+verb, mr)
+			continue
+		}
+		if err := action(mr); err != nil {
+			u.PrintError(verb, mr, err)
+			continue
+		}
+		u.PrintAction(verb, mr, successDetails...)
+	}
 }
 
 // selectGroup searches for MRs in the given scope, groups them by
