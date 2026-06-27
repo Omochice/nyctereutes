@@ -88,14 +88,14 @@
             ghalint = {
               enable = true;
               name = "ghalint";
-              entry = "${pkgs.ghalint}/bin/ghalint run";
+              entry = "${pkgs.lib.getExe pkgs.ghalint} run";
               files = "^\\.github/workflows/.*$";
               pass_filenames = false;
             };
             renovate-config-validator = {
               enable = true;
               name = "renovate-config-validator";
-              entry = "${pkgs.renovate}/bin/renovate-config-validator --strict";
+              entry = "${pkgs.lib.getExe' pkgs.renovate "renovate-config-validator"} --strict";
               files = "^renovate\\.json5$";
             };
             treefmt = {
@@ -105,7 +105,7 @@
             zizmor = {
               enable = true;
               name = "zizmor";
-              entry = "${pkgs.zizmor}/bin/zizmor .github/workflows .github/actions";
+              entry = "${pkgs.lib.getExe pkgs.zizmor} .github/workflows .github/actions";
               files = "^\\.github/(workflows|actions)/.*$";
               pass_filenames = false;
             };
