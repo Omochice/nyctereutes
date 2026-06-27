@@ -119,7 +119,7 @@
           git-hooks = gitHooks;
         };
         devShells.default = pkgs.mkShell {
-          buildInputs = [
+          buildInputs = gitHooks.enabledPackages ++ [
             treefmt.config.build.wrapper
           ];
           inherit (gitHooks) shellHook;
