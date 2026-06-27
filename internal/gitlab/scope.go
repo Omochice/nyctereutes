@@ -1,6 +1,6 @@
 package gitlab
 
-import "strings"
+import "github.com/Omochice/nyctereutes/internal/strutil"
 
 // DefaultAuthor is the GitLab username searched for when neither the --author
 // flag nor dep.author is set. Renovate is the de facto dependency bot on GitLab.
@@ -25,7 +25,7 @@ func ResolveAuthors(author *string, cfgAuthor string) []string {
 // projects.
 func ResolveScope(repo *string, groupPath *string, cfgRepos []string) (group string, repos []string) {
 	if repo != nil {
-		repos = cleanList(*repo)
+		repos = strutil.SplitList(*repo)
 	} else {
 		repos = cfgRepos
 	}
@@ -33,14 +33,4 @@ func ResolveScope(repo *string, groupPath *string, cfgRepos []string) (group str
 		group = *groupPath
 	}
 	return group, repos
-}
-
-func cleanList(value string) []string {
-	var items []string
-	for _, part := range strings.Split(value, ",") {
-		if part = strings.TrimSpace(part); part != "" {
-			items = append(items, part)
-		}
-	}
-	return items
 }

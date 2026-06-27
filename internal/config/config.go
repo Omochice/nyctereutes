@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/strutil"
 )
 
 // Config holds the dep.* values read from glab config.
@@ -19,8 +20,8 @@ type Config struct {
 
 func Load(ctx context.Context, runner glab.Runner) (*Config, error) {
 	return &Config{
-		Repos:    splitList(get(ctx, runner, "dep.repo")),
-		Patterns: splitList(get(ctx, runner, "dep.patterns")),
+		Repos:    strutil.SplitList(get(ctx, runner, "dep.repo")),
+		Patterns: strutil.SplitList(get(ctx, runner, "dep.patterns")),
 		Author:   strings.TrimSpace(get(ctx, runner, "dep.author")),
 	}, nil
 }
@@ -33,14 +34,4 @@ func get(ctx context.Context, runner glab.Runner, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
-}
-
-func splitList(value string) []string {
-	var items []string
-	for _, part := range strings.Split(value, ",") {
-		if part = strings.TrimSpace(part); part != "" {
-			items = append(items, part)
-		}
-	}
-	return items
 }
