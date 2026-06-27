@@ -24,7 +24,7 @@ func (c *stubCommand) Execute(_ []string) error {
 }
 
 type options struct {
-	Dep   *stubCommand `command:"dep" description:"manage dependencies"`
+	Dep   *depCommand  `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
 	Infra *stubCommand `command:"infra" description:"manage infrastructure"`
 	Help  *stubCommand `command:"help" description:"show help"`
 }
@@ -37,10 +37,8 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 // dispatch parses args and runs the selected subcommand. The runner is injected
 // so tests can drive the commands with a fake glab instead of the real CLI.
 func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
-	_ = runner // wired into the subcommands in a later change
-
 	opts := &options{
-		Dep:   &stubCommand{inout: inout},
+		Dep:   newDepCommand(inout, runner),
 		Infra: &stubCommand{inout: inout},
 		Help:  &stubCommand{inout: inout},
 	}
