@@ -242,6 +242,20 @@ func TestDepMergeImmediate(t *testing.T) {
 	}
 }
 
+func TestDepMergeContinuesOnError(t *testing.T) {
+	f := &fakeGlab{listJSON: twoMRsSameGroup, detailJSON: `{}`, mergeErr: errors.New("409 Conflict")}
+	exit, stdout, _ := runDep(f, "dep", "merge", "--group", "lodash@2.0.0")
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	if len(f.merged) != 2 {
+		t.Errorf("want both MRs attempted, got %d", len(f.merged))
+	}
+	if !strings.Contains(stdout, "failed to merge") {
+		t.Errorf("want failure reported, got %q", stdout)
+	}
+}
+
 func TestDepMergeDryRun(t *testing.T) {
 	f := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
 	exit, stdout, _ := runDep(f, "dep", "merge", "--group", "lodash@2.0.0", "--dry-run")
