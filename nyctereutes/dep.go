@@ -130,8 +130,8 @@ type depMergeCommand struct {
 	runner glab.Runner
 
 	scopeFlags
-	Group         string `long:"group" required:"true" description:"Group key (package@version)"`
-	DryRun        bool   `long:"dry-run" description:"Print actions without executing"`
+	Group  string `long:"group" required:"true" description:"Group key (package@version)"`
+	DryRun bool   `long:"dry-run" description:"Print actions without executing"`
 	Method string `long:"method" default:"squash" description:"Merge method: merge, squash, or rebase"`
 	// RequireChecks is a pointer because go-flags bool flags cannot default to
 	// true; nil means unset, which this command treats as enabled.

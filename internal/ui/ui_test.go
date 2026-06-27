@@ -43,8 +43,8 @@ func TestDisplayListJSON(t *testing.T) {
 func TestDisplayGroupsSortedAlphabetically(t *testing.T) {
 	var buf bytes.Buffer
 	groups := map[string][]types.MR{
-		"zlib@1.0.0":   {{IID: 1, Project: "g/z", URL: "u1"}},
-		"alpha@2.0.0":  {{IID: 2, Project: "g/a", URL: "u2"}},
+		"zlib@1.0.0":  {{IID: 1, Project: "g/z", URL: "u1"}},
+		"alpha@2.0.0": {{IID: 2, Project: "g/a", URL: "u2"}},
 	}
 	if err := NewFromGroups(&buf, groups, false).DisplayGroups(groups); err != nil {
 		t.Fatalf("DisplayGroups() error = %v", err)

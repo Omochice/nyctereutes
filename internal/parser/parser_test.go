@@ -4,9 +4,9 @@ import "testing"
 
 func TestParseTitle(t *testing.T) {
 	tests := []struct {
-		name    string
-		title   string
-		want    string // GroupKey form: package@version
+		name  string
+		title string
+		want  string // GroupKey form: package@version
 	}{
 		{
 			name:  "bump from-to",
