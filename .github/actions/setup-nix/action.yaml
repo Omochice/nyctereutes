@@ -1,0 +1,20 @@
+name: Setup nix environments
+description: Setup nix environments with my own config
+
+inputs:
+  github-token:
+    description: GitHub token for action
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install nix
+      uses: cachix/install-nix-action@ab739621df7a23f52766f9ccc97f38da6b7af14f # v31.10.5
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+          access-tokens = github.com=${{ inputs.github-token }}
+    - uses: cachix/cachix-action@1eb2ef646ac0255473d23a5907ad7b04ce94065c # v17
+      with:
+        name: omochice
