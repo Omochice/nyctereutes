@@ -23,10 +23,7 @@ func TestLoadReadsDepConfigKeys(t *testing.T) {
 		return nil, nil
 	})
 
-	cfg, err := Load(context.Background(), runner)
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
+	cfg := Load(context.Background(), runner)
 
 	if cfg.Author != "custom-bot" {
 		t.Errorf("Author = %q, want %q", cfg.Author, "custom-bot")
@@ -44,10 +41,7 @@ func TestLoadTreatsRunnerErrorsAsUnset(t *testing.T) {
 		return nil, context.DeadlineExceeded
 	})
 
-	cfg, err := Load(context.Background(), runner)
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
+	cfg := Load(context.Background(), runner)
 	if cfg.Author != "" || len(cfg.Repos) != 0 || len(cfg.Patterns) != 0 {
 		t.Errorf("expected empty config on runner error, got %+v", cfg)
 	}

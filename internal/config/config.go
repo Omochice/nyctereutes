@@ -18,12 +18,12 @@ type Config struct {
 	Author   string   // dep.author (default dependency bot username)
 }
 
-func Load(ctx context.Context, runner glab.Runner) (*Config, error) {
+func Load(ctx context.Context, runner glab.Runner) *Config {
 	return &Config{
 		Repos:    strutil.SplitList(get(ctx, runner, "dep.repo")),
 		Patterns: strutil.SplitList(get(ctx, runner, "dep.patterns")),
 		Author:   strings.TrimSpace(get(ctx, runner, "dep.author")),
-	}, nil
+	}
 }
 
 // get reads a single glab config key, returning "" when unset or when glab is

@@ -25,7 +25,7 @@ type scopeFlags struct {
 }
 
 func (s scopeFlags) resolve(ctx context.Context, runner glab.Runner) (gitlab.SearchParams, []string) {
-	cfg, _ := config.Load(ctx, runner)
+	cfg := config.Load(ctx, runner)
 	group, repos := gitlab.ResolveScope(s.Repo, s.GroupPath, cfg.Repos)
 	authors := gitlab.ResolveAuthors(s.Author, cfg.Author)
 	return gitlab.SearchParams{
