@@ -80,6 +80,12 @@
             };
           }
         );
+        nyctereutes = pkgs.buildGoModule {
+          pname = "nyctereutes";
+          version = "0.1.0";
+          src = self;
+          vendorHash = "sha256-W6XVd68MS0ungMgam8jefYMVhyiN6/DB+bliFzs2rdk=";
+        };
         gitHooks = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -117,6 +123,7 @@
         # keep-sorted start block=yes
         checks = {
           git-hooks = gitHooks;
+          inherit nyctereutes;
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
@@ -125,6 +132,7 @@
           inherit (gitHooks) shellHook;
         };
         formatter = treefmt.config.build.wrapper;
+        packages.default = nyctereutes;
         # keep-sorted end
       }
     );
