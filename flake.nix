@@ -36,6 +36,31 @@
             nur-packages.overlays.default
           ];
         };
+        golangciConfig = (pkgs.formats.yaml { }).generate "golangci.yaml" {
+          version = "2";
+          linters = {
+            default = "all";
+            disable = [
+              # keep-sorted start
+              "depguard" # requires an explicit import policy to be useful
+              "nlreturn" # blank-line-before-return style, overlaps wsl
+              "noinlineerr" # forbids the idiomatic inline error check
+              "nonamedreturns" # named returns are used deliberately in tests
+              "paralleltest" # t.Parallel() adds little to this small suite
+              "tagalign" # struct-tag alignment belongs to formatting
+              "testpackage" # white-box tests are intentional here
+              "wsl" # opinionated whitespace/cuddling rules
+              "wsl_v5" # successor of wsl, same opinionated whitespace rules
+              # keep-sorted end
+            ];
+          };
+          formatters.enable = [
+            # keep-sorted start
+            "gofmt"
+            "goimports"
+            # keep-sorted end
+          ];
+        };
         treefmt = treefmt-nix.lib.evalModule pkgs (
           { ... }:
           let
@@ -61,6 +86,20 @@
               "--config"
               (toString rumdlConfig)
             ];
+            # The treefmt-nix `golangci-lint` program runs `golangci-lint run
+            # --fix`, which needs dependency type information and fails inside
+            # the sealed git-hooks sandbox. Only the `fmt` subcommand is wanted
+            # here, so define the formatter directly; `go` is added to PATH for
+            # the goimports formatter.
+            settings.formatter.golangci-lint = {
+              command = pkgs.lib.getExe (
+                pkgs.writeShellScriptBin "golangci-lint-fmt" ''
+                  export PATH="${pkgs.go}/bin:$PATH"
+                  exec ${pkgs.lib.getExe pkgs.golangci-lint} fmt --config ${golangciConfig} "$@"
+                ''
+              );
+              includes = [ "*.go" ];
+            };
             programs = {
               # keep-sorted start block=yes
               keep-sorted.enable = true;
@@ -86,6 +125,29 @@
           src = self;
           vendorHash = "sha256-W6XVd68MS0ungMgam8jefYMVhyiN6/DB+bliFzs2rdk=";
         };
+        # Run golangci-lint by reusing buildGoModule's module fetching so the
+        # dependency type information is available inside the sealed
+        # `nix flake check` sandbox, where the git-hooks runner cannot reach
+        # the network.
+        golangci-lint-check = nyctereutes.overrideAttrs (previousAttrs: {
+          pname = "${previousAttrs.pname}-golangci-lint";
+          nativeBuildInputs = (previousAttrs.nativeBuildInputs or [ ]) ++ [
+            pkgs.golangci-lint
+          ];
+          doCheck = false;
+          buildPhase = ''
+            runHook preBuild
+            export HOME="$TMPDIR"
+            export GOLANGCI_LINT_CACHE="$TMPDIR/golangci-lint-cache"
+            golangci-lint run --config ${golangciConfig} ./...
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            touch "$out"
+            runHook postInstall
+          '';
+        });
         gitHooks = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -123,10 +185,12 @@
         # keep-sorted start block=yes
         checks = {
           git-hooks = gitHooks;
+          golangci-lint = golangci-lint-check;
           inherit nyctereutes;
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
+            pkgs.golangci-lint
             treefmt.config.build.wrapper
           ];
           inherit (gitHooks) shellHook;
