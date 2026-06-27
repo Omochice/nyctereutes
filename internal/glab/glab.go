@@ -16,6 +16,14 @@ type Runner interface {
 	Run(ctx context.Context, args ...string) ([]byte, error)
 }
 
+// RunnerFunc adapts an ordinary function to a Runner, mainly so tests can script
+// responses with a closure instead of declaring a fake type.
+type RunnerFunc func(ctx context.Context, args ...string) ([]byte, error)
+
+func (f RunnerFunc) Run(ctx context.Context, args ...string) ([]byte, error) {
+	return f(ctx, args...)
+}
+
 // ExecRunner is the production Runner backed by the real glab executable.
 type ExecRunner struct{}
 
