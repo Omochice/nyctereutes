@@ -40,3 +40,14 @@ func TestInfraIsNotImplemented(t *testing.T) {
 		t.Errorf("want stderr to contain %q, got %q", "not implemented", stderr)
 	}
 }
+
+func TestHelpIsNotImplemented(t *testing.T) {
+	exit, _, stderr := run([]string{"help"})
+
+	if exit != 1 {
+		t.Errorf("want exit status 1, got %d", exit)
+	}
+	if !strings.Contains(stderr, "not implemented") {
+		t.Errorf("want stderr to contain %q, got %q", "not implemented", stderr)
+	}
+}
