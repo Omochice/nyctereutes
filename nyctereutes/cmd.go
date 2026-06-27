@@ -22,15 +22,26 @@ func (c *depCommand) Execute(args []string) error {
 	return errNotImplemented
 }
 
+type infraCommand struct {
+	inout *cli.ProcInout
+}
+
+func (c *infraCommand) Execute(args []string) error {
+	fmt.Fprintln(c.inout.Stderr, "not implemented")
+	return errNotImplemented
+}
+
 type options struct {
-	Dep *depCommand `command:"dep" description:"manage dependencies"`
+	Dep   *depCommand   `command:"dep" description:"manage dependencies"`
+	Infra *infraCommand `command:"infra" description:"manage infrastructure"`
 }
 
 // MainCommand parses args, dispatches to the requested subcommand, and reports
 // the process exit status.
 func MainCommand(args []string, inout *cli.ProcInout) int {
 	opts := &options{
-		Dep: &depCommand{inout: inout},
+		Dep:   &depCommand{inout: inout},
+		Infra: &infraCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash)
 	parser.Name = "nyctereutes"
