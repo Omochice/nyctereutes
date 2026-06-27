@@ -43,10 +43,12 @@
             disable = [
               # keep-sorted start
               "depguard" # requires an explicit import policy to be useful
+              "godoclint" # forces godoc comments to restate the symbol name
               "nlreturn" # blank-line-before-return style, overlaps wsl
               "noinlineerr" # forbids the idiomatic inline error check
               "nonamedreturns" # named returns are used deliberately in tests
               "paralleltest" # t.Parallel() adds little to this small suite
+              "revive" # forces restating doc comments on every export
               "tagalign" # struct-tag alignment belongs to formatting
               "testpackage" # white-box tests are intentional here
               "wsl" # opinionated whitespace/cuddling rules
