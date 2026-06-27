@@ -44,6 +44,7 @@
               # keep-sorted start
               "depguard" # requires an explicit import policy to be useful
               "godoclint" # forces godoc comments to restate the symbol name
+              "gomodguard" # deprecated in v2.12, superseded by gomodguard_v2
               "nlreturn" # blank-line-before-return style, overlaps wsl
               "noinlineerr" # forbids the idiomatic inline error check
               "nonamedreturns" # named returns are used deliberately in tests
@@ -56,12 +57,6 @@
               # keep-sorted end
             ];
           };
-          formatters.enable = [
-            # keep-sorted start
-            "gofmt"
-            "goimports"
-            # keep-sorted end
-          ];
         };
         treefmt = treefmt-nix.lib.evalModule pkgs (
           { ... }:
@@ -88,22 +83,10 @@
               "--config"
               (toString rumdlConfig)
             ];
-            # The treefmt-nix `golangci-lint` program runs `golangci-lint run
-            # --fix`, which needs dependency type information and fails inside
-            # the sealed git-hooks sandbox. Only the `fmt` subcommand is wanted
-            # here, so define the formatter directly; `go` is added to PATH for
-            # the goimports formatter.
-            settings.formatter.golangci-lint = {
-              command = pkgs.lib.getExe (
-                pkgs.writeShellScriptBin "golangci-lint-fmt" ''
-                  export PATH="${pkgs.go}/bin:$PATH"
-                  exec ${pkgs.lib.getExe pkgs.golangci-lint} fmt --config ${golangciConfig} "$@"
-                ''
-              );
-              includes = [ "*.go" ];
-            };
             programs = {
               # keep-sorted start block=yes
+              gofumpt.enable = true;
+              goimports.enable = true;
               keep-sorted.enable = true;
               nixfmt.enable = true;
               rumdl-format.enable = true;
