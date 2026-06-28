@@ -38,9 +38,28 @@ func (md mode) label() string {
 	}
 }
 
+// phase is the screen the model is currently showing.
+type phase int
+
+const (
+	phaseList phase = iota
+	phaseExecuting
+	phaseComplete
+)
+
+// actionResult records the outcome of applying the current mode to one MR.
+type actionResult struct {
+	mr  types.MR
+	err error
+}
+
+// mrResultMsg is sent back to Update when one MR's action finishes.
+type mrResultMsg actionResult
+
 // Model is the bubbletea model backing the interactive dep view.
 type Model struct {
 	client Client
+	ctx    context.Context
 	mrs    []types.MR
 	cursor int
 	// selected holds the indices into the visible (filtered) MR list that the
@@ -54,6 +73,10 @@ type Model struct {
 	// in-progress text that becomes the filter only when committed with enter.
 	searching bool
 	searchBuf string
+
+	phase   phase
+	pending int            // MR actions still in flight during phaseExecuting
+	results []actionResult // outcomes shown in phaseComplete
 }
 
 // modeLabel names the current action mode for display.
@@ -63,8 +86,44 @@ func (m Model) modeLabel() string { return m.mode.label() }
 func New(client Client, mrs []types.MR) Model {
 	return Model{
 		client:   client,
+		ctx:      context.Background(),
 		mrs:      mrs,
 		selected: make(map[int]bool),
+	}
+}
+
+// startExecution kicks off the current mode's action against every selected MR
+// concurrently, or stays on the list when nothing is selected.
+func (m Model) startExecution() (tea.Model, tea.Cmd) {
+	selected := m.selectedMRs()
+	if len(selected) == 0 {
+		return m, nil
+	}
+	m.phase = phaseExecuting
+	m.pending = len(selected)
+	m.results = nil
+
+	cmds := make([]tea.Cmd, 0, len(selected))
+	for _, mr := range selected {
+		cmds = append(cmds, m.actionCmd(mr))
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// actionCmd returns a command that applies the current mode to mr and reports
+// the outcome. In approve & merge mode a failed approval skips the merge so a
+// broken MR is not merged.
+func (m Model) actionCmd(mr types.MR) tea.Cmd {
+	mode := m.mode
+	return func() tea.Msg {
+		var err error
+		if mode == modeApprove || mode == modeApproveMerge {
+			err = m.client.ApproveMR(m.ctx, mr.Project, mr.IID)
+		}
+		if err == nil && (mode == modeMerge || mode == modeApproveMerge) {
+			err = m.client.MergeMR(m.ctx, mr.Project, mr.IID, "squash", true)
+		}
+		return mrResultMsg{mr: mr, err: err}
 	}
 }
 
@@ -99,6 +158,15 @@ func (m Model) Init() tea.Cmd { return nil }
 
 // Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if result, ok := msg.(mrResultMsg); ok {
+		m.results = append(m.results, actionResult(result))
+		m.pending--
+		if m.pending <= 0 {
+			m.phase = phaseComplete
+		}
+		return m, nil
+	}
+
 	keyMsg, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return m, nil
@@ -110,6 +178,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.searching = true
 		m.searchBuf = ""
+	case "x":
+		return m.startExecution()
 	case "j":
 		if m.cursor < len(m.visible())-1 {
 			m.cursor++
@@ -158,7 +228,29 @@ func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
 
 // View implements tea.Model.
 func (m Model) View() tea.View {
-	return tea.NewView(m.renderList())
+	switch m.phase {
+	case phaseExecuting:
+		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
+	case phaseComplete:
+		return tea.NewView(m.renderResults())
+	default:
+		return tea.NewView(m.renderList())
+	}
+}
+
+func (m Model) renderResults() string {
+	var b strings.Builder
+	b.WriteString("Done:\n")
+	for _, r := range m.results {
+		mark := "✓"
+		detail := ""
+		if r.err != nil {
+			mark = "✗"
+			detail = ": " + r.err.Error()
+		}
+		fmt.Fprintf(&b, "%s %s !%d - %s%s\n", mark, pathShorten(r.mr.Project), r.mr.IID, r.mr.Title, detail)
+	}
+	return b.String()
 }
 
 func (m Model) renderList() string {
