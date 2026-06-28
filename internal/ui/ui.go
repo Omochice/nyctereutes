@@ -95,7 +95,7 @@ func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 func (u *UI) PrintAction(action string, mr types.MR, details ...string) {
 	message := fmt.Sprintf("%s !%d", action, mr.IID)
 	if len(details) > 0 {
-		message += ": " + details[0]
+		message += ": " + strings.Join(details, "; ")
 	}
 	_, _ = fmt.Fprintf(u.w, "%s%s\n", u.prefix(mr), message)
 }
