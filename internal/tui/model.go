@@ -83,6 +83,9 @@ type Model struct {
 // modeLabel names the current action mode for display.
 func (m Model) modeLabel() string { return m.mode.label() }
 
+// MRs returns the merge requests the model was built with.
+func (m Model) MRs() []types.MR { return m.mrs }
+
 // New builds a Model showing mrs, driving approve/merge through client.
 func New(client Client, mrs []types.MR) Model {
 	return Model{
