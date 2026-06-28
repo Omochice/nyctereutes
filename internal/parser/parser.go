@@ -13,19 +13,9 @@ const submatchCount = 3
 // dotted numeric versions. A leading "v" is dropped.
 const versionPattern = `v?([0-9][0-9A-Za-z.+_-]*)`
 
-// unknownField is the placeholder used for a package or version that could not
-// be parsed from a title.
-const unknownField = "unknown"
-
 type PackageUpdate struct {
 	Package   string
 	ToVersion string
-}
-
-// Parsed reports whether the title yielded a real package and version rather
-// than the unknown placeholder.
-func (u PackageUpdate) Parsed() bool {
-	return u.Package != unknownField || u.ToVersion != unknownField
 }
 
 // patterns are tried in order; the first match wins. They move from the most
@@ -44,29 +34,28 @@ var patterns = []*regexp.Regexp{
 // ParseTitle extracts the package and target version from a merge request title.
 // Custom patterns are tried before the built-in ones, so a project can override
 // parsing for its own title conventions; callers pass them pre-compiled so the
-// regexps are built once rather than per title. When nothing matches, both
-// fields are "unknown".
-func ParseTitle(title string, customPatterns []*regexp.Regexp) PackageUpdate {
+// regexps are built once rather than per title. The bool is false when no
+// pattern matched.
+func ParseTitle(title string, customPatterns []*regexp.Regexp) (PackageUpdate, bool) {
 	for _, re := range customPatterns {
 		if u, ok := match(re, title); ok {
-			return u
+			return u, true
 		}
 	}
 
 	for _, re := range patterns {
 		if u, ok := match(re, title); ok {
-			return u
+			return u, true
 		}
 	}
 
-	return PackageUpdate{Package: unknownField, ToVersion: unknownField}
+	return PackageUpdate{}, false
 }
 
 func match(re *regexp.Regexp, title string) (PackageUpdate, bool) {
 	groups := re.FindStringSubmatch(title)
 	if len(groups) != submatchCount {
-		var none PackageUpdate
-		return none, false
+		return PackageUpdate{}, false
 	}
 	return PackageUpdate{Package: groups[1], ToVersion: groups[2]}, true
 }

@@ -7,47 +7,56 @@ import (
 
 func TestParseTitle(t *testing.T) {
 	tests := []struct {
-		name  string
-		title string
-		want  string // GroupKey form: package@version
+		name   string
+		title  string
+		want   string // GroupKey form: package@version, when parsed
+		wantOK bool
 	}{
 		{
-			name:  "bump from-to",
-			title: "Bump lodash from 4.17.15 to 4.17.21",
-			want:  "lodash@4.17.21",
+			name:   "bump from-to",
+			title:  "Bump lodash from 4.17.15 to 4.17.21",
+			want:   "lodash@4.17.21",
+			wantOK: true,
 		},
 		{
-			name:  "update dependency to",
-			title: "Update dependency typescript to 5.6.0",
-			want:  "typescript@5.6.0",
+			name:   "update dependency to",
+			title:  "Update dependency typescript to 5.6.0",
+			want:   "typescript@5.6.0",
+			wantOK: true,
 		},
 		{
-			name:  "catch-all X to semver",
-			title: "chore(deps): eslint to v8.57.0",
-			want:  "eslint@8.57.0",
+			name:   "catch-all X to semver",
+			title:  "chore(deps): eslint to v8.57.0",
+			want:   "eslint@8.57.0",
+			wantOK: true,
 		},
 		{
-			name:  "single-segment version",
-			title: "Bump go from 1 to v2",
-			want:  "go@2",
+			name:   "single-segment version",
+			title:  "Bump go from 1 to v2",
+			want:   "go@2",
+			wantOK: true,
 		},
 		{
-			name:  "prerelease version",
-			title: "Update dependency eslint to 9.0.0-beta.1",
-			want:  "eslint@9.0.0-beta.1",
+			name:   "prerelease version",
+			title:  "Update dependency eslint to 9.0.0-beta.1",
+			want:   "eslint@9.0.0-beta.1",
+			wantOK: true,
 		},
 		{
-			name:  "unparseable title",
-			title: "Refactor the build pipeline",
-			want:  "unknown@unknown",
+			name:   "unparseable title",
+			title:  "Refactor the build pipeline",
+			wantOK: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ParseTitle(tt.title, nil).GroupKey()
-			if got != tt.want {
-				t.Errorf("ParseTitle(%q).GroupKey() = %q, want %q", tt.title, got, tt.want)
+			got, ok := ParseTitle(tt.title, nil)
+			if ok != tt.wantOK {
+				t.Fatalf("ParseTitle(%q) ok = %v, want %v", tt.title, ok, tt.wantOK)
+			}
+			if ok && got.GroupKey() != tt.want {
+				t.Errorf("ParseTitle(%q).GroupKey() = %q, want %q", tt.title, got.GroupKey(), tt.want)
 			}
 		})
 	}
@@ -57,8 +66,11 @@ func TestParseTitleCustomPatternsTakePrecedence(t *testing.T) {
 	// A custom pattern matches a title that the default patterns would parse
 	// differently, proving custom patterns are tried first.
 	custom := []*regexp.Regexp{regexp.MustCompile(`(?i)renovate:\s+(\S+)\s+->\s+(\S+)`)}
-	got := ParseTitle("renovate: my-pkg -> 2.0.0", custom).GroupKey()
-	if want := "my-pkg@2.0.0"; got != want {
-		t.Errorf("ParseTitle with custom pattern = %q, want %q", got, want)
+	got, ok := ParseTitle("renovate: my-pkg -> 2.0.0", custom)
+	if !ok {
+		t.Fatal("ParseTitle with custom pattern did not match")
+	}
+	if want := "my-pkg@2.0.0"; got.GroupKey() != want {
+		t.Errorf("ParseTitle with custom pattern = %q, want %q", got.GroupKey(), want)
 	}
 }
