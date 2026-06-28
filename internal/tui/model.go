@@ -206,7 +206,11 @@ func (m Model) editList(keyMsg tea.KeyPressMsg) Model {
 	case keyUp:
 		m = m.moveCursor(-1)
 	case keySpace, keyEnter:
-		m.selected[m.cursor] = !m.selected[m.cursor]
+		// Guard against an empty list, where the cursor has no MR to toggle and
+		// would otherwise mark a hidden index that reappears once the filter clears.
+		if len(m.visible()) > 0 {
+			m.selected[m.cursor] = !m.selected[m.cursor]
+		}
 	case keySelectAll:
 		m = m.selectAll()
 	case keyClear:

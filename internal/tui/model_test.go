@@ -310,6 +310,21 @@ func TestEmptyFilterResultKeepsCursorInRange(t *testing.T) {
 	_ = model.View().Content
 }
 
+func TestToggleOnEmptyListSelectsNothing(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySearch)
+	model = typeRunes(model, "zzz-no-match")
+	model = press(model, keyEnter) // filter to an empty list
+
+	model = press(model, keySpace) // must not select a hidden MR
+
+	model.filter = "" // clear the filter to reveal any stray selection
+	model.filtered = model.mrs
+	if got := len(selectedIIDs(model)); got != 0 {
+		t.Errorf("toggle on an empty list selected %d MRs, want 0", got)
+	}
+}
+
 func TestRunWithoutSelectionStaysOnList(t *testing.T) {
 	model := New(&fakeClient{}, sampleMRs())
 	next, cmd := model.Update(key(keyRun))
