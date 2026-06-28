@@ -22,3 +22,21 @@ func TestGroupMRsBucketsByPackageVersion(t *testing.T) {
 		t.Errorf("typescript@5.6.0 group size = %d, want 1", got)
 	}
 }
+
+func TestGroupMRsKeepsUnparsedMRsSeparate(t *testing.T) {
+	mrs := []types.MR{
+		{IID: 1, Project: "g/a", Title: "Refactor the build"},
+		{IID: 2, Project: "g/b", Title: "Chore: cleanup"},
+	}
+
+	groups := GroupMRs(mrs, nil)
+
+	if len(groups) != 2 {
+		t.Fatalf("unparsed MRs should not share a group, got %d groups: %v", len(groups), groups)
+	}
+	for key, group := range groups {
+		if len(group) != 1 {
+			t.Errorf("group %q has %d MRs, want 1", key, len(group))
+		}
+	}
+}

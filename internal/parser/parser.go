@@ -13,9 +13,19 @@ const submatchCount = 3
 // dotted numeric versions. A leading "v" is dropped.
 const versionPattern = `v?([0-9][0-9A-Za-z.+_-]*)`
 
+// unknownField is the placeholder used for a package or version that could not
+// be parsed from a title.
+const unknownField = "unknown"
+
 type PackageUpdate struct {
 	Package   string
 	ToVersion string
+}
+
+// Parsed reports whether the title yielded a real package and version rather
+// than the unknown placeholder.
+func (u PackageUpdate) Parsed() bool {
+	return u.Package != unknownField || u.ToVersion != unknownField
 }
 
 // patterns are tried in order; the first match wins. They move from the most
@@ -49,7 +59,7 @@ func ParseTitle(title string, customPatterns []*regexp.Regexp) PackageUpdate {
 		}
 	}
 
-	return PackageUpdate{Package: "unknown", ToVersion: "unknown"}
+	return PackageUpdate{Package: unknownField, ToVersion: unknownField}
 }
 
 func match(re *regexp.Regexp, title string) (PackageUpdate, bool) {
