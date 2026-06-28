@@ -106,3 +106,43 @@ func TestCursorMovesUpAndStopsAtTop(t *testing.T) {
 		t.Errorf("cursor = %d, want 0 (clamped at first MR)", m.cursor)
 	}
 }
+
+func selectedIIDs(m Model) []int {
+	var iids []int
+	for _, mr := range m.selectedMRs() {
+		iids = append(iids, mr.IID)
+	}
+	return iids
+}
+
+func TestSpaceAndEnterToggleSelection(t *testing.T) {
+	for _, k := range []string{"space", "enter"} {
+		t.Run(k, func(t *testing.T) {
+			m := New(&fakeClient{}, sampleMRs())
+
+			m = press(m, k) // select MR under cursor (IID 12)
+			if got := selectedIIDs(m); len(got) != 1 || got[0] != 12 {
+				t.Fatalf("after %s selected = %v, want [12]", k, got)
+			}
+
+			m = press(m, k) // toggle off
+			if got := selectedIIDs(m); len(got) != 0 {
+				t.Errorf("after second %s selected = %v, want none", k, got)
+			}
+		})
+	}
+}
+
+func TestSelectAllAndDeselectAll(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+
+	m = press(m, "a")
+	if got := len(selectedIIDs(m)); got != 3 {
+		t.Fatalf("after a selected count = %d, want 3", got)
+	}
+
+	m = press(m, "d")
+	if got := len(selectedIIDs(m)); got != 0 {
+		t.Errorf("after d selected count = %d, want 0", got)
+	}
+}
