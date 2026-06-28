@@ -192,8 +192,8 @@ func TestDepApproveGroupNotFound(t *testing.T) {
 func TestDepApproveContinuesOnError(t *testing.T) {
 	fake := &fakeGlab{listJSON: twoMRsSameGroup, detailJSON: `{}`, approveErr: errStub500}
 	exit, stdout, _ := runDep(fake, "dep", "approve", "--group", "lodash@2.0.0")
-	if exit != 0 {
-		t.Fatalf("exit = %d, want 0", exit)
+	if exit != 1 {
+		t.Fatalf("exit = %d, want 1 (failures must be non-zero exit)", exit)
 	}
 	if len(fake.approved) != 2 {
 		t.Errorf("want both MRs attempted, got %d", len(fake.approved))
@@ -267,8 +267,8 @@ func TestDepMergeImmediate(t *testing.T) {
 func TestDepMergeContinuesOnError(t *testing.T) {
 	fake := &fakeGlab{listJSON: twoMRsSameGroup, detailJSON: `{}`, mergeErr: errStub409}
 	exit, stdout, _ := runDep(fake, "dep", "merge", "--group", "lodash@2.0.0")
-	if exit != 0 {
-		t.Fatalf("exit = %d, want 0", exit)
+	if exit != 1 {
+		t.Fatalf("exit = %d, want 1 (failures must be non-zero exit)", exit)
 	}
 	if len(fake.merged) != 2 {
 		t.Errorf("want both MRs attempted, got %d", len(fake.merged))

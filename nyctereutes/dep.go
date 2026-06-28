@@ -16,6 +16,7 @@ import (
 var (
 	errInvalidMergeMethod = errors.New("invalid merge method")
 	errGroupNotFound      = errors.New("group not found")
+	errSomeActionsFailed  = errors.New("some operations failed")
 )
 
 // scopeFlags are the search-scope flags shared by list, approve and merge.
@@ -125,9 +126,12 @@ func (c *depApproveCommand) Execute(_ []string) error {
 
 	client := gitlab.NewClient(c.runner)
 	view := ui.New(c.inout.Stdout, mrs, false)
-	applyAction(view, mrs, c.DryRun, "approve", func(mr types.MR) error {
+	failures := applyAction(view, mrs, c.DryRun, "approve", func(mr types.MR) error {
 		return client.ApproveMR(ctx, mr.Project, mr.IID)
 	})
+	if failures > 0 {
+		return fmt.Errorf("%w: %d of %d", errSomeActionsFailed, failures, len(mrs))
+	}
 	return nil
 }
 
@@ -167,14 +171,18 @@ func (c *depMergeCommand) Execute(_ []string) error {
 
 	client := gitlab.NewClient(c.runner)
 	view := ui.New(c.inout.Stdout, mrs, false)
-	applyAction(view, mrs, c.DryRun, "merge", func(mr types.MR) error {
+	failures := applyAction(view, mrs, c.DryRun, "merge", func(mr types.MR) error {
 		return client.MergeMR(ctx, mr.Project, mr.IID, c.Method, requireChecks)
 	}, successDetails...)
+	if failures > 0 {
+		return fmt.Errorf("%w: %d of %d", errSomeActionsFailed, failures, len(mrs))
+	}
 	return nil
 }
 
 // applyAction runs action against each MR, printing a consistent dry-run,
-// success, or per-MR error line and continuing past individual failures.
+// success, or per-MR error line and continuing past individual failures. It
+// returns how many MRs failed so the caller can exit non-zero.
 func applyAction(
 	view *ui.UI,
 	mrs []types.MR,
@@ -182,7 +190,8 @@ func applyAction(
 	verb string,
 	action func(types.MR) error,
 	successDetails ...string,
-) {
+) int {
+	failures := 0
 	for _, mergeRequest := range mrs {
 		if dryRun {
 			view.PrintAction("[dry-run] "+verb, mergeRequest)
@@ -190,10 +199,12 @@ func applyAction(
 		}
 		if err := action(mergeRequest); err != nil {
 			view.PrintError(verb, mergeRequest, err)
+			failures++
 			continue
 		}
 		view.PrintAction(verb, mergeRequest, successDetails...)
 	}
+	return failures
 }
 
 // selectGroup searches for MRs in the given scope, groups them by
