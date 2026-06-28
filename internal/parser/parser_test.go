@@ -74,3 +74,12 @@ func TestParseTitleCustomPatternsTakePrecedence(t *testing.T) {
 		t.Errorf("ParseTitle with custom pattern = %q, want %q", got.GroupKey(), want)
 	}
 }
+
+func TestMatchRejectsEmptyCaptures(t *testing.T) {
+	// The package capture matches empty here; that must not count as parsed,
+	// otherwise grouping produces a malformed "@version" key.
+	re := regexp.MustCompile(`(\S*) to (\S+)`)
+	if _, ok := match(re, " to 1.0.0"); ok {
+		t.Error("match with an empty capture = ok, want not ok")
+	}
+}

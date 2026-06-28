@@ -54,7 +54,9 @@ func ParseTitle(title string, customPatterns []*regexp.Regexp) (PackageUpdate, b
 
 func match(re *regexp.Regexp, title string) (PackageUpdate, bool) {
 	groups := re.FindStringSubmatch(title)
-	if len(groups) != submatchCount {
+	// Both captures must be non-empty; a custom pattern that matches with an
+	// empty group would otherwise yield a malformed "pkg@" or "@version" key.
+	if len(groups) != submatchCount || groups[1] == "" || groups[2] == "" {
 		return PackageUpdate{}, false
 	}
 	return PackageUpdate{Package: groups[1], ToVersion: groups[2]}, true
