@@ -156,6 +156,102 @@ func TestListViewRendersRowElements(t *testing.T) {
 	}
 }
 
+func visibleIIDs(m Model) []int {
+	var iids []int
+	for _, mr := range m.visible() {
+		iids = append(iids, mr.IID)
+	}
+	return iids
+}
+
+func typeRunes(m Model, s string) Model {
+	for _, r := range s {
+		m = press(m, string(r))
+	}
+	return m
+}
+
+func TestSlashEntersSearchMode(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	m = press(m, "/")
+	if !strings.Contains(m.View().Content, "search:") {
+		t.Errorf("search mode should show a search prompt\n%s", m.View().Content)
+	}
+}
+
+func TestSearchFiltersOnEnter(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	m = press(m, "/")
+	m = typeRunes(m, "axios")
+	// Not applied until enter is pressed.
+	if got := len(visibleIIDs(m)); got != 3 {
+		t.Fatalf("before enter visible = %d, want 3 (live filtering disabled)", got)
+	}
+	m = press(m, "enter")
+	if got := visibleIIDs(m); len(got) != 1 || got[0] != 13 {
+		t.Errorf("after enter visible = %v, want [13]", got)
+	}
+}
+
+func TestSearchIsCaseInsensitiveAcrossFields(t *testing.T) {
+	cases := map[string]struct {
+		query string
+		want  int // expected single matching IID
+	}{
+		"title":   {query: "LODASH", want: 12},
+		"project": {query: "GROUP/B", want: 13},
+		"iid":     {query: "14", want: 14},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			m := New(&fakeClient{}, sampleMRs())
+			m = press(m, "/")
+			m = typeRunes(m, tc.query)
+			m = press(m, "enter")
+			if got := visibleIIDs(m); len(got) != 1 || got[0] != tc.want {
+				t.Errorf("query %q visible = %v, want [%d]", tc.query, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSearchEscCancelsWithoutFiltering(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	m = press(m, "/")
+	m = typeRunes(m, "axios")
+	m = press(m, "esc")
+	if got := len(visibleIIDs(m)); got != 3 {
+		t.Errorf("after esc visible = %d, want 3 (filter discarded)", got)
+	}
+}
+
+func TestApplyingFilterClearsSelection(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	m = press(m, "space") // select first MR
+	m = press(m, "/")
+	m = typeRunes(m, "axios")
+	m = press(m, "enter")
+	if got := len(selectedIIDs(m)); got != 0 {
+		t.Errorf("after applying filter selected = %d, want 0", got)
+	}
+}
+
+func TestEmptyFilterResultKeepsCursorInRange(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	m = press(m, "j", "j") // cursor at 2
+	m = press(m, "/")
+	m = typeRunes(m, "zzz-no-match")
+	m = press(m, "enter")
+	if len(visibleIIDs(m)) != 0 {
+		t.Fatalf("expected no matches, got %v", visibleIIDs(m))
+	}
+	if m.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 when the list is empty", m.cursor)
+	}
+	// View must not panic on an empty list.
+	_ = m.View().Content
+}
+
 func TestModeStartsAtApproveAndCycles(t *testing.T) {
 	m := New(&fakeClient{}, sampleMRs())
 	if got := m.modeLabel(); got != "approve" {
