@@ -23,13 +23,13 @@ func GroupMRs(mrs []types.MR, customPatterns []string) map[string][]types.MR {
 	}
 
 	groups := make(map[string][]types.MR)
-	for _, mr := range mrs {
-		update := parser.ParseTitle(mr.Title, compiled)
+	for _, mergeRequest := range mrs {
+		update := parser.ParseTitle(mergeRequest.Title, compiled)
 		key := update.GroupKey()
 		if !update.Parsed() {
-			key = fmt.Sprintf("unparsed:%s!%d", mr.Project, mr.IID)
+			key = fmt.Sprintf("unparsed:%s!%d", mergeRequest.Project, mergeRequest.IID)
 		}
-		groups[key] = append(groups[key], mr)
+		groups[key] = append(groups[key], mergeRequest)
 	}
 	return groups
 }
