@@ -77,6 +77,7 @@ type Model struct {
 	phase   phase
 	pending int            // MR actions still in flight during phaseExecuting
 	results []actionResult // outcomes shown in phaseComplete
+	helping bool           // true while the help overlay is shown
 }
 
 // modeLabel names the current action mode for display.
@@ -175,6 +176,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSearch(keyMsg), nil
 	}
 	switch keyMsg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "?":
+		m.helping = !m.helping
 	case "/":
 		m.searching = true
 		m.searchBuf = ""
@@ -226,8 +231,22 @@ func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
 	return m
 }
 
+const helpText = `Keybindings
+  j/k        move cursor
+  space/enter toggle selection
+  a/d        select all / clear
+  /          search (enter to apply, esc to cancel)
+  m          change mode (approve / merge / approve & merge)
+  x          run the current mode on selected MRs
+  ?          toggle this help
+  q/ctrl+c   quit
+`
+
 // View implements tea.Model.
 func (m Model) View() tea.View {
+	if m.helping {
+		return tea.NewView(helpText)
+	}
 	switch m.phase {
 	case phaseExecuting:
 		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
