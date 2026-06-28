@@ -17,6 +17,26 @@ type Client interface {
 	MergeMR(ctx context.Context, project string, iid int, method string, autoMerge bool) error
 }
 
+// mode is the action the user applies to the selected MRs.
+type mode int
+
+const (
+	modeApprove mode = iota
+	modeMerge
+	modeApproveMerge
+)
+
+func (md mode) label() string {
+	switch md {
+	case modeMerge:
+		return "merge"
+	case modeApproveMerge:
+		return "approve & merge"
+	default:
+		return "approve"
+	}
+}
+
 // Model is the bubbletea model backing the interactive dep view.
 type Model struct {
 	client Client
@@ -24,7 +44,11 @@ type Model struct {
 	cursor int
 	// selected holds the indices into mrs that the user has checked.
 	selected map[int]bool
+	mode     mode
 }
+
+// modeLabel names the current action mode for display.
+func (m Model) modeLabel() string { return m.mode.label() }
 
 // New builds a Model showing mrs, driving approve/merge through client.
 func New(client Client, mrs []types.MR) Model {
@@ -73,6 +97,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case "d":
 		m.selected = make(map[int]bool)
+	case "m":
+		m.mode = (m.mode + 1) % 3
 	}
 	return m, nil
 }
@@ -88,6 +114,7 @@ func (m Model) renderList() string {
 		b.WriteString(m.renderRow(i, mr))
 		b.WriteByte('\n')
 	}
+	fmt.Fprintf(&b, "\nmode: %s  (m: change, x: run, ?: help, q: quit)\n", m.modeLabel())
 	return b.String()
 }
 
