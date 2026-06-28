@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -42,9 +43,13 @@ type Model struct {
 	client Client
 	mrs    []types.MR
 	cursor int
-	// selected holds the indices into mrs that the user has checked.
+	// selected holds the indices into the visible (filtered) MR list that the
+	// user has checked. Indices stay valid because changing the filter clears
+	// the selection.
 	selected map[int]bool
 	mode     mode
+	// filter, when non-empty, restricts the visible MRs to those matching it.
+	filter string
 }
 
 // modeLabel names the current action mode for display.
@@ -59,10 +64,24 @@ func New(client Client, mrs []types.MR) Model {
 	}
 }
 
+// visible returns the MRs that pass the current filter, in display order.
+func (m Model) visible() []types.MR {
+	if m.filter == "" {
+		return m.mrs
+	}
+	var out []types.MR
+	for _, mr := range m.mrs {
+		if matchesFilter(mr, m.filter) {
+			out = append(out, mr)
+		}
+	}
+	return out
+}
+
 // selectedMRs returns the checked MRs in display order.
 func (m Model) selectedMRs() []types.MR {
 	var out []types.MR
-	for i, mr := range m.mrs {
+	for i, mr := range m.visible() {
 		if m.selected[i] {
 			out = append(out, mr)
 		}
@@ -82,7 +101,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch keyMsg.String() {
 	case "j":
-		if m.cursor < len(m.mrs)-1 {
+		if m.cursor < len(m.visible())-1 {
 			m.cursor++
 		}
 	case "k":
@@ -92,7 +111,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "space", "enter":
 		m.selected[m.cursor] = !m.selected[m.cursor]
 	case "a":
-		for i := range m.mrs {
+		for i := range m.visible() {
 			m.selected[i] = true
 		}
 	case "d":
@@ -110,7 +129,7 @@ func (m Model) View() tea.View {
 
 func (m Model) renderList() string {
 	var b strings.Builder
-	for i, mr := range m.mrs {
+	for i, mr := range m.visible() {
 		b.WriteString(m.renderRow(i, mr))
 		b.WriteByte('\n')
 	}
@@ -133,6 +152,15 @@ func (m Model) renderRow(index int, mr types.MR) string {
 	}
 	return fmt.Sprintf("%s %s %s %s %s !%d - %s",
 		cursor, checkbox, ciSymbol(mr.CIStatus), warn, pathShorten(mr.Project), mr.IID, mr.Title)
+}
+
+// matchesFilter reports whether mr matches query as a case-insensitive
+// substring of its title, project path, or IID.
+func matchesFilter(mr types.MR, query string) bool {
+	q := strings.ToLower(query)
+	return strings.Contains(strings.ToLower(mr.Title), q) ||
+		strings.Contains(strings.ToLower(mr.Project), q) ||
+		strings.Contains(strconv.Itoa(mr.IID), q)
 }
 
 // ciSymbol maps a normalized pipeline status to a single-column glyph.
