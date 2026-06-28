@@ -55,7 +55,12 @@ func TestDisplayGroupsSortedAlphabetically(t *testing.T) {
 		t.Fatalf("DisplayGroups() error = %v", err)
 	}
 	out := buf.String()
-	if strings.Index(out, "alpha@2.0.0") > strings.Index(out, "zlib@1.0.0") {
+	alpha := strings.Index(out, "alpha@2.0.0")
+	zlib := strings.Index(out, "zlib@1.0.0")
+	if alpha == -1 || zlib == -1 {
+		t.Fatalf("group label missing from output:\n%s", out)
+	}
+	if alpha > zlib {
 		t.Errorf("groups not sorted alphabetically:\n%s", out)
 	}
 }
