@@ -141,10 +141,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case mrResultMsg:
 		return m.recordResult(typed), nil
 	case tea.KeyPressMsg:
-		if m.searching {
-			return m.updateSearch(typed), nil
-		}
-		return m.updateList(typed)
+		return m.handleKey(typed)
 	default:
 		return m, nil
 	}
@@ -179,11 +176,46 @@ func (m Model) recordResult(result mrResultMsg) Model {
 	return m
 }
 
+// handleKey routes a key press to the active screen so list edits and runs
+// happen only on the list itself. ctrl+c quits from anywhere; q quits except
+// while searching, where it is an ordinary character.
+//
+//nolint:ireturn // bubbletea's Update contract requires the tea.Model interface.
+func (m Model) handleKey(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if keyMsg.String() == keyInterrupt {
+		return m, tea.Quit
+	}
+	switch {
+	case m.searching:
+		return m.updateSearch(keyMsg), nil
+	case m.helping:
+		if keyMsg.String() == keyHelp {
+			m.helping = false
+		}
+		return m.quitOr(keyMsg)
+	case m.phase != phaseList:
+		return m.quitOr(keyMsg)
+	default:
+		return m.updateList(keyMsg)
+	}
+}
+
+// quitOr quits on q and otherwise leaves the model unchanged; it backs the
+// non-interactive screens (help, executing, complete) where only exit applies.
+//
+//nolint:ireturn // matches handleKey's tea.Model return.
+func (m Model) quitOr(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if keyMsg.String() == keyQuit {
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
 // updateList handles keys on the list screen, delegating selection edits so no
 // single function carries the whole keymap.
 func (m Model) updateList(keyMsg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch keyMsg.String() {
-	case keyQuit, keyInterrupt:
+	case keyQuit:
 		return m, tea.Quit
 	case keyRun:
 		return m.startExecution()

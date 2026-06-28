@@ -325,6 +325,71 @@ func TestToggleOnEmptyListSelectsNothing(t *testing.T) {
 	}
 }
 
+func isQuit(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	_, ok := cmd().(tea.QuitMsg)
+	return ok
+}
+
+func TestInterruptQuitsFromSearchMode(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySearch)
+	if _, cmd := model.Update(key(keyInterrupt)); !isQuit(cmd) {
+		t.Error("ctrl+c should quit even while searching")
+	}
+}
+
+func TestKeysDoNotRerunDuringExecution(t *testing.T) {
+	fake := &fakeClient{}
+	model := New(fake, sampleMRs())
+	model = press(model, keySpace) // select first MR
+	next, _ := model.Update(key(keyRun))
+	model = asModel(next) // now phaseExecuting, action in flight
+	if model.phase != phaseExecuting {
+		t.Fatalf("phase = %v, want phaseExecuting", model.phase)
+	}
+
+	next2, cmd := model.Update(key(keyRun)) // pressing x again must not re-run
+	model = asModel(next2)
+	if cmd != nil {
+		t.Error("x during execution must not start another run")
+	}
+	if model.phase != phaseExecuting {
+		t.Errorf("phase = %v, want phaseExecuting (unchanged)", model.phase)
+	}
+}
+
+func TestKeysIgnoredOnCompleteScreenExceptQuit(t *testing.T) {
+	fake := &fakeClient{}
+	model := New(fake, sampleMRs())
+	model = press(model, keySpace)
+	next, cmd := model.Update(key(keyRun))
+	model = drain(asModel(next), cmd) // phaseComplete
+
+	next2, cmd2 := model.Update(key(keyRun)) // must not re-run actions
+	if cmd2 != nil {
+		t.Error("x on the complete screen must not run actions")
+	}
+	if len(fake.approved) != 1 {
+		t.Errorf("approved %d times, want 1 (no re-run)", len(fake.approved))
+	}
+	if _, cmd := asModel(next2).Update(key(keyQuit)); !isQuit(cmd) {
+		t.Error("q should quit from the complete screen")
+	}
+}
+
+func TestHelpOverlayIgnoresNavigation(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keyDown) // cursor at 1
+	model = press(model, keyHelp) // open help
+	model = press(model, keyDown) // must be ignored while help is shown
+	if model.cursor != 1 {
+		t.Errorf("cursor = %d, want 1 (navigation ignored under help)", model.cursor)
+	}
+}
+
 func TestRunWithoutSelectionStaysOnList(t *testing.T) {
 	model := New(&fakeClient{}, sampleMRs())
 	next, cmd := model.Update(key(keyRun))
