@@ -50,6 +50,10 @@ type Model struct {
 	mode     mode
 	// filter, when non-empty, restricts the visible MRs to those matching it.
 	filter string
+	// searching is true while the user types a query; searchBuf holds the
+	// in-progress text that becomes the filter only when committed with enter.
+	searching bool
+	searchBuf string
 }
 
 // modeLabel names the current action mode for display.
@@ -99,7 +103,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	if m.searching {
+		return m.updateSearch(keyMsg), nil
+	}
 	switch keyMsg.String() {
+	case "/":
+		m.searching = true
+		m.searchBuf = ""
 	case "j":
 		if m.cursor < len(m.visible())-1 {
 			m.cursor++
@@ -122,6 +132,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateSearch handles keys while the search prompt is open: enter commits the
+// query (clearing any prior selection, since the indices it referenced no
+// longer apply), esc discards it, and any other text edits the query.
+func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
+	switch keyMsg.String() {
+	case "enter":
+		m.filter = m.searchBuf
+		m.searching = false
+		m.selected = make(map[int]bool)
+		m.cursor = 0
+	case "esc":
+		m.searching = false
+		m.searchBuf = ""
+	case "backspace":
+		if m.searchBuf != "" {
+			runes := []rune(m.searchBuf)
+			m.searchBuf = string(runes[:len(runes)-1])
+		}
+	default:
+		m.searchBuf += keyMsg.Text
+	}
+	return m
+}
+
 // View implements tea.Model.
 func (m Model) View() tea.View {
 	return tea.NewView(m.renderList())
@@ -132,6 +166,10 @@ func (m Model) renderList() string {
 	for i, mr := range m.visible() {
 		b.WriteString(m.renderRow(i, mr))
 		b.WriteByte('\n')
+	}
+	if m.searching {
+		fmt.Fprintf(&b, "\nsearch: %s\n", m.searchBuf)
+		return b.String()
 	}
 	fmt.Fprintf(&b, "\nmode: %s  (m: change, x: run, ?: help, q: quit)\n", m.modeLabel())
 	return b.String()
