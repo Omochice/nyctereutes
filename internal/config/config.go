@@ -20,8 +20,10 @@ type Config struct {
 
 func Load(ctx context.Context, runner glab.Runner) *Config {
 	return &Config{
-		Repos:    strutil.SplitList(get(ctx, runner, "dep.repo")),
-		Patterns: strutil.SplitList(get(ctx, runner, "dep.patterns")),
+		Repos: strutil.SplitList(get(ctx, runner, "dep.repo")),
+		// Patterns are regexes, which may contain commas, so they are listed one
+		// per line rather than comma-separated.
+		Patterns: strutil.SplitLines(get(ctx, runner, "dep.patterns")),
 		Author:   strings.TrimSpace(get(ctx, runner, "dep.author")),
 	}
 }

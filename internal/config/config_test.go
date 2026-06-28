@@ -18,7 +18,9 @@ func TestLoadReadsDepConfigKeys(t *testing.T) {
 		case "dep.repo":
 			return []byte("g/a, g/b\n"), nil
 		case "dep.patterns":
-			return []byte(`pat1,pat2`), nil
+			// Newline-separated; the second pattern contains a comma that must
+			// survive (regex quantifier).
+			return []byte("foo.*\na{1,3}"), nil
 		}
 		return nil, nil
 	})
@@ -31,8 +33,8 @@ func TestLoadReadsDepConfigKeys(t *testing.T) {
 	if strings.Join(cfg.Repos, ",") != "g/a,g/b" {
 		t.Errorf("Repos = %v, want [g/a g/b]", cfg.Repos)
 	}
-	if strings.Join(cfg.Patterns, ",") != "pat1,pat2" {
-		t.Errorf("Patterns = %v, want [pat1 pat2]", cfg.Patterns)
+	if len(cfg.Patterns) != 2 || cfg.Patterns[0] != "foo.*" || cfg.Patterns[1] != "a{1,3}" {
+		t.Errorf("Patterns = %v, want [foo.* a{1,3}] with the comma preserved", cfg.Patterns)
 	}
 }
 
