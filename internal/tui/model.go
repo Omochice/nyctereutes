@@ -20,14 +20,28 @@ type Model struct {
 	client Client
 	mrs    []types.MR
 	cursor int
+	// selected holds the indices into mrs that the user has checked.
+	selected map[int]bool
 }
 
 // New builds a Model showing mrs, driving approve/merge through client.
 func New(client Client, mrs []types.MR) Model {
 	return Model{
-		client: client,
-		mrs:    mrs,
+		client:   client,
+		mrs:      mrs,
+		selected: make(map[int]bool),
 	}
+}
+
+// selectedMRs returns the checked MRs in display order.
+func (m Model) selectedMRs() []types.MR {
+	var out []types.MR
+	for i, mr := range m.mrs {
+		if m.selected[i] {
+			out = append(out, mr)
+		}
+	}
+	return out
 }
 
 // Init implements tea.Model; the MRs are loaded before the program starts, so
@@ -49,6 +63,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor > 0 {
 			m.cursor--
 		}
+	case "space", "enter":
+		m.selected[m.cursor] = !m.selected[m.cursor]
+	case "a":
+		for i := range m.mrs {
+			m.selected[i] = true
+		}
+	case "d":
+		m.selected = make(map[int]bool)
 	}
 	return m, nil
 }
