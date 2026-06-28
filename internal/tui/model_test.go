@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -130,6 +131,38 @@ func TestSpaceAndEnterToggleSelection(t *testing.T) {
 				t.Errorf("after second %s selected = %v, want none", k, got)
 			}
 		})
+	}
+}
+
+func TestListViewRendersRowElements(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	m = press(m, "space") // select the first MR so a checked box renders
+
+	out := m.View().Content
+	for _, want := range []string{
+		">",           // cursor on the first row
+		"[x]",         // checkbox of the selected MR
+		"g/a",         // shortened project path of group/a
+		"!12",         // MR IID
+		"Bump lodash", // title
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("view missing %q\n%s", want, out)
+		}
+	}
+	// The second MR is unselected, so its box is empty.
+	if !strings.Contains(out, "[ ]") {
+		t.Errorf("view missing an empty checkbox\n%s", out)
+	}
+}
+
+func TestListViewMarksUnmergeable(t *testing.T) {
+	mrs := []types.MR{
+		{IID: 20, Project: "group/x", Title: "Bump foo from 1 to 2", UnmergeableReason: types.ReasonConflict},
+	}
+	m := New(&fakeClient{}, mrs)
+	if !strings.Contains(m.View().Content, "⚠") {
+		t.Errorf("unmergeable MR should show a warning marker\n%s", m.View().Content)
 	}
 }
 
