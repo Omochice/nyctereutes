@@ -29,12 +29,12 @@ type options struct {
 	Help  *stubCommand `command:"help" description:"show help"`
 }
 
-// MainCommand is the production entry point; it drives the real glab CLI.
+// The production entry point; it drives the real glab CLI.
 func MainCommand(args []string, inout *cli.ProcInout) int {
 	return dispatch(args, inout, glab.ExecRunner{})
 }
 
-// dispatch parses args and runs the selected subcommand. The runner is injected
+// Parses args and runs the selected subcommand. The runner is injected
 // so tests can drive the commands with a fake glab instead of the real CLI.
 func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{

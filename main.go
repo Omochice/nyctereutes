@@ -1,3 +1,4 @@
+// Entry point of the nyctereutes CLI, which drives the glab toolchain.
 package main
 
 import (

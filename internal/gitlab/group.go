@@ -8,9 +8,9 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
-// GroupMRs buckets merge requests by the "package@version" key parsed from each
-// title. customPatterns override the built-in title patterns and are compiled
-// once here rather than per merge request; invalid patterns are skipped.
+// Buckets merge requests by the "package@version" key parsed from each title.
+// customPatterns override the built-in title patterns and are compiled once
+// here rather than per merge request; invalid patterns are skipped.
 //
 // An MR whose title cannot be parsed gets a unique fallback key so that a bulk
 // approve/merge against a group never sweeps up unrelated, unparsed MRs.
