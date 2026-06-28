@@ -78,7 +78,7 @@ func newDepCommand(inout *cli.ProcInout, runner glab.Runner) *depCommand {
 // without launching when nothing matches.
 func (c *depCommand) Execute(_ []string) error {
 	ctx := context.Background()
-	params, _ := c.scopeFlags.resolve(ctx, c.runner)
+	params, _ := c.resolve(ctx, c.runner)
 
 	mrs, err := gitlab.NewClient(c.runner).SearchMRs(ctx, params)
 	if err != nil {

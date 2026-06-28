@@ -27,16 +27,46 @@ const (
 	modeApproveMerge
 )
 
+// modeCount is the number of modes, used to wrap when cycling. It is a plain
+// int (not a mode) so it is not treated as an enum value in exhaustive switches.
+const modeCount = 3
+
+const (
+	labelApprove      = "approve"
+	labelMerge        = "merge"
+	labelApproveMerge = "approve & merge"
+)
+
 func (md mode) label() string {
 	switch md {
+	case modeApprove:
+		return labelApprove
 	case modeMerge:
-		return "merge"
+		return labelMerge
 	case modeApproveMerge:
-		return "approve & merge"
+		return labelApproveMerge
 	default:
-		return "approve"
+		return labelApprove
 	}
 }
+
+// Key names as returned by tea.KeyPressMsg.String().
+const (
+	keyDown      = "j"
+	keyUp        = "k"
+	keySpace     = "space"
+	keyEnter     = "enter"
+	keyEscape    = "esc"
+	keyBackspace = "backspace"
+	keyQuit      = "q"
+	keyInterrupt = "ctrl+c"
+	keySearch    = "/"
+	keyHelp      = "?"
+	keySelectAll = "a"
+	keyClear     = "d"
+	keyMode      = "m"
+	keyRun       = "x"
+)
 
 // phase is the screen the model is currently showing.
 type phase int
@@ -46,6 +76,10 @@ const (
 	phaseExecuting
 	phaseComplete
 )
+
+// mergeMethod is fixed to squash for the MVP; method/require-checks toggles are
+// a later increment.
+const mergeMethod = "squash"
 
 // actionResult records the outcome of applying the current mode to one MR.
 type actionResult struct {
@@ -59,7 +93,6 @@ type mrResultMsg actionResult
 // Model is the bubbletea model backing the interactive dep view.
 type Model struct {
 	client Client
-	ctx    context.Context
 	mrs    []types.MR
 	cursor int
 	// selected holds the indices into the visible (filtered) MR list that the
@@ -80,25 +113,152 @@ type Model struct {
 	helping bool           // true while the help overlay is shown
 }
 
-// modeLabel names the current action mode for display.
-func (m Model) modeLabel() string { return m.mode.label() }
-
-// MRs returns the merge requests the model was built with.
-func (m Model) MRs() []types.MR { return m.mrs }
-
 // New builds a Model showing mrs, driving approve/merge through client.
 func New(client Client, mrs []types.MR) Model {
 	return Model{
 		client:   client,
-		ctx:      context.Background(),
 		mrs:      mrs,
 		selected: make(map[int]bool),
 	}
 }
 
+// MRs returns the merge requests the model was built with.
+func (m Model) MRs() []types.MR { return m.mrs }
+
+// Init implements tea.Model; the MRs are loaded before the program starts, so
+// there is no initial command.
+func (m Model) Init() tea.Cmd { return nil }
+
+// Update implements tea.Model.
+//
+//nolint:ireturn // bubbletea's Update must return the tea.Model interface.
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch typed := msg.(type) {
+	case mrResultMsg:
+		return m.recordResult(typed), nil
+	case tea.KeyPressMsg:
+		if m.searching {
+			return m.updateSearch(typed), nil
+		}
+		return m.updateList(typed)
+	default:
+		return m, nil
+	}
+}
+
+// View implements tea.Model.
+func (m Model) View() tea.View {
+	if m.helping {
+		return tea.NewView(helpText)
+	}
+	switch m.phase {
+	case phaseExecuting:
+		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
+	case phaseComplete:
+		return tea.NewView(m.renderResults())
+	case phaseList:
+		return tea.NewView(m.renderList())
+	default:
+		return tea.NewView(m.renderList())
+	}
+}
+
+// modeLabel names the current action mode for display.
+func (m Model) modeLabel() string { return m.mode.label() }
+
+// recordResult folds one finished MR action into the results and advances to
+// the complete screen once every action has reported back.
+func (m Model) recordResult(result mrResultMsg) Model {
+	m.results = append(m.results, actionResult(result))
+	m.pending--
+	if m.pending <= 0 {
+		m.phase = phaseComplete
+	}
+	return m
+}
+
+// updateList handles keys on the list screen, delegating selection edits so no
+// single function carries the whole keymap.
+func (m Model) updateList(keyMsg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch keyMsg.String() {
+	case keyQuit, keyInterrupt:
+		return m, tea.Quit
+	case keyRun:
+		return m.startExecution()
+	default:
+		return m.editList(keyMsg), nil
+	}
+}
+
+// editList applies the non-terminal list keys: navigation, selection, search
+// entry, help and mode cycling.
+func (m Model) editList(keyMsg tea.KeyPressMsg) Model {
+	switch keyMsg.String() {
+	case keyHelp:
+		m.helping = !m.helping
+	case keySearch:
+		m.searching = true
+		m.searchBuf = ""
+	case keyDown:
+		m = m.moveCursor(1)
+	case keyUp:
+		m = m.moveCursor(-1)
+	case keySpace, keyEnter:
+		m.selected[m.cursor] = !m.selected[m.cursor]
+	case keySelectAll:
+		m = m.selectAll()
+	case keyClear:
+		m.selected = make(map[int]bool)
+	case keyMode:
+		m.mode = (m.mode + 1) % modeCount
+	}
+	return m
+}
+
+// moveCursor shifts the cursor by delta, staying within the visible list.
+func (m Model) moveCursor(delta int) Model {
+	next := m.cursor + delta
+	if next >= 0 && next < len(m.visible()) {
+		m.cursor = next
+	}
+	return m
+}
+
+// selectAll checks every visible MR.
+func (m Model) selectAll() Model {
+	for index := range m.visible() {
+		m.selected[index] = true
+	}
+	return m
+}
+
+// updateSearch handles keys while the search prompt is open: enter commits the
+// query (clearing any prior selection, since the indices it referenced no
+// longer apply), esc discards it, and any other text edits the query.
+func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
+	switch keyMsg.String() {
+	case keyEnter:
+		m.filter = m.searchBuf
+		m.searching = false
+		m.selected = make(map[int]bool)
+		m.cursor = 0
+	case keyEscape:
+		m.searching = false
+		m.searchBuf = ""
+	case keyBackspace:
+		if m.searchBuf != "" {
+			runes := []rune(m.searchBuf)
+			m.searchBuf = string(runes[:len(runes)-1])
+		}
+	default:
+		m.searchBuf += keyMsg.Text
+	}
+	return m
+}
+
 // startExecution kicks off the current mode's action against every selected MR
 // concurrently, or stays on the list when nothing is selected.
-func (m Model) startExecution() (tea.Model, tea.Cmd) {
+func (m Model) startExecution() (Model, tea.Cmd) {
 	selected := m.selectedMRs()
 	if len(selected) == 0 {
 		return m, nil
@@ -108,26 +268,27 @@ func (m Model) startExecution() (tea.Model, tea.Cmd) {
 	m.results = nil
 
 	cmds := make([]tea.Cmd, 0, len(selected))
-	for _, mr := range selected {
-		cmds = append(cmds, m.actionCmd(mr))
+	for _, mergeRequest := range selected {
+		cmds = append(cmds, m.actionCmd(mergeRequest))
 	}
 	return m, tea.Batch(cmds...)
 }
 
-// actionCmd returns a command that applies the current mode to mr and reports
-// the outcome. In approve & merge mode a failed approval skips the merge so a
-// broken MR is not merged.
-func (m Model) actionCmd(mr types.MR) tea.Cmd {
-	mode := m.mode
+// actionCmd returns a command that applies the current mode to mergeRequest and
+// reports the outcome. In approve & merge mode a failed approval skips the merge
+// so a broken MR is not merged.
+func (m Model) actionCmd(mergeRequest types.MR) tea.Cmd {
+	currentMode := m.mode
 	return func() tea.Msg {
+		ctx := context.Background()
 		var err error
-		if mode == modeApprove || mode == modeApproveMerge {
-			err = m.client.ApproveMR(m.ctx, mr.Project, mr.IID)
+		if currentMode == modeApprove || currentMode == modeApproveMerge {
+			err = m.client.ApproveMR(ctx, mergeRequest.Project, mergeRequest.IID)
 		}
-		if err == nil && (mode == modeMerge || mode == modeApproveMerge) {
-			err = m.client.MergeMR(m.ctx, mr.Project, mr.IID, "squash", true)
+		if err == nil && (currentMode == modeMerge || currentMode == modeApproveMerge) {
+			err = m.client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, mergeMethod, true)
 		}
-		return mrResultMsg{mr: mr, err: err}
+		return mrResultMsg{mr: mergeRequest, err: err}
 	}
 }
 
@@ -137,9 +298,9 @@ func (m Model) visible() []types.MR {
 		return m.mrs
 	}
 	var out []types.MR
-	for _, mr := range m.mrs {
-		if matchesFilter(mr, m.filter) {
-			out = append(out, mr)
+	for _, mergeRequest := range m.mrs {
+		if matchesFilter(mergeRequest, m.filter) {
+			out = append(out, mergeRequest)
 		}
 	}
 	return out
@@ -148,90 +309,12 @@ func (m Model) visible() []types.MR {
 // selectedMRs returns the checked MRs in display order.
 func (m Model) selectedMRs() []types.MR {
 	var out []types.MR
-	for i, mr := range m.visible() {
-		if m.selected[i] {
-			out = append(out, mr)
+	for index, mergeRequest := range m.visible() {
+		if m.selected[index] {
+			out = append(out, mergeRequest)
 		}
 	}
 	return out
-}
-
-// Init implements tea.Model; the MRs are loaded before the program starts, so
-// there is no initial command.
-func (m Model) Init() tea.Cmd { return nil }
-
-// Update implements tea.Model.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if result, ok := msg.(mrResultMsg); ok {
-		m.results = append(m.results, actionResult(result))
-		m.pending--
-		if m.pending <= 0 {
-			m.phase = phaseComplete
-		}
-		return m, nil
-	}
-
-	keyMsg, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil
-	}
-	if m.searching {
-		return m.updateSearch(keyMsg), nil
-	}
-	switch keyMsg.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
-	case "?":
-		m.helping = !m.helping
-	case "/":
-		m.searching = true
-		m.searchBuf = ""
-	case "x":
-		return m.startExecution()
-	case "j":
-		if m.cursor < len(m.visible())-1 {
-			m.cursor++
-		}
-	case "k":
-		if m.cursor > 0 {
-			m.cursor--
-		}
-	case "space", "enter":
-		m.selected[m.cursor] = !m.selected[m.cursor]
-	case "a":
-		for i := range m.visible() {
-			m.selected[i] = true
-		}
-	case "d":
-		m.selected = make(map[int]bool)
-	case "m":
-		m.mode = (m.mode + 1) % 3
-	}
-	return m, nil
-}
-
-// updateSearch handles keys while the search prompt is open: enter commits the
-// query (clearing any prior selection, since the indices it referenced no
-// longer apply), esc discards it, and any other text edits the query.
-func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
-	switch keyMsg.String() {
-	case "enter":
-		m.filter = m.searchBuf
-		m.searching = false
-		m.selected = make(map[int]bool)
-		m.cursor = 0
-	case "esc":
-		m.searching = false
-		m.searchBuf = ""
-	case "backspace":
-		if m.searchBuf != "" {
-			runes := []rune(m.searchBuf)
-			m.searchBuf = string(runes[:len(runes)-1])
-		}
-	default:
-		m.searchBuf += keyMsg.Text
-	}
-	return m
 }
 
 const helpText = `Keybindings
@@ -245,51 +328,37 @@ const helpText = `Keybindings
   q/ctrl+c   quit
 `
 
-// View implements tea.Model.
-func (m Model) View() tea.View {
-	if m.helping {
-		return tea.NewView(helpText)
-	}
-	switch m.phase {
-	case phaseExecuting:
-		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
-	case phaseComplete:
-		return tea.NewView(m.renderResults())
-	default:
-		return tea.NewView(m.renderList())
-	}
-}
-
 func (m Model) renderResults() string {
-	var b strings.Builder
-	b.WriteString("Done:\n")
-	for _, r := range m.results {
+	var builder strings.Builder
+	builder.WriteString("Done:\n")
+	for _, result := range m.results {
 		mark := "✓"
 		detail := ""
-		if r.err != nil {
+		if result.err != nil {
 			mark = "✗"
-			detail = ": " + r.err.Error()
+			detail = ": " + result.err.Error()
 		}
-		fmt.Fprintf(&b, "%s %s !%d - %s%s\n", mark, pathShorten(r.mr.Project), r.mr.IID, r.mr.Title, detail)
+		fmt.Fprintf(&builder, "%s %s !%d - %s%s\n",
+			mark, pathShorten(result.mr.Project), result.mr.IID, result.mr.Title, detail)
 	}
-	return b.String()
+	return builder.String()
 }
 
 func (m Model) renderList() string {
-	var b strings.Builder
-	for i, mr := range m.visible() {
-		b.WriteString(m.renderRow(i, mr))
-		b.WriteByte('\n')
+	var builder strings.Builder
+	for index, mergeRequest := range m.visible() {
+		builder.WriteString(m.renderRow(index, mergeRequest))
+		builder.WriteByte('\n')
 	}
 	if m.searching {
-		fmt.Fprintf(&b, "\nsearch: %s\n", m.searchBuf)
-		return b.String()
+		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
+		return builder.String()
 	}
-	fmt.Fprintf(&b, "\nmode: %s  (m: change, x: run, ?: help, q: quit)\n", m.modeLabel())
-	return b.String()
+	fmt.Fprintf(&builder, "\nmode: %s  (m: change, x: run, ?: help, q: quit)\n", m.modeLabel())
+	return builder.String()
 }
 
-func (m Model) renderRow(index int, mr types.MR) string {
+func (m Model) renderRow(index int, mergeRequest types.MR) string {
 	cursor := " "
 	if index == m.cursor {
 		cursor = ">"
@@ -299,20 +368,21 @@ func (m Model) renderRow(index int, mr types.MR) string {
 		checkbox = "[x]"
 	}
 	warn := " "
-	if mr.UnmergeableReason != "" {
+	if mergeRequest.UnmergeableReason != "" {
 		warn = "⚠"
 	}
 	return fmt.Sprintf("%s %s %s %s %s !%d - %s",
-		cursor, checkbox, ciSymbol(mr.CIStatus), warn, pathShorten(mr.Project), mr.IID, mr.Title)
+		cursor, checkbox, ciSymbol(mergeRequest.CIStatus), warn,
+		pathShorten(mergeRequest.Project), mergeRequest.IID, mergeRequest.Title)
 }
 
-// matchesFilter reports whether mr matches query as a case-insensitive
+// matchesFilter reports whether mergeRequest matches query as a case-insensitive
 // substring of its title, project path, or IID.
-func matchesFilter(mr types.MR, query string) bool {
-	q := strings.ToLower(query)
-	return strings.Contains(strings.ToLower(mr.Title), q) ||
-		strings.Contains(strings.ToLower(mr.Project), q) ||
-		strings.Contains(strconv.Itoa(mr.IID), q)
+func matchesFilter(mergeRequest types.MR, query string) bool {
+	lowered := strings.ToLower(query)
+	return strings.Contains(strings.ToLower(mergeRequest.Title), lowered) ||
+		strings.Contains(strings.ToLower(mergeRequest.Project), lowered) ||
+		strings.Contains(strconv.Itoa(mergeRequest.IID), lowered)
 }
 
 // ciSymbol maps a normalized pipeline status to a single-column glyph.

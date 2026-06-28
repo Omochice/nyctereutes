@@ -12,10 +12,10 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
-// fakeClient records the approve/merge calls the model issues so tests can
-// assert on them without a real glab.
 var errApprove = errors.New("approve failed")
 
+// fakeClient records the approve/merge calls the model issues so tests can
+// assert on them without a real glab.
 type fakeClient struct {
 	mu          sync.Mutex
 	approved    []int
@@ -56,98 +56,152 @@ func sampleMRs() []types.MR {
 	}
 }
 
-func key(s string) tea.KeyPressMsg {
-	switch s {
-	case "enter":
+func key(name string) tea.KeyPressMsg {
+	switch name {
+	case keyEnter:
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
-	case "space":
+	case keySpace:
 		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
-	case "esc":
+	case keyEscape:
 		return tea.KeyPressMsg{Code: tea.KeyEsc}
-	case "ctrl+c":
+	case keyInterrupt:
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	default:
-		r := []rune(s)[0]
-		return tea.KeyPressMsg{Code: r, Text: s}
+		return tea.KeyPressMsg{Code: []rune(name)[0], Text: name}
 	}
 }
 
-// press feeds each key string through Update in order and returns the model.
-func press(m Model, keys ...string) Model {
-	for _, k := range keys {
-		next, _ := m.Update(key(k))
-		m = next.(Model)
-	}
-	return m
+func asModel(updated tea.Model) Model {
+	model, _ := updated.(Model)
+	return model
 }
 
-func TestInitialCursorOnFirstMR(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	if m.cursor != 0 {
-		t.Errorf("initial cursor = %d, want 0", m.cursor)
+// press feeds each key name through Update in order and returns the model.
+func press(model Model, names ...string) Model {
+	for _, name := range names {
+		next, _ := model.Update(key(name))
+		model = asModel(next)
 	}
+	return model
 }
 
-func TestCursorMovesDownAndStopsAtEnd(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs()) // 3 MRs
-
-	m = press(m, "j")
-	if m.cursor != 1 {
-		t.Fatalf("after j cursor = %d, want 1", m.cursor)
+// typeRunes feeds the runes of text one key press at a time.
+func typeRunes(model Model, text string) Model {
+	for _, char := range text {
+		model = press(model, string(char))
 	}
-
-	m = press(m, "j", "j", "j") // past the end
-	if m.cursor != 2 {
-		t.Errorf("cursor = %d, want 2 (clamped at last MR)", m.cursor)
-	}
+	return model
 }
 
-func TestCursorMovesUpAndStopsAtTop(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	m = press(m, "j", "j") // cursor at 2
-
-	m = press(m, "k")
-	if m.cursor != 1 {
-		t.Fatalf("after k cursor = %d, want 1", m.cursor)
+// drain runs cmd and feeds the resulting message(s) back through Update,
+// unwrapping tea.Batch so the per-MR commands actually execute.
+func drain(model Model, cmd tea.Cmd) Model {
+	if cmd == nil {
+		return model
 	}
-
-	m = press(m, "k", "k", "k") // past the top
-	if m.cursor != 0 {
-		t.Errorf("cursor = %d, want 0 (clamped at first MR)", m.cursor)
+	switch msg := cmd().(type) {
+	case tea.BatchMsg:
+		for _, batched := range msg {
+			model = drain(model, batched)
+		}
+	default:
+		next, _ := model.Update(msg)
+		model = asModel(next)
 	}
+	return model
 }
 
-func selectedIIDs(m Model) []int {
-	var iids []int
-	for _, mr := range m.selectedMRs() {
-		iids = append(iids, mr.IID)
+func selectedIIDs(model Model) []int {
+	selected := model.selectedMRs()
+	iids := make([]int, 0, len(selected))
+	for _, mergeRequest := range selected {
+		iids = append(iids, mergeRequest.IID)
 	}
 	return iids
 }
 
-func TestSpaceAndEnterToggleSelection(t *testing.T) {
-	for _, k := range []string{"space", "enter"} {
-		t.Run(k, func(t *testing.T) {
-			m := New(&fakeClient{}, sampleMRs())
+func visibleIIDs(model Model) []int {
+	visible := model.visible()
+	iids := make([]int, 0, len(visible))
+	for _, mergeRequest := range visible {
+		iids = append(iids, mergeRequest.IID)
+	}
+	return iids
+}
 
-			m = press(m, k) // select MR under cursor (IID 12)
-			if got := selectedIIDs(m); len(got) != 1 || got[0] != 12 {
-				t.Fatalf("after %s selected = %v, want [12]", k, got)
+func TestInitialCursorOnFirstMR(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	if model.cursor != 0 {
+		t.Errorf("initial cursor = %d, want 0", model.cursor)
+	}
+}
+
+func TestCursorMovesDownAndStopsAtEnd(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs()) // 3 MRs
+
+	model = press(model, keyDown)
+	if model.cursor != 1 {
+		t.Fatalf("after j cursor = %d, want 1", model.cursor)
+	}
+
+	model = press(model, keyDown, keyDown, keyDown) // past the end
+	if model.cursor != 2 {
+		t.Errorf("cursor = %d, want 2 (clamped at last MR)", model.cursor)
+	}
+}
+
+func TestCursorMovesUpAndStopsAtTop(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keyDown, keyDown) // cursor at 2
+
+	model = press(model, keyUp)
+	if model.cursor != 1 {
+		t.Fatalf("after k cursor = %d, want 1", model.cursor)
+	}
+
+	model = press(model, keyUp, keyUp, keyUp) // past the top
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 (clamped at first MR)", model.cursor)
+	}
+}
+
+func TestSpaceAndEnterToggleSelection(t *testing.T) {
+	for _, keyName := range []string{keySpace, keyEnter} {
+		t.Run(keyName, func(t *testing.T) {
+			model := New(&fakeClient{}, sampleMRs())
+
+			model = press(model, keyName) // select MR under cursor (IID 12)
+			if got := selectedIIDs(model); len(got) != 1 || got[0] != 12 {
+				t.Fatalf("after %s selected = %v, want [12]", keyName, got)
 			}
 
-			m = press(m, k) // toggle off
-			if got := selectedIIDs(m); len(got) != 0 {
-				t.Errorf("after second %s selected = %v, want none", k, got)
+			model = press(model, keyName) // toggle off
+			if got := selectedIIDs(model); len(got) != 0 {
+				t.Errorf("after second %s selected = %v, want none", keyName, got)
 			}
 		})
 	}
 }
 
-func TestListViewRendersRowElements(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	m = press(m, "space") // select the first MR so a checked box renders
+func TestSelectAllAndDeselectAll(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
 
-	out := m.View().Content
+	model = press(model, keySelectAll)
+	if got := len(selectedIIDs(model)); got != 3 {
+		t.Fatalf("after a selected count = %d, want 3", got)
+	}
+
+	model = press(model, keyClear)
+	if got := len(selectedIIDs(model)); got != 0 {
+		t.Errorf("after d selected count = %d, want 0", got)
+	}
+}
+
+func TestListViewRendersRowElements(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySpace) // select the first MR so a checked box renders
+
+	out := model.View().Content
 	for _, want := range []string{
 		">",           // cursor on the first row
 		"[x]",         // checkbox of the selected MR
@@ -165,39 +219,34 @@ func TestListViewRendersRowElements(t *testing.T) {
 	}
 }
 
-func visibleIIDs(m Model) []int {
-	var iids []int
-	for _, mr := range m.visible() {
-		iids = append(iids, mr.IID)
+func TestListViewMarksUnmergeable(t *testing.T) {
+	mrs := []types.MR{
+		{IID: 20, Project: "group/x", Title: "Bump foo from 1 to 2", UnmergeableReason: types.ReasonConflict},
 	}
-	return iids
-}
-
-func typeRunes(m Model, s string) Model {
-	for _, r := range s {
-		m = press(m, string(r))
+	model := New(&fakeClient{}, mrs)
+	if !strings.Contains(model.View().Content, "⚠") {
+		t.Errorf("unmergeable MR should show a warning marker\n%s", model.View().Content)
 	}
-	return m
 }
 
 func TestSlashEntersSearchMode(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	m = press(m, "/")
-	if !strings.Contains(m.View().Content, "search:") {
-		t.Errorf("search mode should show a search prompt\n%s", m.View().Content)
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySearch)
+	if !strings.Contains(model.View().Content, "search:") {
+		t.Errorf("search mode should show a search prompt\n%s", model.View().Content)
 	}
 }
 
 func TestSearchFiltersOnEnter(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	m = press(m, "/")
-	m = typeRunes(m, "axios")
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySearch)
+	model = typeRunes(model, "axios")
 	// Not applied until enter is pressed.
-	if got := len(visibleIIDs(m)); got != 3 {
+	if got := len(visibleIIDs(model)); got != 3 {
 		t.Fatalf("before enter visible = %d, want 3 (live filtering disabled)", got)
 	}
-	m = press(m, "enter")
-	if got := visibleIIDs(m); len(got) != 1 || got[0] != 13 {
+	model = press(model, keyEnter)
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 13 {
 		t.Errorf("after enter visible = %v, want [13]", got)
 	}
 }
@@ -207,84 +256,66 @@ func TestSearchIsCaseInsensitiveAcrossFields(t *testing.T) {
 		query string
 		want  int // expected single matching IID
 	}{
-		"title":   {query: "LODASH", want: 12},
-		"project": {query: "GROUP/B", want: 13},
-		"iid":     {query: "14", want: 14},
+		"title":       {query: "LODASH", want: 12},
+		"projectPath": {query: "GROUP/B", want: 13},
+		"iid":         {query: "14", want: 14},
 	}
-	for name, tc := range cases {
+	for name, testCase := range cases {
 		t.Run(name, func(t *testing.T) {
-			m := New(&fakeClient{}, sampleMRs())
-			m = press(m, "/")
-			m = typeRunes(m, tc.query)
-			m = press(m, "enter")
-			if got := visibleIIDs(m); len(got) != 1 || got[0] != tc.want {
-				t.Errorf("query %q visible = %v, want [%d]", tc.query, got, tc.want)
+			model := New(&fakeClient{}, sampleMRs())
+			model = press(model, keySearch)
+			model = typeRunes(model, testCase.query)
+			model = press(model, keyEnter)
+			if got := visibleIIDs(model); len(got) != 1 || got[0] != testCase.want {
+				t.Errorf("query %q visible = %v, want [%d]", testCase.query, got, testCase.want)
 			}
 		})
 	}
 }
 
 func TestSearchEscCancelsWithoutFiltering(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	m = press(m, "/")
-	m = typeRunes(m, "axios")
-	m = press(m, "esc")
-	if got := len(visibleIIDs(m)); got != 3 {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySearch)
+	model = typeRunes(model, "axios")
+	model = press(model, keyEscape)
+	if got := len(visibleIIDs(model)); got != 3 {
 		t.Errorf("after esc visible = %d, want 3 (filter discarded)", got)
 	}
 }
 
 func TestApplyingFilterClearsSelection(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	m = press(m, "space") // select first MR
-	m = press(m, "/")
-	m = typeRunes(m, "axios")
-	m = press(m, "enter")
-	if got := len(selectedIIDs(m)); got != 0 {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySpace) // select first MR
+	model = press(model, keySearch)
+	model = typeRunes(model, "axios")
+	model = press(model, keyEnter)
+	if got := len(selectedIIDs(model)); got != 0 {
 		t.Errorf("after applying filter selected = %d, want 0", got)
 	}
 }
 
 func TestEmptyFilterResultKeepsCursorInRange(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	m = press(m, "j", "j") // cursor at 2
-	m = press(m, "/")
-	m = typeRunes(m, "zzz-no-match")
-	m = press(m, "enter")
-	if len(visibleIIDs(m)) != 0 {
-		t.Fatalf("expected no matches, got %v", visibleIIDs(m))
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keyDown, keyDown) // cursor at 2
+	model = press(model, keySearch)
+	model = typeRunes(model, "zzz-no-match")
+	model = press(model, keyEnter)
+	if len(visibleIIDs(model)) != 0 {
+		t.Fatalf("expected no matches, got %v", visibleIIDs(model))
 	}
-	if m.cursor != 0 {
-		t.Errorf("cursor = %d, want 0 when the list is empty", m.cursor)
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 when the list is empty", model.cursor)
 	}
 	// View must not panic on an empty list.
-	_ = m.View().Content
-}
-
-// drain runs cmd and feeds the resulting message(s) back through Update,
-// unwrapping tea.Batch so the per-MR commands actually execute.
-func drain(m Model, cmd tea.Cmd) Model {
-	if cmd == nil {
-		return m
-	}
-	switch msg := cmd().(type) {
-	case tea.BatchMsg:
-		for _, c := range msg {
-			m = drain(m, c)
-		}
-	default:
-		next, _ := m.Update(msg)
-		m = next.(Model)
-	}
-	return m
+	_ = model.View().Content
 }
 
 func TestRunWithoutSelectionStaysOnList(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	next, cmd := m.Update(key("x"))
-	m = next.(Model)
-	if m.phase != phaseList {
-		t.Errorf("phase = %v, want phaseList when nothing is selected", m.phase)
+	model := New(&fakeClient{}, sampleMRs())
+	next, cmd := model.Update(key(keyRun))
+	model = asModel(next)
+	if model.phase != phaseList {
+		t.Errorf("phase = %v, want phaseList when nothing is selected", model.phase)
 	}
 	if cmd != nil {
 		t.Errorf("want no command when nothing is selected")
@@ -293,12 +324,12 @@ func TestRunWithoutSelectionStaysOnList(t *testing.T) {
 
 func TestRunWithSelectionEntersExecuting(t *testing.T) {
 	fake := &fakeClient{approveFn: func(int) error { return nil }}
-	m := New(fake, sampleMRs())
-	m = press(m, "space") // select first MR
-	next, cmd := m.Update(key("x"))
-	m = next.(Model)
-	if m.phase != phaseExecuting {
-		t.Errorf("phase = %v, want phaseExecuting", m.phase)
+	model := New(fake, sampleMRs())
+	model = press(model, keySpace) // select first MR
+	next, cmd := model.Update(key(keyRun))
+	model = asModel(next)
+	if model.phase != phaseExecuting {
+		t.Errorf("phase = %v, want phaseExecuting", model.phase)
 	}
 	if cmd == nil {
 		t.Errorf("want a command to perform the action")
@@ -307,10 +338,10 @@ func TestRunWithSelectionEntersExecuting(t *testing.T) {
 
 func TestApproveModeRunsApproveOnly(t *testing.T) {
 	fake := &fakeClient{}
-	m := New(fake, sampleMRs())
-	m = press(m, "a") // select all 3
-	next, cmd := m.Update(key("x"))
-	m = drain(next.(Model), cmd)
+	model := New(fake, sampleMRs())
+	model = press(model, keySelectAll) // select all 3
+	next, cmd := model.Update(key(keyRun))
+	model = drain(asModel(next), cmd)
 
 	if len(fake.approved) != 3 {
 		t.Errorf("approved %d MRs, want 3", len(fake.approved))
@@ -318,18 +349,18 @@ func TestApproveModeRunsApproveOnly(t *testing.T) {
 	if len(fake.merged) != 0 {
 		t.Errorf("merged %d MRs, want 0 in approve mode", len(fake.merged))
 	}
-	if m.phase != phaseComplete {
-		t.Errorf("phase = %v, want phaseComplete after execution", m.phase)
+	if model.phase != phaseComplete {
+		t.Errorf("phase = %v, want phaseComplete after execution", model.phase)
 	}
 }
 
 func TestMergeModeMergesWithSquashAutoMerge(t *testing.T) {
 	fake := &fakeClient{}
-	m := New(fake, sampleMRs())
-	m = press(m, "m")     // mode -> merge
-	m = press(m, "space") // select first MR
-	next, cmd := m.Update(key("x"))
-	m = drain(next.(Model), cmd)
+	model := New(fake, sampleMRs())
+	model = press(model, keyMode)  // mode -> merge
+	model = press(model, keySpace) // select first MR
+	next, cmd := model.Update(key(keyRun))
+	drain(asModel(next), cmd)
 
 	if len(fake.approved) != 0 {
 		t.Errorf("approved %d MRs, want 0 in merge mode", len(fake.approved))
@@ -337,18 +368,18 @@ func TestMergeModeMergesWithSquashAutoMerge(t *testing.T) {
 	if len(fake.merged) != 1 {
 		t.Fatalf("merged %d MRs, want 1", len(fake.merged))
 	}
-	if fake.mergeMethod[0] != "squash" || !fake.mergeAuto[0] {
+	if fake.mergeMethod[0] != mergeMethod || !fake.mergeAuto[0] {
 		t.Errorf("merge called with method=%q auto=%v, want squash/true", fake.mergeMethod[0], fake.mergeAuto[0])
 	}
 }
 
 func TestApproveMergeApprovesThenMerges(t *testing.T) {
 	fake := &fakeClient{}
-	m := New(fake, sampleMRs())
-	m = press(m, "m", "m") // mode -> approve & merge
-	m = press(m, "space")  // select first MR (IID 12)
-	next, cmd := m.Update(key("x"))
-	m = drain(next.(Model), cmd)
+	model := New(fake, sampleMRs())
+	model = press(model, keyMode, keyMode) // mode -> approve & merge
+	model = press(model, keySpace)         // select first MR (IID 12)
+	next, cmd := model.Update(key(keyRun))
+	drain(asModel(next), cmd)
 
 	if len(fake.approved) != 1 || fake.approved[0] != 12 {
 		t.Errorf("approved = %v, want [12]", fake.approved)
@@ -360,11 +391,11 @@ func TestApproveMergeApprovesThenMerges(t *testing.T) {
 
 func TestApproveMergeSkipsMergeWhenApproveFails(t *testing.T) {
 	fake := &fakeClient{approveFn: func(int) error { return errApprove }}
-	m := New(fake, sampleMRs())
-	m = press(m, "m", "m") // mode -> approve & merge
-	m = press(m, "space")
-	next, cmd := m.Update(key("x"))
-	m = drain(next.(Model), cmd)
+	model := New(fake, sampleMRs())
+	model = press(model, keyMode, keyMode) // mode -> approve & merge
+	model = press(model, keySpace)
+	next, cmd := model.Update(key(keyRun))
+	drain(asModel(next), cmd)
 
 	if len(fake.approved) != 1 {
 		t.Errorf("approved %d, want 1 attempt", len(fake.approved))
@@ -376,81 +407,57 @@ func TestApproveMergeSkipsMergeWhenApproveFails(t *testing.T) {
 
 func TestCompleteViewShowsResults(t *testing.T) {
 	fake := &fakeClient{}
-	m := New(fake, sampleMRs())
-	m = press(m, "space") // select IID 12
-	next, cmd := m.Update(key("x"))
-	m = drain(next.(Model), cmd)
+	model := New(fake, sampleMRs())
+	model = press(model, keySpace) // select IID 12
+	next, cmd := model.Update(key(keyRun))
+	model = drain(asModel(next), cmd)
 
-	out := m.View().Content
+	out := model.View().Content
 	if !strings.Contains(out, "!12") {
 		t.Errorf("complete view should report the processed MR\n%s", out)
 	}
 }
 
 func TestHelpToggles(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
+	model := New(&fakeClient{}, sampleMRs())
 
-	m = press(m, "?")
-	if !strings.Contains(m.View().Content, "Keybindings") {
-		t.Fatalf("? should show the help view\n%s", m.View().Content)
+	model = press(model, keyHelp)
+	if !strings.Contains(model.View().Content, "Keybindings") {
+		t.Fatalf("? should show the help view\n%s", model.View().Content)
 	}
 
-	m = press(m, "?")
-	if strings.Contains(m.View().Content, "Keybindings") {
-		t.Errorf("second ? should return to the list view\n%s", m.View().Content)
+	model = press(model, keyHelp)
+	if strings.Contains(model.View().Content, "Keybindings") {
+		t.Errorf("second ? should return to the list view\n%s", model.View().Content)
 	}
 }
 
 func TestQuitKeys(t *testing.T) {
-	for _, k := range []string{"q", "ctrl+c"} {
-		t.Run(k, func(t *testing.T) {
-			m := New(&fakeClient{}, sampleMRs())
-			_, cmd := m.Update(key(k))
+	for _, keyName := range []string{keyQuit, keyInterrupt} {
+		t.Run(keyName, func(t *testing.T) {
+			model := New(&fakeClient{}, sampleMRs())
+			_, cmd := model.Update(key(keyName))
 			if cmd == nil {
-				t.Fatalf("%s should return a command", k)
+				t.Fatalf("%s should return a command", keyName)
 			}
 			if _, ok := cmd().(tea.QuitMsg); !ok {
-				t.Errorf("%s should return tea.Quit", k)
+				t.Errorf("%s should return tea.Quit", keyName)
 			}
 		})
 	}
 }
 
 func TestModeStartsAtApproveAndCycles(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-	if got := m.modeLabel(); got != "approve" {
+	model := New(&fakeClient{}, sampleMRs())
+	if got := model.modeLabel(); got != labelApprove {
 		t.Fatalf("initial mode = %q, want approve", got)
 	}
 
-	want := []string{"merge", "approve & merge", "approve"}
-	for _, w := range want {
-		m = press(m, "m")
-		if got := m.modeLabel(); got != w {
-			t.Errorf("after m mode = %q, want %q", got, w)
+	want := []string{labelMerge, labelApproveMerge, labelApprove}
+	for _, wantLabel := range want {
+		model = press(model, keyMode)
+		if got := model.modeLabel(); got != wantLabel {
+			t.Errorf("after m mode = %q, want %q", got, wantLabel)
 		}
-	}
-}
-
-func TestListViewMarksUnmergeable(t *testing.T) {
-	mrs := []types.MR{
-		{IID: 20, Project: "group/x", Title: "Bump foo from 1 to 2", UnmergeableReason: types.ReasonConflict},
-	}
-	m := New(&fakeClient{}, mrs)
-	if !strings.Contains(m.View().Content, "⚠") {
-		t.Errorf("unmergeable MR should show a warning marker\n%s", m.View().Content)
-	}
-}
-
-func TestSelectAllAndDeselectAll(t *testing.T) {
-	m := New(&fakeClient{}, sampleMRs())
-
-	m = press(m, "a")
-	if got := len(selectedIIDs(m)); got != 3 {
-		t.Fatalf("after a selected count = %d, want 3", got)
-	}
-
-	m = press(m, "d")
-	if got := len(selectedIIDs(m)); got != 0 {
-		t.Errorf("after d selected count = %d, want 0", got)
 	}
 }
