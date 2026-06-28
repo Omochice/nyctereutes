@@ -64,6 +64,8 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 	case "esc":
 		return tea.KeyPressMsg{Code: tea.KeyEsc}
+	case "ctrl+c":
+		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	default:
 		r := []rune(s)[0]
 		return tea.KeyPressMsg{Code: r, Text: s}
@@ -382,6 +384,35 @@ func TestCompleteViewShowsResults(t *testing.T) {
 	out := m.View().Content
 	if !strings.Contains(out, "!12") {
 		t.Errorf("complete view should report the processed MR\n%s", out)
+	}
+}
+
+func TestHelpToggles(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+
+	m = press(m, "?")
+	if !strings.Contains(m.View().Content, "Keybindings") {
+		t.Fatalf("? should show the help view\n%s", m.View().Content)
+	}
+
+	m = press(m, "?")
+	if strings.Contains(m.View().Content, "Keybindings") {
+		t.Errorf("second ? should return to the list view\n%s", m.View().Content)
+	}
+}
+
+func TestQuitKeys(t *testing.T) {
+	for _, k := range []string{"q", "ctrl+c"} {
+		t.Run(k, func(t *testing.T) {
+			m := New(&fakeClient{}, sampleMRs())
+			_, cmd := m.Update(key(k))
+			if cmd == nil {
+				t.Fatalf("%s should return a command", k)
+			}
+			if _, ok := cmd().(tea.QuitMsg); !ok {
+				t.Errorf("%s should return tea.Quit", k)
+			}
+		})
 	}
 }
 
