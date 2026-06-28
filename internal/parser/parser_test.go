@@ -27,6 +27,16 @@ func TestParseTitle(t *testing.T) {
 			want:  "eslint@8.57.0",
 		},
 		{
+			name:  "single-segment version",
+			title: "Bump go from 1 to v2",
+			want:  "go@2",
+		},
+		{
+			name:  "prerelease version",
+			title: "Update dependency eslint to 9.0.0-beta.1",
+			want:  "eslint@9.0.0-beta.1",
+		},
+		{
 			name:  "unparseable title",
 			title: "Refactor the build pipeline",
 			want:  "unknown@unknown",

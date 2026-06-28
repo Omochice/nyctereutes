@@ -8,6 +8,11 @@ import "regexp"
 // whole match plus the package and version capture groups.
 const submatchCount = 3
 
+// versionPattern captures a leading-digit version, allowing pre-release and
+// build suffixes (for example v2, 1.2.3-beta.1, 1.0.0+build) rather than only
+// dotted numeric versions. A leading "v" is dropped.
+const versionPattern = `v?([0-9][0-9A-Za-z.+_-]*)`
+
 type PackageUpdate struct {
 	Package   string
 	ToVersion string
@@ -19,11 +24,11 @@ type PackageUpdate struct {
 //nolint:gochecknoglobals // immutable compiled patterns shared as package data
 var patterns = []*regexp.Regexp{
 	// "Bump/Update PACKAGE from X to VERSION" (Dependabot/Renovate "from...to").
-	regexp.MustCompile(`(?i)(?:bump|update)[:\s]+([^\s]+)\s+from\s+[^\s]+\s+to\s+v?(\d+\.\d+(?:\.\d+)?)`),
+	regexp.MustCompile(`(?i)(?:bump|update)[:\s]+([^\s]+)\s+from\s+[^\s]+\s+to\s+` + versionPattern),
 	// "Update [dependency] PACKAGE to VERSION".
-	regexp.MustCompile(`(?i)update\s+(?:dependency\s+)?([^\s]+)\s+to\s+v?(\d+\.\d+(?:\.\d+)?)`),
-	// Catch-all: the last word before "to" and a following semver.
-	regexp.MustCompile(`(?i)([^\s:]+)\s+to\s+v?(\d+\.\d+(?:\.\d+)?)`),
+	regexp.MustCompile(`(?i)update\s+(?:dependency\s+)?([^\s]+)\s+to\s+` + versionPattern),
+	// Catch-all: the last word before "to" and a following version.
+	regexp.MustCompile(`(?i)([^\s:]+)\s+to\s+` + versionPattern),
 }
 
 // ParseTitle extracts the package and target version from a merge request title.
