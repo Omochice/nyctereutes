@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -76,4 +78,46 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model.
-func (m Model) View() tea.View { return tea.NewView("") }
+func (m Model) View() tea.View {
+	return tea.NewView(m.renderList())
+}
+
+func (m Model) renderList() string {
+	var b strings.Builder
+	for i, mr := range m.mrs {
+		b.WriteString(m.renderRow(i, mr))
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func (m Model) renderRow(index int, mr types.MR) string {
+	cursor := " "
+	if index == m.cursor {
+		cursor = ">"
+	}
+	checkbox := "[ ]"
+	if m.selected[index] {
+		checkbox = "[x]"
+	}
+	warn := " "
+	if mr.UnmergeableReason != "" {
+		warn = "⚠"
+	}
+	return fmt.Sprintf("%s %s %s %s %s !%d - %s",
+		cursor, checkbox, ciSymbol(mr.CIStatus), warn, pathShorten(mr.Project), mr.IID, mr.Title)
+}
+
+// ciSymbol maps a normalized pipeline status to a single-column glyph.
+func ciSymbol(status string) string {
+	switch status {
+	case "success":
+		return "✓"
+	case "failure":
+		return "✗"
+	case "pending":
+		return "◌"
+	default:
+		return " "
+	}
+}
