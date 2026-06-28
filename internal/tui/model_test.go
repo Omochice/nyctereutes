@@ -62,9 +62,47 @@ func key(s string) tea.KeyPressMsg {
 	}
 }
 
+// press feeds each key string through Update in order and returns the model.
+func press(m Model, keys ...string) Model {
+	for _, k := range keys {
+		next, _ := m.Update(key(k))
+		m = next.(Model)
+	}
+	return m
+}
+
 func TestInitialCursorOnFirstMR(t *testing.T) {
 	m := New(&fakeClient{}, sampleMRs())
 	if m.cursor != 0 {
 		t.Errorf("initial cursor = %d, want 0", m.cursor)
+	}
+}
+
+func TestCursorMovesDownAndStopsAtEnd(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs()) // 3 MRs
+
+	m = press(m, "j")
+	if m.cursor != 1 {
+		t.Fatalf("after j cursor = %d, want 1", m.cursor)
+	}
+
+	m = press(m, "j", "j", "j") // past the end
+	if m.cursor != 2 {
+		t.Errorf("cursor = %d, want 2 (clamped at last MR)", m.cursor)
+	}
+}
+
+func TestCursorMovesUpAndStopsAtTop(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	m = press(m, "j", "j") // cursor at 2
+
+	m = press(m, "k")
+	if m.cursor != 1 {
+		t.Fatalf("after k cursor = %d, want 1", m.cursor)
+	}
+
+	m = press(m, "k", "k", "k") // past the top
+	if m.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 (clamped at first MR)", m.cursor)
 	}
 }
