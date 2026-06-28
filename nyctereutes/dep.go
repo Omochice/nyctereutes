@@ -19,7 +19,7 @@ var (
 	errSomeActionsFailed  = errors.New("some operations failed")
 )
 
-// scopeFlags are the search-scope flags shared by list, approve and merge.
+// The search-scope flags shared by list, approve and merge.
 // Repo and Author are pointers so an explicit (even empty) flag can be told
 // apart from "not specified", in which case config or a default is used.
 type scopeFlags struct {
@@ -62,8 +62,8 @@ func newDepCommand(inout *cli.ProcInout, runner glab.Runner) *depCommand {
 	}
 }
 
-// Execute runs when "dep" is invoked with no subcommand. It is reserved for a
-// future TUI; for now it reports that it is not implemented.
+// Runs when "dep" is invoked with no subcommand. It is reserved for a future
+// TUI; for now it reports that it is not implemented.
 func (c *depCommand) Execute(_ []string) error {
 	_, _ = fmt.Fprintln(c.inout.Stderr, "not implemented")
 	return errNotImplemented
@@ -172,9 +172,9 @@ func (c *depMergeCommand) Execute(_ []string) error {
 	}, successDetails...)
 }
 
-// applyAction runs action against each MR, printing a consistent dry-run,
-// success, or per-MR error line and continuing past individual failures. It
-// returns a non-nil error when any MR failed so the command exits non-zero.
+// Runs action against each MR, printing a consistent dry-run, success, or
+// per-MR error line and continuing past individual failures. Returns a non-nil
+// error when any MR failed so the command exits non-zero.
 func applyAction(
 	view *ui.UI,
 	mrs []types.MR,
@@ -202,9 +202,9 @@ func applyAction(
 	return nil
 }
 
-// selectGroup searches for MRs in the given scope, groups them by
-// package@version, and returns the MRs in the requested group. It replaces the
-// upstream disk cache: the group is recomputed on each invocation.
+// Searches for MRs in the given scope, groups them by package@version, and
+// returns the MRs in the requested group. It replaces the upstream disk cache:
+// the group is recomputed on each invocation.
 func selectGroup(ctx context.Context, runner glab.Runner, scope scopeFlags, key string) ([]types.MR, error) {
 	params, patterns := scope.resolve(ctx, runner)
 	mrs, err := gitlab.NewClient(runner).SearchMRs(ctx, params)

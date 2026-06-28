@@ -14,10 +14,10 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
-// tabPadding is the cell padding passed to tabwriter.
+// The cell padding passed to tabwriter.
 const tabPadding = 2
 
-// UI renders to w. multiProject controls whether action messages are prefixed
+// Renders to w. multiProject controls whether action messages are prefixed
 // with the project path (only meaningful when MRs span several projects).
 type UI struct {
 	w            io.Writer
@@ -25,14 +25,14 @@ type UI struct {
 	json         bool
 }
 
-// New builds a UI for a flat MR list, auto-detecting whether the MRs span
-// multiple projects.
+// Builds a UI for a flat MR list, auto-detecting whether the MRs span multiple
+// projects.
 func New(w io.Writer, mrs []types.MR, jsonOut bool) *UI {
 	return &UI{w: w, multiProject: isMultiProject(mrs), json: jsonOut}
 }
 
-// NewFromGroups builds a UI for grouped MRs, detecting multi-project output
-// across all groups.
+// Builds a UI for grouped MRs, detecting multi-project output across all
+// groups.
 func NewFromGroups(w io.Writer, groups map[string][]types.MR, jsonOut bool) *UI {
 	return &UI{w: w, multiProject: isMultiProjectGroups(groups), json: jsonOut}
 }
@@ -41,7 +41,7 @@ func newTabWriter(w io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(w, 0, 0, tabPadding, ' ', 0)
 }
 
-// DisplayList prints MRs as a flat table, or as a JSON array under json mode.
+// Prints MRs as a flat table, or as a JSON array under json mode.
 func (u *UI) DisplayList(mrs []types.MR) error {
 	if u.json {
 		// A nil slice marshals to null; emit [] so consumers can always iterate.
@@ -62,8 +62,8 @@ func (u *UI) DisplayList(mrs []types.MR) error {
 	return flush(tabWriter)
 }
 
-// DisplayGroups sorts groups alphabetically and MRs within a group by project
-// then IID, so output is stable across runs.
+// Sorts groups alphabetically and MRs within a group by project then IID, so
+// output is stable across runs.
 func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 	if u.json {
 		return u.writeJSON(groups)
@@ -98,8 +98,8 @@ func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 	return flush(tabWriter)
 }
 
-// PrintAction prints a standardized action message for an MR, prefixed with the
-// project when output spans multiple projects.
+// Prints a standardized action message for an MR, prefixed with the project
+// when output spans multiple projects.
 func (u *UI) PrintAction(action string, mr types.MR, details ...string) {
 	message := fmt.Sprintf("%s !%d", action, mr.IID)
 	if len(details) > 0 {
@@ -108,8 +108,8 @@ func (u *UI) PrintAction(action string, mr types.MR, details ...string) {
 	_, _ = fmt.Fprintf(u.w, "%s%s\n", u.prefix(mr), message)
 }
 
-// PrintError prints a per-MR failure line, prefixed with the project when
-// output spans multiple projects.
+// Prints a per-MR failure line, prefixed with the project when output spans
+// multiple projects.
 func (u *UI) PrintError(action string, mr types.MR, err error) {
 	_, _ = fmt.Fprintf(u.w, "%sfailed to %s !%d: %v\n", u.prefix(mr), action, mr.IID, err)
 }

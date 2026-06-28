@@ -1,4 +1,4 @@
-// Command nyctereutes is a CLI that drives the glab toolchain.
+// Entry point of the nyctereutes CLI, which drives the glab toolchain.
 package main
 
 import (

@@ -15,7 +15,7 @@ type ProcInout struct {
 	Stderr io.Writer
 }
 
-// NewProcInout returns a ProcInout wired to the real standard streams.
+// Builds a ProcInout wired to the real OS standard streams.
 func NewProcInout() *ProcInout {
 	return &ProcInout{
 		Stdin:  os.Stdin,
@@ -24,11 +24,11 @@ func NewProcInout() *ProcInout {
 	}
 }
 
-// Command is a subcommand entry point: it runs against the given arguments and
-// streams and returns the process exit code.
+// A subcommand entry point: it runs against the given arguments and streams
+// and returns the process exit code.
 type Command func(args []string, inout *ProcInout) int
 
-// Run executes c against the real process arguments and standard streams, then
+// Executes c against the real process arguments and standard streams, then
 // exits with the code it returns.
 func Run(c Command) {
 	os.Exit(c(os.Args[1:], NewProcInout()))

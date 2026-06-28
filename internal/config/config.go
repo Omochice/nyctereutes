@@ -11,15 +11,15 @@ import (
 	"github.com/Omochice/nyctereutes/internal/textlist"
 )
 
-// Config holds the dep.* values read from glab config.
+// Holds the dep.* values read from glab config.
 type Config struct {
 	Repos    []string // dep.repo (comma-separated)
 	Patterns []string // dep.patterns (newline-separated regex patterns)
 	Author   string   // dep.author (default dependency bot username)
 }
 
-// Load reads the dep.* settings through runner; an unset key or an unavailable
-// glab yields zero values rather than an error.
+// Reads the dep.* settings through runner; an unset key or an unavailable glab
+// yields zero values rather than an error.
 func Load(ctx context.Context, runner glab.Runner) *Config {
 	return &Config{
 		Repos: textlist.SplitList(get(ctx, runner, "dep.repo")),
@@ -30,7 +30,7 @@ func Load(ctx context.Context, runner glab.Runner) *Config {
 	}
 }
 
-// get reads a single glab config key, returning "" when unset or when glab is
+// Reads a single glab config key, returning "" when unset or when glab is
 // unavailable; config is optional, so such errors are not fatal.
 func get(ctx context.Context, runner glab.Runner, key string) string {
 	out, err := runner.Run(ctx, "config", "get", key)

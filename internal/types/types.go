@@ -8,7 +8,7 @@ const (
 	ReasonNeedRebase = "need_rebase"
 )
 
-// MR is a merge request with the subset of fields the dep commands consume.
+// A merge request with the subset of fields the dep commands consume.
 type MR struct {
 	IID       int    `json:"iid"`
 	ProjectID int    `json:"project_id"` // numeric GitLab project ID, used for API calls

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// ApproveMR approves a merge request via glab.
+// Approves a merge request via glab.
 //
 // Approval is idempotent from the caller's perspective: GitLab answers a repeat
 // approval from the same user with 401 Unauthorized, so an already-approved MR
@@ -26,9 +26,9 @@ func isAlreadyApproved(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "401")
 }
 
-// MergeMR merges a merge request via glab. When autoMerge is true the merge is
-// gated on the pipeline succeeding (GitLab's native "merge when pipeline
-// succeeds"); otherwise it merges immediately.
+// Merges a merge request via glab. When autoMerge is true the merge is gated on
+// the pipeline succeeding (GitLab's native "merge when pipeline succeeds");
+// otherwise it merges immediately.
 func (c *Client) MergeMR(ctx context.Context, project string, iid int, method string, autoMerge bool) error {
 	args := []string{"mr", "merge", strconv.Itoa(iid), "-R", project, "--yes"}
 
