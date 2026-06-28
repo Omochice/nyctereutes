@@ -80,7 +80,8 @@ func (c *depCommand) Execute(_ []string) error {
 	ctx := context.Background()
 	params, _ := c.resolve(ctx, c.runner)
 
-	mrs, err := gitlab.NewClient(c.runner).SearchMRs(ctx, params)
+	client := gitlab.NewClient(c.runner)
+	mrs, err := client.SearchMRs(ctx, params)
 	if err != nil {
 		return fmt.Errorf("search MRs: %w", err)
 	}
@@ -88,7 +89,7 @@ func (c *depCommand) Execute(_ []string) error {
 		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
 		return nil
 	}
-	return c.launch(tui.New(gitlab.NewClient(c.runner), mrs))
+	return c.launch(tui.New(client, mrs))
 }
 
 type depListCommand struct {

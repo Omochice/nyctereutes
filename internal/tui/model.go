@@ -94,10 +94,13 @@ type mrResultMsg actionResult
 type Model struct {
 	client Client
 	mrs    []types.MR
-	cursor int
-	// selected holds the indices into the visible (filtered) MR list that the
-	// user has checked. Indices stay valid because changing the filter clears
-	// the selection.
+	// filtered is mrs narrowed by the committed filter; it is recomputed only
+	// when the filter changes rather than on every render or keystroke.
+	filtered []types.MR
+	cursor   int
+	// selected holds the indices into the filtered MR list that the user has
+	// checked. Indices stay valid because changing the filter clears the
+	// selection.
 	selected map[int]bool
 	mode     mode
 	// filter, when non-empty, restricts the visible MRs to those matching it.
@@ -118,6 +121,7 @@ func New(client Client, mrs []types.MR) Model {
 	return Model{
 		client:   client,
 		mrs:      mrs,
+		filtered: mrs,
 		selected: make(map[int]bool),
 	}
 }
@@ -146,18 +150,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// View implements tea.Model.
+// View implements tea.Model. The help overlay and the executing/complete phases
+// each own a screen; every other state shows the list.
 func (m Model) View() tea.View {
-	if m.helping {
+	switch {
+	case m.helping:
 		return tea.NewView(helpText)
-	}
-	switch m.phase {
-	case phaseExecuting:
+	case m.phase == phaseExecuting:
 		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
-	case phaseComplete:
+	case m.phase == phaseComplete:
 		return tea.NewView(m.renderResults())
-	case phaseList:
-		return tea.NewView(m.renderList())
 	default:
 		return tea.NewView(m.renderList())
 	}
@@ -239,6 +241,7 @@ func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
 	switch keyMsg.String() {
 	case keyEnter:
 		m.filter = m.searchBuf
+		m.filtered = filterMRs(m.mrs, m.filter)
 		m.searching = false
 		m.selected = make(map[int]bool)
 		m.cursor = 0
@@ -278,15 +281,17 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 // reports the outcome. In approve & merge mode a failed approval skips the merge
 // so a broken MR is not merged.
 func (m Model) actionCmd(mergeRequest types.MR) tea.Cmd {
-	currentMode := m.mode
+	// Capture only what the command needs so it does not pin the whole Model
+	// (its MR slices, results and selection map) alive while it runs.
+	client, currentMode := m.client, m.mode
 	return func() tea.Msg {
 		ctx := context.Background()
 		var err error
 		if currentMode == modeApprove || currentMode == modeApproveMerge {
-			err = m.client.ApproveMR(ctx, mergeRequest.Project, mergeRequest.IID)
+			err = client.ApproveMR(ctx, mergeRequest.Project, mergeRequest.IID)
 		}
 		if err == nil && (currentMode == modeMerge || currentMode == modeApproveMerge) {
-			err = m.client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, mergeMethod, true)
+			err = client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, mergeMethod, true)
 		}
 		return mrResultMsg{mr: mergeRequest, err: err}
 	}
@@ -294,12 +299,18 @@ func (m Model) actionCmd(mergeRequest types.MR) tea.Cmd {
 
 // visible returns the MRs that pass the current filter, in display order.
 func (m Model) visible() []types.MR {
-	if m.filter == "" {
-		return m.mrs
+	return m.filtered
+}
+
+// filterMRs narrows mrs to those matching query; an empty query keeps them all.
+func filterMRs(mrs []types.MR, query string) []types.MR {
+	if query == "" {
+		return mrs
 	}
+	lowered := strings.ToLower(query)
 	var out []types.MR
-	for _, mergeRequest := range m.mrs {
-		if matchesFilter(mergeRequest, m.filter) {
+	for _, mergeRequest := range mrs {
+		if matchesFilter(mergeRequest, lowered) {
 			out = append(out, mergeRequest)
 		}
 	}
@@ -352,9 +363,9 @@ func (m Model) renderList() string {
 	}
 	if m.searching {
 		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
-		return builder.String()
+	} else {
+		fmt.Fprintf(&builder, "\nmode: %s  (m: change, x: run, ?: help, q: quit)\n", m.modeLabel())
 	}
-	fmt.Fprintf(&builder, "\nmode: %s  (m: change, x: run, ?: help, q: quit)\n", m.modeLabel())
 	return builder.String()
 }
 
@@ -376,10 +387,9 @@ func (m Model) renderRow(index int, mergeRequest types.MR) string {
 		pathShorten(mergeRequest.Project), mergeRequest.IID, mergeRequest.Title)
 }
 
-// matchesFilter reports whether mergeRequest matches query as a case-insensitive
-// substring of its title, project path, or IID.
-func matchesFilter(mergeRequest types.MR, query string) bool {
-	lowered := strings.ToLower(query)
+// matchesFilter reports whether mergeRequest matches the already-lowercased
+// query as a substring of its title, project path, or IID.
+func matchesFilter(mergeRequest types.MR, lowered string) bool {
 	return strings.Contains(strings.ToLower(mergeRequest.Title), lowered) ||
 		strings.Contains(strings.ToLower(mergeRequest.Project), lowered) ||
 		strings.Contains(strconv.Itoa(mergeRequest.IID), lowered)
