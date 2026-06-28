@@ -25,6 +25,22 @@ func TestGroupMRsBucketsByPackageVersion(t *testing.T) {
 	}
 }
 
+func TestGroupMRsRejectsEmptyCaptureKey(t *testing.T) {
+	// The custom pattern matches the title but captures an empty package.
+	// Before the fix this produced a malformed "@1.2.3" group key; now the MR
+	// falls back to a unique unparsed key.
+	mrs := []types.MR{{IID: 1, Project: projectA, Title: "[] 1.2.3"}}
+
+	groups := GroupMRs(mrs, []string{`^\[(\w*)\]\s+(v?\d\S*)`})
+
+	if _, bad := groups["@1.2.3"]; bad {
+		t.Errorf("empty package capture produced a malformed key @1.2.3: %v", groups)
+	}
+	if _, ok := groups["unparsed:g/a!1"]; !ok {
+		t.Errorf("want the MR under a unique unparsed key, got %v", groups)
+	}
+}
+
 func TestGroupMRsKeepsUnparsedMRsSeparate(t *testing.T) {
 	mrs := []types.MR{
 		{IID: 1, Project: projectA, Title: "Refactor the build"},

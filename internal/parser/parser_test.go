@@ -75,11 +75,12 @@ func TestParseTitleCustomPatternsTakePrecedence(t *testing.T) {
 	}
 }
 
-func TestMatchRejectsEmptyCaptures(t *testing.T) {
-	// The package capture matches empty here; that must not count as parsed,
-	// otherwise grouping produces a malformed "@version" key.
-	re := regexp.MustCompile(`(\S*) to (\S+)`)
-	if _, ok := match(re, " to 1.0.0"); ok {
-		t.Error("match with an empty capture = ok, want not ok")
+func TestParseTitleRejectsEmptyCapture(t *testing.T) {
+	// The custom pattern matches "[] 1.2.3" but leaves the package capture
+	// empty; that must not count as a parsed update (no built-in pattern
+	// matches this title either).
+	custom := []*regexp.Regexp{regexp.MustCompile(`^\[(\w*)\]\s+(v?\d\S*)`)}
+	if got, ok := ParseTitle("[] 1.2.3", custom); ok {
+		t.Errorf("empty package capture parsed as %q, want not ok", got.GroupKey())
 	}
 }
