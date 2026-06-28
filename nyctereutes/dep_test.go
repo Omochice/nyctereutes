@@ -130,9 +130,9 @@ func TestDepListEmptyJSON(t *testing.T) {
 	if strings.Contains(stdout, "No dependency MRs found") {
 		t.Errorf("--json must not emit the plain message, got %q", stdout)
 	}
-	var decoded []map[string]any
-	if err := json.Unmarshal([]byte(stdout), &decoded); err != nil {
-		t.Fatalf("empty --json is not valid JSON: %v\n%s", err, stdout)
+	// Must be an empty array, not null, so consumers can always iterate.
+	if got := strings.TrimSpace(stdout); got != "[]" {
+		t.Errorf("empty --json = %q, want %q", got, "[]")
 	}
 }
 

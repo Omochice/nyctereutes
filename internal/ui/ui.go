@@ -40,6 +40,10 @@ func newTabWriter(w io.Writer) *tabwriter.Writer {
 
 func (u *UI) DisplayList(mrs []types.MR) error {
 	if u.json {
+		// A nil slice marshals to null; emit [] so consumers can always iterate.
+		if mrs == nil {
+			mrs = []types.MR{}
+		}
 		return u.writeJSON(mrs)
 	}
 	if len(mrs) == 0 {
