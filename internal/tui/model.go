@@ -11,14 +11,14 @@ import (
 	"github.com/Omochice/nyctereutes/internal/types"
 )
 
-// Client is the subset of gitlab.Client the TUI drives. It is an interface so
+// The subset of gitlab.Client the TUI drives. It is an interface so
 // tests can inject a fake that records calls instead of shelling out to glab.
 type Client interface {
 	ApproveMR(ctx context.Context, project string, iid int) error
 	MergeMR(ctx context.Context, project string, iid int, method string, autoMerge bool) error
 }
 
-// mode is the action the user applies to the selected MRs.
+// The action the user applies to the selected MRs.
 type mode int
 
 const (
@@ -27,7 +27,7 @@ const (
 	modeApproveMerge
 )
 
-// modeCount is the number of modes, used to wrap when cycling. It is a plain
+// The number of modes, used to wrap when cycling. It is a plain
 // int (not a mode) so it is not treated as an enum value in exhaustive switches.
 const modeCount = 3
 
@@ -68,7 +68,7 @@ const (
 	keyRun       = "x"
 )
 
-// phase is the screen the model is currently showing.
+// The screen the model is currently showing.
 type phase int
 
 const (
@@ -77,36 +77,35 @@ const (
 	phaseComplete
 )
 
-// mergeMethod is fixed to squash for the MVP; method/require-checks toggles are
+// Fixed to squash for the MVP; method/require-checks toggles are
 // a later increment.
 const mergeMethod = "squash"
 
-// actionResult records the outcome of applying the current mode to one MR.
+// Records the outcome of applying the current mode to one MR.
 type actionResult struct {
 	mr  types.MR
 	err error
 }
 
-// mrResultMsg is sent back to Update when one MR's action finishes.
+// Sent back to Update when one MR's action finishes.
 type mrResultMsg actionResult
 
-// Model is the bubbletea model backing the interactive dep view.
+// The bubbletea model backing the interactive dep view.
 type Model struct {
 	client Client
 	mrs    []types.MR
-	// filtered is mrs narrowed by the committed filter; it is recomputed only
-	// when the filter changes rather than on every render or keystroke.
+	// The MRs left after the committed filter; recomputed only when the filter
+	// changes rather than on every render or keystroke.
 	filtered []types.MR
 	cursor   int
-	// selected holds the indices into the filtered MR list that the user has
-	// checked. Indices stay valid because changing the filter clears the
-	// selection.
+	// The indices into the filtered MR list the user has checked. They stay
+	// valid because changing the filter clears the selection.
 	selected map[int]bool
 	mode     mode
-	// filter, when non-empty, restricts the visible MRs to those matching it.
+	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
-	// searching is true while the user types a query; searchBuf holds the
-	// in-progress text that becomes the filter only when committed with enter.
+	// True while the user types a query; searchBuf holds the in-progress text
+	// that becomes the filter only when committed with enter.
 	searching bool
 	searchBuf string
 
@@ -116,7 +115,7 @@ type Model struct {
 	helping bool           // true while the help overlay is shown
 }
 
-// New builds a Model showing mrs, driving approve/merge through client.
+// Builds a Model showing mrs, driving approve/merge through client.
 func New(client Client, mrs []types.MR) Model {
 	return Model{
 		client:   client,
@@ -126,14 +125,14 @@ func New(client Client, mrs []types.MR) Model {
 	}
 }
 
-// MRs returns the merge requests the model was built with.
+// Returns the merge requests the model was built with.
 func (m Model) MRs() []types.MR { return m.mrs }
 
-// Init implements tea.Model; the MRs are loaded before the program starts, so
+// Implements tea.Model; the MRs are loaded before the program starts, so
 // there is no initial command.
 func (m Model) Init() tea.Cmd { return nil }
 
-// Update implements tea.Model.
+// Implements tea.Model.
 //
 //nolint:ireturn // bubbletea's Update must return the tea.Model interface.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -147,7 +146,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// View implements tea.Model. The help overlay and the executing/complete phases
+// Implements tea.Model. The help overlay and the executing/complete phases
 // each own a screen; every other state shows the list.
 func (m Model) View() tea.View {
 	switch {
@@ -162,10 +161,10 @@ func (m Model) View() tea.View {
 	}
 }
 
-// modeLabel names the current action mode for display.
+// Names the current action mode for display.
 func (m Model) modeLabel() string { return m.mode.label() }
 
-// recordResult folds one finished MR action into the results and advances to
+// Folds one finished MR action into the results and advances to
 // the complete screen once every action has reported back.
 func (m Model) recordResult(result mrResultMsg) Model {
 	m.results = append(m.results, actionResult(result))
@@ -176,7 +175,7 @@ func (m Model) recordResult(result mrResultMsg) Model {
 	return m
 }
 
-// handleKey routes a key press to the active screen so list edits and runs
+// Routes a key press to the active screen so list edits and runs
 // happen only on the list itself. ctrl+c quits from anywhere; q quits except
 // while searching, where it is an ordinary character; help toggles from the
 // list or the help overlay.
@@ -200,7 +199,7 @@ func (m Model) handleKey(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m.updateList(name)
 }
 
-// quitOr quits on q and otherwise leaves the model unchanged; it backs the
+// Quits on q and otherwise leaves the model unchanged; it backs the
 // non-interactive screens (help, executing, complete) where only exit applies.
 //
 //nolint:ireturn // matches handleKey's tea.Model return.
@@ -211,7 +210,7 @@ func (m Model) quitOr(name string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateList handles keys on the list screen, delegating selection edits so no
+// Handles keys on the list screen, delegating selection edits so no
 // single function carries the whole keymap.
 func (m Model) updateList(name string) (Model, tea.Cmd) {
 	switch name {
@@ -224,7 +223,7 @@ func (m Model) updateList(name string) (Model, tea.Cmd) {
 	}
 }
 
-// editList applies the non-terminal list keys: navigation, selection, search
+// Applies the non-terminal list keys: navigation, selection, search
 // entry and mode cycling.
 func (m Model) editList(name string) Model {
 	switch name {
@@ -251,7 +250,7 @@ func (m Model) editList(name string) Model {
 	return m
 }
 
-// moveCursor shifts the cursor by delta, staying within the visible list.
+// Shifts the cursor by delta, staying within the visible list.
 func (m Model) moveCursor(delta int) Model {
 	next := m.cursor + delta
 	if next >= 0 && next < len(m.visible()) {
@@ -260,7 +259,7 @@ func (m Model) moveCursor(delta int) Model {
 	return m
 }
 
-// selectAll checks every visible MR.
+// Checks every visible MR.
 func (m Model) selectAll() Model {
 	for index := range m.visible() {
 		m.selected[index] = true
@@ -268,7 +267,7 @@ func (m Model) selectAll() Model {
 	return m
 }
 
-// updateSearch handles keys while the search prompt is open: enter commits the
+// Handles keys while the search prompt is open: enter commits the
 // query (clearing any prior selection, since the indices it referenced no
 // longer apply), esc discards it, and any other text edits the query.
 func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
@@ -293,7 +292,7 @@ func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
 	return m
 }
 
-// startExecution kicks off the current mode's action against every selected MR
+// Kicks off the current mode's action against every selected MR
 // concurrently, or stays on the list when nothing is selected.
 func (m Model) startExecution() (Model, tea.Cmd) {
 	selected := m.selectedMRs()
@@ -311,7 +310,7 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// actionCmd returns a command that applies the current mode to mergeRequest and
+// Returns a command that applies the current mode to mergeRequest and
 // reports the outcome. In approve & merge mode a failed approval skips the merge
 // so a broken MR is not merged.
 func (m Model) actionCmd(mergeRequest types.MR) tea.Cmd {
@@ -331,12 +330,12 @@ func (m Model) actionCmd(mergeRequest types.MR) tea.Cmd {
 	}
 }
 
-// visible returns the MRs that pass the current filter, in display order.
+// Returns the MRs that pass the current filter, in display order.
 func (m Model) visible() []types.MR {
 	return m.filtered
 }
 
-// filterMRs narrows mrs to those matching query; an empty query keeps them all.
+// Narrows mrs to those matching query; an empty query keeps them all.
 func filterMRs(mrs []types.MR, query string) []types.MR {
 	if query == "" {
 		return mrs
@@ -351,7 +350,7 @@ func filterMRs(mrs []types.MR, query string) []types.MR {
 	return out
 }
 
-// selectedMRs returns the checked MRs in display order.
+// Returns the checked MRs in display order.
 func (m Model) selectedMRs() []types.MR {
 	var out []types.MR
 	for index, mergeRequest := range m.visible() {
@@ -421,7 +420,7 @@ func (m Model) renderRow(index int, mergeRequest types.MR) string {
 		pathShorten(mergeRequest.Project), mergeRequest.IID, mergeRequest.Title)
 }
 
-// matchesFilter reports whether mergeRequest matches the already-lowercased
+// Reports whether mergeRequest matches the already-lowercased
 // query as a substring of its title, project path, or IID.
 func matchesFilter(mergeRequest types.MR, lowered string) bool {
 	return strings.Contains(strings.ToLower(mergeRequest.Title), lowered) ||
@@ -429,7 +428,7 @@ func matchesFilter(mergeRequest types.MR, lowered string) bool {
 		strings.Contains(strconv.Itoa(mergeRequest.IID), lowered)
 }
 
-// ciSymbol maps a normalized pipeline status to a single-column glyph.
+// Maps a normalized pipeline status to a single-column glyph.
 func ciSymbol(status string) string {
 	switch status {
 	case "success":

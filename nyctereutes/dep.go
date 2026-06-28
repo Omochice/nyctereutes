@@ -51,8 +51,8 @@ type depCommand struct {
 
 	inout  *cli.ProcInout
 	runner glab.Runner
-	// launch starts the interactive TUI; it is a field so tests can substitute
-	// a fake instead of driving a real terminal program.
+	// Starts the interactive TUI; it is a field so tests can substitute a fake
+	// instead of driving a real terminal program.
 	launch func(tui.Model) error
 
 	List    *depListCommand    `command:"list" description:"list dependency MRs"`
