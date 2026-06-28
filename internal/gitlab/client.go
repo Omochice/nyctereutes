@@ -22,10 +22,12 @@ const (
 	pipelineSuccess = "success"
 )
 
+// Client searches, approves and merges merge requests through glab.
 type Client struct {
 	runner glab.Runner
 }
 
+// NewClient returns a Client that drives glab through runner.
 func NewClient(runner glab.Runner) *Client {
 	return &Client{runner: runner}
 }

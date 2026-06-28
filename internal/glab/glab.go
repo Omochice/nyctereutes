@@ -16,10 +16,11 @@ type Runner interface {
 	Run(ctx context.Context, args ...string) ([]byte, error)
 }
 
-// RunnerFunc adapts an ordinary function to a Runner, mainly so tests can script
+// RunnerFunc adapts an ordinary function to a Runner so tests can script
 // responses with a closure instead of declaring a fake type.
 type RunnerFunc func(ctx context.Context, args ...string) ([]byte, error)
 
+// Run calls the underlying function.
 func (f RunnerFunc) Run(ctx context.Context, args ...string) ([]byte, error) {
 	return f(ctx, args...)
 }

@@ -18,6 +18,8 @@ type Config struct {
 	Author   string   // dep.author (default dependency bot username)
 }
 
+// Load reads the dep.* settings through runner; an unset key or an unavailable
+// glab yields zero values rather than an error.
 func Load(ctx context.Context, runner glab.Runner) *Config {
 	return &Config{
 		Repos: textlist.SplitList(get(ctx, runner, "dep.repo")),

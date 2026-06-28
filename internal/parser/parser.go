@@ -13,6 +13,7 @@ const submatchCount = 3
 // dotted numeric versions. A leading "v" is dropped.
 const versionPattern = `v?([0-9][0-9A-Za-z.+_-]*)`
 
+// PackageUpdate is the package name and target version parsed from a title.
 type PackageUpdate struct {
 	Package   string
 	ToVersion string
@@ -31,7 +32,7 @@ var patterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)([^\s:]+)\s+to\s+` + versionPattern),
 }
 
-// ParseTitle extracts the package and target version from a merge request title.
+// ParseTitle extracts the package and target version from an MR title.
 // Custom patterns are tried before the built-in ones, so a project can override
 // parsing for its own title conventions; callers pass them pre-compiled so the
 // regexps are built once rather than per title. The bool is false when no
