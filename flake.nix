@@ -135,6 +135,28 @@
             runHook postInstall
           '';
         });
+        # godoclint needs the same dependency type information as golangci-lint,
+        # so reuse buildGoModule's module fetching for the sealed sandbox.
+        # start-with-name and pkg-doc force restating the symbol/package name,
+        # and max-len enforces a wrap width the reader's editor should own.
+        godoclint-check = nyctereutes.overrideAttrs (previousAttrs: {
+          pname = "${previousAttrs.pname}-godoclint";
+          nativeBuildInputs = (previousAttrs.nativeBuildInputs or [ ]) ++ [
+            pkgs.godoclint
+          ];
+          doCheck = false;
+          buildPhase = ''
+            runHook preBuild
+            export HOME="$TMPDIR"
+            godoclint -default=all -disable=start-with-name,pkg-doc,max-len ./...
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            touch "$out"
+            runHook postInstall
+          '';
+        });
         gitHooks = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -172,11 +194,13 @@
         # keep-sorted start block=yes
         checks = {
           git-hooks = gitHooks;
+          godoclint = godoclint-check;
           golangci-lint = golangci-lint-check;
           inherit nyctereutes;
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
+            pkgs.godoclint
             pkgs.golangci-lint
             treefmt.config.build.wrapper
           ];
