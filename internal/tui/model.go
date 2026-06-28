@@ -35,7 +35,23 @@ func New(client Client, mrs []types.MR) Model {
 func (m Model) Init() tea.Cmd { return nil }
 
 // Update implements tea.Model.
-func (m Model) Update(_ tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	keyMsg, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil
+	}
+	switch keyMsg.String() {
+	case "j":
+		if m.cursor < len(m.mrs)-1 {
+			m.cursor++
+		}
+	case "k":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	}
+	return m, nil
+}
 
 // View implements tea.Model.
 func (m Model) View() tea.View { return tea.NewView("") }
