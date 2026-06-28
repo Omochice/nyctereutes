@@ -49,14 +49,14 @@ func TestParseTitle(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := ParseTitle(tt.title, nil)
-			if ok != tt.wantOK {
-				t.Fatalf("ParseTitle(%q) ok = %v, want %v", tt.title, ok, tt.wantOK)
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, ok := ParseTitle(testCase.title, nil)
+			if ok != testCase.wantOK {
+				t.Fatalf("ParseTitle(%q) ok = %v, want %v", testCase.title, ok, testCase.wantOK)
 			}
-			if ok && got.GroupKey() != tt.want {
-				t.Errorf("ParseTitle(%q).GroupKey() = %q, want %q", tt.title, got.GroupKey(), tt.want)
+			if ok && got.GroupKey() != testCase.want {
+				t.Errorf("ParseTitle(%q).GroupKey() = %q, want %q", testCase.title, got.GroupKey(), testCase.want)
 			}
 		})
 	}
