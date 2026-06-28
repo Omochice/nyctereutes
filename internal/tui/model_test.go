@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -13,12 +14,16 @@ import (
 
 // fakeClient records the approve/merge calls the model issues so tests can
 // assert on them without a real glab.
+var errApprove = errors.New("approve failed")
+
 type fakeClient struct {
-	mu        sync.Mutex
-	approved  []int
-	merged    []int
-	approveFn func(iid int) error
-	mergeFn   func(iid int) error
+	mu          sync.Mutex
+	approved    []int
+	merged      []int
+	mergeMethod []string
+	mergeAuto   []bool
+	approveFn   func(iid int) error
+	mergeFn     func(iid int) error
 }
 
 func (f *fakeClient) ApproveMR(_ context.Context, _ string, iid int) error {
@@ -31,10 +36,12 @@ func (f *fakeClient) ApproveMR(_ context.Context, _ string, iid int) error {
 	return nil
 }
 
-func (f *fakeClient) MergeMR(_ context.Context, _ string, iid int, _ string, _ bool) error {
+func (f *fakeClient) MergeMR(_ context.Context, _ string, iid int, method string, autoMerge bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.merged = append(f.merged, iid)
+	f.mergeMethod = append(f.mergeMethod, method)
+	f.mergeAuto = append(f.mergeAuto, autoMerge)
 	if f.mergeFn != nil {
 		return f.mergeFn(iid)
 	}
@@ -250,6 +257,132 @@ func TestEmptyFilterResultKeepsCursorInRange(t *testing.T) {
 	}
 	// View must not panic on an empty list.
 	_ = m.View().Content
+}
+
+// drain runs cmd and feeds the resulting message(s) back through Update,
+// unwrapping tea.Batch so the per-MR commands actually execute.
+func drain(m Model, cmd tea.Cmd) Model {
+	if cmd == nil {
+		return m
+	}
+	switch msg := cmd().(type) {
+	case tea.BatchMsg:
+		for _, c := range msg {
+			m = drain(m, c)
+		}
+	default:
+		next, _ := m.Update(msg)
+		m = next.(Model)
+	}
+	return m
+}
+
+func TestRunWithoutSelectionStaysOnList(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	next, cmd := m.Update(key("x"))
+	m = next.(Model)
+	if m.phase != phaseList {
+		t.Errorf("phase = %v, want phaseList when nothing is selected", m.phase)
+	}
+	if cmd != nil {
+		t.Errorf("want no command when nothing is selected")
+	}
+}
+
+func TestRunWithSelectionEntersExecuting(t *testing.T) {
+	fake := &fakeClient{approveFn: func(int) error { return nil }}
+	m := New(fake, sampleMRs())
+	m = press(m, "space") // select first MR
+	next, cmd := m.Update(key("x"))
+	m = next.(Model)
+	if m.phase != phaseExecuting {
+		t.Errorf("phase = %v, want phaseExecuting", m.phase)
+	}
+	if cmd == nil {
+		t.Errorf("want a command to perform the action")
+	}
+}
+
+func TestApproveModeRunsApproveOnly(t *testing.T) {
+	fake := &fakeClient{}
+	m := New(fake, sampleMRs())
+	m = press(m, "a") // select all 3
+	next, cmd := m.Update(key("x"))
+	m = drain(next.(Model), cmd)
+
+	if len(fake.approved) != 3 {
+		t.Errorf("approved %d MRs, want 3", len(fake.approved))
+	}
+	if len(fake.merged) != 0 {
+		t.Errorf("merged %d MRs, want 0 in approve mode", len(fake.merged))
+	}
+	if m.phase != phaseComplete {
+		t.Errorf("phase = %v, want phaseComplete after execution", m.phase)
+	}
+}
+
+func TestMergeModeMergesWithSquashAutoMerge(t *testing.T) {
+	fake := &fakeClient{}
+	m := New(fake, sampleMRs())
+	m = press(m, "m")     // mode -> merge
+	m = press(m, "space") // select first MR
+	next, cmd := m.Update(key("x"))
+	m = drain(next.(Model), cmd)
+
+	if len(fake.approved) != 0 {
+		t.Errorf("approved %d MRs, want 0 in merge mode", len(fake.approved))
+	}
+	if len(fake.merged) != 1 {
+		t.Fatalf("merged %d MRs, want 1", len(fake.merged))
+	}
+	if fake.mergeMethod[0] != "squash" || !fake.mergeAuto[0] {
+		t.Errorf("merge called with method=%q auto=%v, want squash/true", fake.mergeMethod[0], fake.mergeAuto[0])
+	}
+}
+
+func TestApproveMergeApprovesThenMerges(t *testing.T) {
+	fake := &fakeClient{}
+	m := New(fake, sampleMRs())
+	m = press(m, "m", "m") // mode -> approve & merge
+	m = press(m, "space")  // select first MR (IID 12)
+	next, cmd := m.Update(key("x"))
+	m = drain(next.(Model), cmd)
+
+	if len(fake.approved) != 1 || fake.approved[0] != 12 {
+		t.Errorf("approved = %v, want [12]", fake.approved)
+	}
+	if len(fake.merged) != 1 || fake.merged[0] != 12 {
+		t.Errorf("merged = %v, want [12]", fake.merged)
+	}
+}
+
+func TestApproveMergeSkipsMergeWhenApproveFails(t *testing.T) {
+	fake := &fakeClient{approveFn: func(int) error { return errApprove }}
+	m := New(fake, sampleMRs())
+	m = press(m, "m", "m") // mode -> approve & merge
+	m = press(m, "space")
+	next, cmd := m.Update(key("x"))
+	m = drain(next.(Model), cmd)
+
+	if len(fake.approved) != 1 {
+		t.Errorf("approved %d, want 1 attempt", len(fake.approved))
+	}
+	if len(fake.merged) != 0 {
+		t.Errorf("merged %d, want 0 when approve failed", len(fake.merged))
+	}
+}
+
+func TestCompleteViewShowsResults(t *testing.T) {
+	fake := &fakeClient{}
+	m := New(fake, sampleMRs())
+	m = press(m, "space") // select IID 12
+	next, cmd := m.Update(key("x"))
+	m = drain(next.(Model), cmd)
+
+	out := m.View().Content
+	if !strings.Contains(out, "!12") {
+		t.Errorf("complete view should report the processed MR\n%s", out)
+	}
 }
 
 func TestModeStartsAtApproveAndCycles(t *testing.T) {
