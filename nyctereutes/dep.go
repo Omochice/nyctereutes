@@ -86,7 +86,9 @@ func (c *depListCommand) Execute(_ []string) error {
 	if err != nil {
 		return fmt.Errorf("search MRs: %w", err)
 	}
-	if len(mrs) == 0 {
+	// In JSON mode an empty result still has to be valid JSON for machine
+	// consumers, so only the human-readable path prints a message here.
+	if len(mrs) == 0 && !c.JSON {
 		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
 		return nil
 	}

@@ -121,6 +121,21 @@ func TestDepListEmpty(t *testing.T) {
 	}
 }
 
+func TestDepListEmptyJSON(t *testing.T) {
+	fake := &fakeGlab{listJSON: `[]`, detailJSON: `{}`}
+	exit, stdout, _ := runDep(fake, "dep", "list", "--json")
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	if strings.Contains(stdout, "No dependency MRs found") {
+		t.Errorf("--json must not emit the plain message, got %q", stdout)
+	}
+	var decoded []map[string]any
+	if err := json.Unmarshal([]byte(stdout), &decoded); err != nil {
+		t.Fatalf("empty --json is not valid JSON: %v\n%s", err, stdout)
+	}
+}
+
 func TestDepApproveRequiresGroup(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
 	exit, _, stderr := runDep(fake, "dep", "approve")
