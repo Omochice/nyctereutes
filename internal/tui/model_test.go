@@ -156,6 +156,21 @@ func TestListViewRendersRowElements(t *testing.T) {
 	}
 }
 
+func TestModeStartsAtApproveAndCycles(t *testing.T) {
+	m := New(&fakeClient{}, sampleMRs())
+	if got := m.modeLabel(); got != "approve" {
+		t.Fatalf("initial mode = %q, want approve", got)
+	}
+
+	want := []string{"merge", "approve & merge", "approve"}
+	for _, w := range want {
+		m = press(m, "m")
+		if got := m.modeLabel(); got != w {
+			t.Errorf("after m mode = %q, want %q", got, w)
+		}
+	}
+}
+
 func TestListViewMarksUnmergeable(t *testing.T) {
 	mrs := []types.MR{
 		{IID: 20, Project: "group/x", Title: "Bump foo from 1 to 2", UnmergeableReason: types.ReasonConflict},
