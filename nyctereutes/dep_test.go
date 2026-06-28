@@ -12,6 +12,7 @@ import (
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/tui"
 )
 
 var detailPath = regexp.MustCompile(`merge_requests/\d+$`)
@@ -73,6 +74,50 @@ const twoMRsSameGroup = `[` +
 	`"web_url":"https://gitlab.com/g/proj/-/merge_requests/12"},` +
 	`{"iid":13,"project_id":8,"title":"Bump lodash from 1.1.0 to 2.0.0",` +
 	`"web_url":"https://gitlab.com/g/other/-/merge_requests/13"}]`
+
+func TestDepNoSubcommandLaunchesTUIWithSearchResults(t *testing.T) {
+	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
+	outBuf := &bytes.Buffer{}
+	cmd := newDepCommand(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
+
+	var launched *tui.Model
+	cmd.launch = func(m tui.Model) error {
+		launched = &m
+		return nil
+	}
+
+	if err := cmd.Execute(nil); err != nil {
+		t.Fatalf("Execute returned %v", err)
+	}
+	if launched == nil {
+		t.Fatalf("TUI was not launched for a non-empty search")
+	}
+	if got := len(launched.MRs()); got != 1 {
+		t.Errorf("model built with %d MRs, want 1", got)
+	}
+}
+
+func TestDepNoSubcommandEmptyDoesNotLaunch(t *testing.T) {
+	fake := &fakeGlab{listJSON: `[]`, detailJSON: `{}`}
+	outBuf := &bytes.Buffer{}
+	cmd := newDepCommand(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
+
+	launched := false
+	cmd.launch = func(tui.Model) error {
+		launched = true
+		return nil
+	}
+
+	if err := cmd.Execute(nil); err != nil {
+		t.Fatalf("Execute returned %v", err)
+	}
+	if launched {
+		t.Error("TUI must not launch when no MRs are found")
+	}
+	if !strings.Contains(outBuf.String(), "No dependency MRs found") {
+		t.Errorf("want empty message, got %q", outBuf.String())
+	}
+}
 
 func TestDepListRendersTable(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
