@@ -178,34 +178,34 @@ func (m Model) recordResult(result mrResultMsg) Model {
 
 // handleKey routes a key press to the active screen so list edits and runs
 // happen only on the list itself. ctrl+c quits from anywhere; q quits except
-// while searching, where it is an ordinary character.
+// while searching, where it is an ordinary character; help toggles from the
+// list or the help overlay.
 //
 //nolint:ireturn // bubbletea's Update contract requires the tea.Model interface.
 func (m Model) handleKey(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if keyMsg.String() == keyInterrupt {
+	name := keyMsg.String()
+	if name == keyInterrupt {
 		return m, tea.Quit
 	}
-	switch {
-	case m.searching:
+	if m.searching {
 		return m.updateSearch(keyMsg), nil
-	case m.helping:
-		if keyMsg.String() == keyHelp {
-			m.helping = false
-		}
-		return m.quitOr(keyMsg)
-	case m.phase != phaseList:
-		return m.quitOr(keyMsg)
-	default:
-		return m.updateList(keyMsg)
 	}
+	if name == keyHelp && (m.helping || m.phase == phaseList) {
+		m.helping = !m.helping
+		return m, nil
+	}
+	if m.helping || m.phase != phaseList {
+		return m.quitOr(name)
+	}
+	return m.updateList(name)
 }
 
 // quitOr quits on q and otherwise leaves the model unchanged; it backs the
 // non-interactive screens (help, executing, complete) where only exit applies.
 //
 //nolint:ireturn // matches handleKey's tea.Model return.
-func (m Model) quitOr(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if keyMsg.String() == keyQuit {
+func (m Model) quitOr(name string) (tea.Model, tea.Cmd) {
+	if name == keyQuit {
 		return m, tea.Quit
 	}
 	return m, nil
@@ -213,23 +213,21 @@ func (m Model) quitOr(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // updateList handles keys on the list screen, delegating selection edits so no
 // single function carries the whole keymap.
-func (m Model) updateList(keyMsg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch keyMsg.String() {
+func (m Model) updateList(name string) (Model, tea.Cmd) {
+	switch name {
 	case keyQuit:
 		return m, tea.Quit
 	case keyRun:
 		return m.startExecution()
 	default:
-		return m.editList(keyMsg), nil
+		return m.editList(name), nil
 	}
 }
 
 // editList applies the non-terminal list keys: navigation, selection, search
-// entry, help and mode cycling.
-func (m Model) editList(keyMsg tea.KeyPressMsg) Model {
-	switch keyMsg.String() {
-	case keyHelp:
-		m.helping = !m.helping
+// entry and mode cycling.
+func (m Model) editList(name string) Model {
+	switch name {
 	case keySearch:
 		m.searching = true
 		m.searchBuf = ""
