@@ -1,5 +1,6 @@
-// Package strutil holds small string helpers shared across packages.
-package strutil
+// Package textlist splits delimited string values into trimmed, non-empty
+// item lists.
+package textlist
 
 import "strings"
 

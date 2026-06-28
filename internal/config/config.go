@@ -8,22 +8,22 @@ import (
 	"strings"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
-	"github.com/Omochice/nyctereutes/internal/strutil"
+	"github.com/Omochice/nyctereutes/internal/textlist"
 )
 
 // Config holds the dep.* values read from glab config.
 type Config struct {
 	Repos    []string // dep.repo (comma-separated)
-	Patterns []string // dep.patterns (comma-separated regex patterns)
+	Patterns []string // dep.patterns (newline-separated regex patterns)
 	Author   string   // dep.author (default dependency bot username)
 }
 
 func Load(ctx context.Context, runner glab.Runner) *Config {
 	return &Config{
-		Repos: strutil.SplitList(get(ctx, runner, "dep.repo")),
+		Repos: textlist.SplitList(get(ctx, runner, "dep.repo")),
 		// Patterns are regexes, which may contain commas, so they are listed one
 		// per line rather than comma-separated.
-		Patterns: strutil.SplitLines(get(ctx, runner, "dep.patterns")),
+		Patterns: textlist.SplitLines(get(ctx, runner, "dep.patterns")),
 		Author:   strings.TrimSpace(get(ctx, runner, "dep.author")),
 	}
 }
