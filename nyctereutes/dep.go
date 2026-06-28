@@ -24,7 +24,7 @@ var (
 // apart from "not specified", in which case config or a default is used.
 type scopeFlags struct {
 	Repo      *string `short:"R" long:"repo" description:"Target project(s) (GROUP/PROJECT), comma-separated"`
-	Author    *string `long:"author" description:"MR author username (defaults to the Renovate bot)"`
+	Author    *string `long:"author" description:"MR author username; --author= matches any (default: Renovate bot)"`
 	Label     string  `long:"label" description:"MR label to filter"`
 	GroupPath *string `long:"group-path" description:"Target GitLab group/subgroup full path"`
 	Reviewer  string  `long:"reviewer" description:"Filter MRs by reviewer username"`
