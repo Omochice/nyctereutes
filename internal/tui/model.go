@@ -69,6 +69,7 @@ const (
 	keyMergeMethod   = "M"
 	keyRequireChecks = "c"
 	keyGroupFilter   = "g"
+	keyOpen          = "o"
 	keyRun           = "x"
 )
 
@@ -105,6 +106,9 @@ type actionResult struct {
 // Sent back to Update when one MR's action finishes.
 type mrResultMsg actionResult
 
+// Sent back to Update when an o keypress finishes opening an MR in the browser.
+type openDoneMsg struct{ err error }
+
 // The bubbletea model backing the interactive dep view.
 type Model struct {
 	client Client
@@ -128,6 +132,10 @@ type Model struct {
 	groupFilter string
 	// Returns an MR's package@version group key; nil leaves the g key a no-op.
 	groupKeyOf func(types.MR) string
+	// Opens an MR in the browser; nil leaves the o key a no-op.
+	open func(types.MR) error
+	// The most recent open/refresh failure, shown on the list until the next attempt.
+	errMsg string
 	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
 	// True while the user types a query; searchBuf holds the in-progress text
@@ -168,6 +176,11 @@ func WithGroupKey(fn func(types.MR) string) Option {
 	return func(m *Model) { m.groupKeyOf = fn }
 }
 
+// WithOpen injects the function that opens an MR in the browser, enabling the o key.
+func WithOpen(fn func(types.MR) error) Option {
+	return func(m *Model) { m.open = fn }
+}
+
 // Returns the merge requests the model was built with.
 func (m Model) MRs() []types.MR { return m.mrs }
 
@@ -182,6 +195,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch typed := msg.(type) {
 	case mrResultMsg:
 		return m.recordResult(typed), nil
+	case openDoneMsg:
+		return m.recordError(typed.err), nil
 	case tea.KeyPressMsg:
 		return m.handleKey(typed)
 	default:
@@ -214,6 +229,17 @@ func (m Model) recordResult(result mrResultMsg) Model {
 	m.pending--
 	if m.pending <= 0 {
 		m.phase = phaseComplete
+	}
+	return m
+}
+
+// Records an external action's outcome: a failure becomes the status error line,
+// while success clears any prior error.
+func (m Model) recordError(err error) Model {
+	if err != nil {
+		m.errMsg = err.Error()
+	} else {
+		m.errMsg = ""
 	}
 	return m
 }
@@ -284,8 +310,24 @@ func (m Model) updateList(name string) (Model, tea.Cmd) {
 		return m, tea.Quit
 	case keyRun:
 		return m.startExecution()
+	case keyOpen:
+		return m.openCursor()
 	default:
 		return m.editList(name), nil
+	}
+}
+
+// Opens the cursor MR in the browser through the injected open function. It is a
+// no-op when no open dependency is injected or no MR is under the cursor.
+func (m Model) openCursor() (Model, tea.Cmd) {
+	visible := m.visible()
+	if m.open == nil || len(visible) == 0 {
+		return m, nil
+	}
+	m.errMsg = ""
+	open, mergeRequest := m.open, visible[m.cursor]
+	return m, func() tea.Msg {
+		return openDoneMsg{err: open(mergeRequest)}
 	}
 }
 
@@ -533,6 +575,7 @@ const helpText = `Keybindings
   M          change merge method (squash / merge / rebase)
   c          toggle require-checks (show only CI-passing, auto-merge)
   g          filter to the cursor MR's group (toggle)
+  o          open the cursor MR in the browser
   x          run the current mode on selected MRs
   ?          toggle this help
   q/ctrl+c   quit
@@ -566,6 +609,9 @@ func (m Model) renderList() string {
 	} else {
 		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s%s  (? for help)\n",
 			m.modeLabel(), m.method, onOff(m.requireChecks), m.groupSuffix())
+	}
+	if m.errMsg != "" {
+		fmt.Fprintf(&builder, "error: %s\n", m.errMsg)
 	}
 	return builder.String()
 }

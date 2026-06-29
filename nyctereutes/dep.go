@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/config"
@@ -89,9 +90,19 @@ func (c *depCommand) Execute(_ []string) error {
 		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
 		return nil
 	}
-	model := tui.New(client, mrs, tui.WithGroupKey(func(mr types.MR) string {
-		return gitlab.GroupKey(mr, patterns)
-	}))
+	model := tui.New(
+		client, mrs,
+		tui.WithGroupKey(func(mr types.MR) string {
+			return gitlab.GroupKey(mr, patterns)
+		}),
+		tui.WithOpen(func(mr types.MR) error {
+			_, err := c.runner.Run(context.Background(), "mr", "view", strconv.Itoa(mr.IID), "-R", mr.Project, "--web")
+			if err != nil {
+				return fmt.Errorf("open MR in browser: %w", err)
+			}
+			return nil
+		}),
+	)
 	return c.launch(model)
 }
 

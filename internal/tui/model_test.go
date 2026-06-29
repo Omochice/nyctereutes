@@ -17,6 +17,8 @@ import (
 
 var errApprove = errors.New("approve failed")
 
+var errExternal = errors.New("external failed")
+
 // fakeClient records the approve/merge calls the model issues so tests can
 // assert on them without a real glab.
 type fakeClient struct {
@@ -875,5 +877,43 @@ func TestGroupFilterNoopWithoutDependency(t *testing.T) {
 	model = press(model, keyGroupFilter)
 	if got := visibleIIDs(model); len(got) != 3 {
 		t.Errorf("visible = %v, want all 3 when no group-key dependency is injected", got)
+	}
+}
+
+func TestOpenInvokesOpenWithCursorMR(t *testing.T) {
+	var opened []int
+	open := func(mr types.MR) error { opened = append(opened, mr.IID); return nil }
+	model := New(&fakeClient{}, sampleMRs(), WithOpen(open))
+	model = press(model, keyDown) // cursor on IID 13
+	next, cmd := model.Update(key(keyOpen))
+	drain(asModel(next), cmd)
+	if len(opened) != 1 || opened[0] != 13 {
+		t.Errorf("opened = %v, want [13]", opened)
+	}
+}
+
+func TestOpenStaysOnList(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithOpen(func(types.MR) error { return nil }))
+	next, cmd := model.Update(key(keyOpen))
+	model = drain(asModel(next), cmd)
+	if model.phase != phaseList {
+		t.Errorf("phase = %v, want list after a successful open", model.phase)
+	}
+}
+
+func TestOpenFailureShowsError(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithOpen(func(types.MR) error { return errExternal }))
+	next, cmd := model.Update(key(keyOpen))
+	model = drain(asModel(next), cmd)
+	if !strings.Contains(model.View().Content, errExternal.Error()) {
+		t.Errorf("view should show the open error\n%s", model.View().Content)
+	}
+}
+
+func TestOpenNoopWithoutDependency(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	_, cmd := model.Update(key(keyOpen))
+	if cmd != nil {
+		t.Errorf("o should be a no-op without an open dependency")
 	}
 }
