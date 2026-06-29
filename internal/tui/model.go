@@ -269,11 +269,10 @@ func (m Model) recordError(err error) Model {
 // reports the error. Either way the refreshing state ends.
 func (m Model) recordRefresh(result refreshDoneMsg) Model {
 	m.loading = false
+	m = m.recordError(result.err)
 	if result.err != nil {
-		m.errMsg = result.err.Error()
 		return m
 	}
-	m.errMsg = ""
 	m.mrs = result.mrs
 	return m.applyFilters()
 }

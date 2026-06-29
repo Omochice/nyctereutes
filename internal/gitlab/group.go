@@ -25,11 +25,15 @@ func GroupMRs(mrs []types.MR, customPatterns []string) map[string][]types.MR {
 	return groups
 }
 
-// GroupKey returns the package@version key for a single MR, using the same
-// bucketing (and unparsed fallback) as [GroupMRs], so callers that need one MR's
-// group key stay consistent with the grouped listing.
-func GroupKey(mr types.MR, customPatterns []string) string {
-	return groupKeyOf(mr, compilePatterns(customPatterns))
+// GroupKeyFunc returns a function mapping an MR to its package@version key, using
+// the same bucketing (and unparsed fallback) as [GroupMRs]. The patterns are
+// compiled once up front so repeated calls (such as the TUI's group filter over
+// every visible MR) do not recompile them per MR.
+func GroupKeyFunc(customPatterns []string) func(types.MR) string {
+	compiled := compilePatterns(customPatterns)
+	return func(mr types.MR) string {
+		return groupKeyOf(mr, compiled)
+	}
 }
 
 // compilePatterns compiles the custom title patterns once, skipping invalid ones.

@@ -92,9 +92,7 @@ func (c *depCommand) Execute(_ []string) error {
 	}
 	model := tui.New(
 		client, mrs,
-		tui.WithGroupKey(func(mr types.MR) string {
-			return gitlab.GroupKey(mr, patterns)
-		}),
+		tui.WithGroupKey(gitlab.GroupKeyFunc(patterns)),
 		tui.WithOpen(func(mr types.MR) error {
 			_, err := c.runner.Run(context.Background(), "mr", "view", strconv.Itoa(mr.IID), "-R", mr.Project, "--web")
 			if err != nil {

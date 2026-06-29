@@ -41,15 +41,17 @@ func TestGroupMRsRejectsEmptyCaptureKey(t *testing.T) {
 	}
 }
 
-func TestGroupKeyMatchesGroupMRs(t *testing.T) {
+func TestGroupKeyFuncMatchesGroupMRs(t *testing.T) {
+	groupKey := GroupKeyFunc(nil)
+
 	parsed := types.MR{IID: 1, Project: projectA, Title: "Bump lodash from 4.0.0 to 4.17.21"}
-	if got := GroupKey(parsed, nil); got != "lodash@4.17.21" {
-		t.Errorf("GroupKey = %q, want lodash@4.17.21", got)
+	if got := groupKey(parsed); got != "lodash@4.17.21" {
+		t.Errorf("group key = %q, want lodash@4.17.21", got)
 	}
 
 	unparsed := types.MR{IID: 7, Project: "g/c", Title: "Refactor the build"}
-	if got := GroupKey(unparsed, nil); got != "unparsed:g/c!7" {
-		t.Errorf("GroupKey for an unparsed title = %q, want unparsed:g/c!7", got)
+	if got := groupKey(unparsed); got != "unparsed:g/c!7" {
+		t.Errorf("group key for an unparsed title = %q, want unparsed:g/c!7", got)
 	}
 }
 
