@@ -779,10 +779,13 @@ func TestCIStatusesUseDistinctColors(t *testing.T) {
 	}
 }
 
-func TestUnknownCIGlyphIsNotColored(t *testing.T) {
+func TestUnknownCIGlyphIsDimmed(t *testing.T) {
 	out := styledCISymbol("")
-	if strings.Contains(out, ansiEscape) {
-		t.Errorf("unknown status glyph should not be colored, got %q", out)
+	if !strings.Contains(out, ansiEscape) {
+		t.Errorf("unknown status glyph should be dimmed gray, got %q", out)
+	}
+	if !strings.Contains(out, "-") {
+		t.Errorf("unknown status should render the dash marker, got %q", out)
 	}
 }
 

@@ -555,37 +555,42 @@ const (
 	ciStatusPending = "pending"
 )
 
-// ANSI 16-color indices used to tint the status column and warning marker.
+// ANSI 256-color indices used to tint the status column and warning marker,
+// matching the upstream glab-dep palette.
 const (
-	colorGreen  = "2"
-	colorRed    = "1"
-	colorYellow = "3"
+	colorGreen  = "42"
+	colorRed    = "196"
+	colorYellow = "226"
+	colorGray   = "240"
 )
 
 // The marker shown for an MR that cannot be merged.
 const warnGlyph = "⚠"
 
-// Renders the CI glyph for status tinted by pipeline outcome. An unknown status
-// is left unstyled so the column keeps its width without adding color.
+// Renders the CI glyph for status tinted by pipeline outcome, matching the
+// upstream palette: a known status is bold and colored, while an unknown status
+// is dimmed gray.
 func styledCISymbol(status string) string {
-	style := lipgloss.NewStyle()
+	glyph := ciSymbol(status)
 	switch status {
 	case ciStatusSuccess:
-		style = style.Foreground(lipgloss.Color(colorGreen))
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorGreen)).Render(glyph)
 	case ciStatusFailure:
-		style = style.Foreground(lipgloss.Color(colorRed))
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorRed)).Render(glyph)
 	case ciStatusPending:
-		style = style.Foreground(lipgloss.Color(colorYellow))
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorYellow)).Render(glyph)
+	default:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorGray)).Render(glyph)
 	}
-	return style.Render(ciSymbol(status))
 }
 
-// Renders the unmergeable warning marker in red.
+// Renders the unmergeable warning marker in bold red.
 func styledWarn() string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorRed)).Render(warnGlyph)
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorRed)).Render(warnGlyph)
 }
 
-// Maps a normalized pipeline status to a single-column glyph.
+// Maps a normalized pipeline status to a single-column glyph, matching the
+// upstream glab-dep markers.
 func ciSymbol(status string) string {
 	switch status {
 	case ciStatusSuccess:
@@ -593,8 +598,8 @@ func ciSymbol(status string) string {
 	case ciStatusFailure:
 		return "✗"
 	case ciStatusPending:
-		return "◌"
+		return "●"
 	default:
-		return " "
+		return "-"
 	}
 }
