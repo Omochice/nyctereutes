@@ -522,7 +522,7 @@ func TestMergeModeMergesWithSquashAutoMerge(t *testing.T) {
 	if len(fake.merged) != 1 {
 		t.Fatalf("merged %d MRs, want 1", len(fake.merged))
 	}
-	if fake.mergeMethod[0] != mergeMethod || !fake.mergeAuto[0] {
+	if fake.mergeMethod[0] != defaultMergeMethod || !fake.mergeAuto[0] {
 		t.Errorf("merge called with method=%q auto=%v, want squash/true", fake.mergeMethod[0], fake.mergeAuto[0])
 	}
 }

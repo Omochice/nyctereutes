@@ -77,9 +77,12 @@ const (
 	phaseComplete
 )
 
-// Fixed to squash for the MVP; method/require-checks toggles are
-// a later increment.
-const mergeMethod = "squash"
+// The merge methods cycled through by the M key, in order. The first is the
+// default a freshly built model uses.
+var mergeMethodCycle = []string{"squash", "merge", "rebase"}
+
+// The merge method a freshly built model starts on.
+const defaultMergeMethod = "squash"
 
 // The most glab calls a single run fires at once. tea.Batch would otherwise
 // spawn one subprocess per selected MR, so a large selection could overwhelm
@@ -107,6 +110,8 @@ type Model struct {
 	// valid because changing the filter clears the selection.
 	selected map[int]bool
 	mode     mode
+	// The merge method applied when running merge or approve & merge; cycled by M.
+	method string
 	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
 	// True while the user types a query; searchBuf holds the in-progress text
@@ -127,6 +132,7 @@ func New(client Client, mrs []types.MR) Model {
 		mrs:      mrs,
 		filtered: mrs,
 		selected: make(map[int]bool),
+		method:   defaultMergeMethod,
 	}
 }
 
@@ -347,7 +353,7 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd {
 	// Capture only what the command needs so it does not pin the whole Model
 	// (its MR slices, results and selection map) alive while it runs.
-	client, currentMode := m.client, m.mode
+	client, currentMode, method := m.client, m.mode, m.method
 	return func() tea.Msg {
 		semaphore <- struct{}{}
 		defer func() { <-semaphore }()
@@ -358,7 +364,7 @@ func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd
 			err = client.ApproveMR(ctx, mergeRequest.Project, mergeRequest.IID)
 		}
 		if err == nil && (currentMode == modeMerge || currentMode == modeApproveMerge) {
-			err = client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, mergeMethod, true)
+			err = client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, method, true)
 		}
 		return mrResultMsg{mr: mergeRequest, err: err}
 	}
