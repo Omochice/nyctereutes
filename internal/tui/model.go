@@ -193,10 +193,33 @@ func (m Model) handleKey(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.helping = !m.helping
 		return m, nil
 	}
-	if m.helping || m.phase != phaseList {
-		return m.quitOr(name)
+	if m.phase == phaseList && !m.helping {
+		return m.updateList(name)
 	}
-	return m.updateList(name)
+	return m.exitKey(name)
+}
+
+// Handles keys on the non-list screens (help, executing, complete): the
+// complete screen returns to the list on enter/esc, and q quits from any of
+// them.
+//
+//nolint:ireturn // matches handleKey's tea.Model return.
+func (m Model) exitKey(name string) (tea.Model, tea.Cmd) {
+	if m.phase == phaseComplete && (name == keyEnter || name == keyEscape) {
+		return m.backToList(), nil
+	}
+	return m.quitOr(name)
+}
+
+// Returns to the list from the complete screen, discarding the finished run's
+// results and selection so the next run starts clean.
+func (m Model) backToList() Model {
+	m.phase = phaseList
+	m.results = nil
+	m.pending = 0
+	m.selected = make(map[int]bool)
+	m.cursor = 0
+	return m
 }
 
 // Quits on q and otherwise leaves the model unchanged; it backs the
@@ -385,6 +408,7 @@ func (m Model) renderResults() string {
 		fmt.Fprintf(&builder, "%s %s !%d - %s%s\n",
 			mark, pathShorten(result.mr.Project), result.mr.IID, result.mr.Title, detail)
 	}
+	builder.WriteString("\n(enter: back to list, q: quit)\n")
 	return builder.String()
 }
 

@@ -380,6 +380,28 @@ func TestKeysIgnoredOnCompleteScreenExceptQuit(t *testing.T) {
 	}
 }
 
+func TestCompleteScreenReturnsToListOnEnter(t *testing.T) {
+	fake := &fakeClient{}
+	model := New(fake, sampleMRs())
+	model = press(model, keySpace) // select IID 12
+	next, cmd := model.Update(key(keyRun))
+	model = drain(asModel(next), cmd) // phaseComplete
+	if model.phase != phaseComplete {
+		t.Fatalf("setup: phase = %v, want phaseComplete", model.phase)
+	}
+
+	model = press(model, keyEnter) // return to the list
+	if model.phase != phaseList {
+		t.Errorf("phase = %v, want phaseList after enter", model.phase)
+	}
+	if got := len(selectedIIDs(model)); got != 0 {
+		t.Errorf("selection should be cleared on return, got %d", got)
+	}
+	if !strings.Contains(model.View().Content, "mode:") {
+		t.Errorf("expected the list view after returning\n%s", model.View().Content)
+	}
+}
+
 func TestHelpOverlayIgnoresNavigation(t *testing.T) {
 	model := New(&fakeClient{}, sampleMRs())
 	model = press(model, keyDown) // cursor at 1
