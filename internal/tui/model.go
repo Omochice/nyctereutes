@@ -79,12 +79,15 @@ const (
 	phaseComplete
 )
 
-// The merge methods cycled through by the M key, in order. The first is the
-// default a freshly built model uses.
-var mergeMethodCycle = []string{"squash", "merge", "rebase"}
+// The merge methods glab accepts, passed through to MergeMR.
+const (
+	methodSquash = "squash"
+	methodMerge  = "merge"
+	methodRebase = "rebase"
+)
 
 // The merge method a freshly built model starts on.
-const defaultMergeMethod = "squash"
+const defaultMergeMethod = methodSquash
 
 // The most glab calls a single run fires at once. tea.Batch would otherwise
 // spawn one subprocess per selected MR, so a large selection could overwhelm
@@ -275,15 +278,31 @@ func (m Model) editList(name string) Model {
 	case keyUp:
 		m = m.moveCursor(-1)
 	case keySpace, keyEnter:
-		// Guard against an empty list, where the cursor has no MR to toggle and
-		// would otherwise mark a hidden index that reappears once the filter clears.
-		if len(m.visible()) > 0 {
-			m.selected[m.cursor] = !m.selected[m.cursor]
-		}
+		m = m.toggleSelection()
 	case keySelectAll:
 		m = m.selectAll()
 	case keyClear:
 		m.selected = make(map[int]bool)
+	default:
+		m = m.cycleSetting(name)
+	}
+	return m
+}
+
+// Toggles the selection of the MR under the cursor. It guards against an empty
+// list, where the cursor has no MR and would otherwise mark a hidden index that
+// reappears once the filter clears.
+func (m Model) toggleSelection() Model {
+	if len(m.visible()) > 0 {
+		m.selected[m.cursor] = !m.selected[m.cursor]
+	}
+	return m
+}
+
+// Cycles the run-configuration keys: the action mode, the merge method, and the
+// require-checks toggle (which re-filters the list).
+func (m Model) cycleSetting(name string) Model {
+	switch name {
 	case keyMode:
 		m.mode = (m.mode + 1) % modeCount
 	case keyMergeMethod:
@@ -295,15 +314,16 @@ func (m Model) editList(name string) Model {
 	return m
 }
 
-// Returns the merge method following current in mergeMethodCycle, wrapping
-// around; an unknown current resets to the first method.
+// Returns the merge method following current in the squash/merge/rebase cycle,
+// wrapping around; an unknown current resets to the first method.
 func nextMergeMethod(current string) string {
-	for index, method := range mergeMethodCycle {
+	cycle := []string{methodSquash, methodMerge, methodRebase}
+	for index, method := range cycle {
 		if method == current {
-			return mergeMethodCycle[(index+1)%len(mergeMethodCycle)]
+			return cycle[(index+1)%len(cycle)]
 		}
 	}
-	return mergeMethodCycle[0]
+	return cycle[0]
 }
 
 // Shifts the cursor by delta, staying within the visible list.
@@ -414,7 +434,7 @@ func (m Model) applyFilters() Model {
 func filterCISuccess(mrs []types.MR) []types.MR {
 	var out []types.MR
 	for _, mergeRequest := range mrs {
-		if mergeRequest.CIStatus == "success" {
+		if mergeRequest.CIStatus == ciStatusSuccess {
 			out = append(out, mergeRequest)
 		}
 	}
@@ -486,7 +506,7 @@ func (m Model) renderList() string {
 	if m.searching {
 		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
 	} else {
-		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s  (m: mode, M: method, c: checks, x: run, ?: help, q: quit)\n",
+		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s  (m/M/c change, x run, ? help, q quit)\n",
 			m.modeLabel(), m.method, onOff(m.requireChecks))
 	}
 	return builder.String()
@@ -526,10 +546,13 @@ func onOff(enabled bool) string {
 	return "off"
 }
 
+// The pipeline status marking an MR as passing; used by the CI filter and glyph.
+const ciStatusSuccess = "success"
+
 // Maps a normalized pipeline status to a single-column glyph.
 func ciSymbol(status string) string {
 	switch status {
-	case "success":
+	case ciStatusSuccess:
 		return "✓"
 	case "failure":
 		return "✗"
