@@ -356,7 +356,9 @@ func (m Model) updateList(name string) (Model, tea.Cmd) {
 // selection and entering the refreshing state. It is a no-op when no refresh
 // dependency is injected.
 func (m Model) startRefresh() (Model, tea.Cmd) {
-	if m.refresh == nil {
+	// Ignore r while a refresh is already in flight: overlapping fetches could
+	// finish out of order and let a slower, older result overwrite a newer list.
+	if m.refresh == nil || m.loading {
 		return m, nil
 	}
 	m.selected = make(map[int]bool)

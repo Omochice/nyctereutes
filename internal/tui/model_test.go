@@ -981,3 +981,12 @@ func TestRefreshNoopWithoutDependency(t *testing.T) {
 		t.Errorf("r should be a no-op without a refresh dependency")
 	}
 }
+
+func TestRefreshIgnoredWhileLoading(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	next, _ := model.Update(key(keyRefresh)) // first refresh: now loading
+	model = asModel(next)
+	if _, cmd := model.Update(key(keyRefresh)); cmd != nil {
+		t.Errorf("a second r while a refresh is in flight should be ignored")
+	}
+}
