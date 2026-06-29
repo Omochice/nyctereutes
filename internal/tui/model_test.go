@@ -3,9 +3,11 @@ package tui
 import (
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -28,22 +30,26 @@ type fakeClient struct {
 
 func (f *fakeClient) ApproveMR(_ context.Context, _ string, iid int) error {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.approved = append(f.approved, iid)
-	if f.approveFn != nil {
-		return f.approveFn(iid)
+	fn := f.approveFn
+	f.mu.Unlock()
+	// Call the hook outside the lock so a blocking hook exercises the model's
+	// concurrency limit rather than serializing on this mutex.
+	if fn != nil {
+		return fn(iid)
 	}
 	return nil
 }
 
 func (f *fakeClient) MergeMR(_ context.Context, _ string, iid int, method string, autoMerge bool) error {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.merged = append(f.merged, iid)
 	f.mergeMethod = append(f.mergeMethod, method)
 	f.mergeAuto = append(f.mergeAuto, autoMerge)
-	if f.mergeFn != nil {
-		return f.mergeFn(iid)
+	fn := f.mergeFn
+	f.mu.Unlock()
+	if fn != nil {
+		return fn(iid)
 	}
 	return nil
 }
@@ -378,6 +384,52 @@ func TestKeysIgnoredOnCompleteScreenExceptQuit(t *testing.T) {
 	if _, cmd := asModel(next2).Update(key(keyQuit)); !isQuit(cmd) {
 		t.Error("q should quit from the complete screen")
 	}
+}
+
+func TestExecutionCapsConcurrentActions(t *testing.T) {
+	total := maxConcurrentActions + 4
+	mrs := make([]types.MR, total)
+	for index := range mrs {
+		mrs[index] = types.MR{IID: index + 1, Project: "g/p"}
+	}
+
+	entered := make(chan int, total)
+	release := make(chan struct{})
+	fake := &fakeClient{approveFn: func(iid int) error {
+		entered <- iid
+		<-release
+		return nil
+	}}
+
+	model := New(fake, mrs)
+	model = press(model, keySelectAll)
+	_, cmd := model.Update(key(keyRun))
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected a batch of per-MR commands")
+	}
+	for _, command := range batch {
+		go command()
+	}
+
+	// The cap many actions reach glab and park on release.
+	for range maxConcurrentActions {
+		select {
+		case <-entered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for the capped actions to start")
+		}
+	}
+	// No further action may enter glab while the cap is held by the parked ones.
+	for range 100 {
+		runtime.Gosched()
+		select {
+		case extra := <-entered:
+			t.Fatalf("more than %d actions ran concurrently (extra !%d)", maxConcurrentActions, extra)
+		default:
+		}
+	}
+	close(release)
 }
 
 func TestCompleteScreenReturnsToListOnEnter(t *testing.T) {

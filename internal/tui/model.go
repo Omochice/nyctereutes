@@ -81,6 +81,11 @@ const (
 // a later increment.
 const mergeMethod = "squash"
 
+// The most glab calls a single run fires at once. tea.Batch would otherwise
+// spawn one subprocess per selected MR, so a large selection could overwhelm
+// the host and GitLab; this matches internal/gitlab's status-fetch worker cap.
+const maxConcurrentActions = 10
+
 // Records the outcome of applying the current mode to one MR.
 type actionResult struct {
 	mr  types.MR
@@ -326,9 +331,12 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 	m.pending = len(selected)
 	m.results = nil
 
+	// A shared buffered channel caps how many of the batched commands hit glab
+	// at once; the rest block on send until a slot frees.
+	semaphore := make(chan struct{}, maxConcurrentActions)
 	cmds := make([]tea.Cmd, 0, len(selected))
 	for _, mergeRequest := range selected {
-		cmds = append(cmds, m.actionCmd(mergeRequest))
+		cmds = append(cmds, m.actionCmd(mergeRequest, semaphore))
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -336,11 +344,14 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 // Returns a command that applies the current mode to mergeRequest and
 // reports the outcome. In approve & merge mode a failed approval skips the merge
 // so a broken MR is not merged.
-func (m Model) actionCmd(mergeRequest types.MR) tea.Cmd {
+func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd {
 	// Capture only what the command needs so it does not pin the whole Model
 	// (its MR slices, results and selection map) alive while it runs.
 	client, currentMode := m.client, m.mode
 	return func() tea.Msg {
+		semaphore <- struct{}{}
+		defer func() { <-semaphore }()
+
 		ctx := context.Background()
 		var err error
 		if currentMode == modeApprove || currentMode == modeApproveMerge {
