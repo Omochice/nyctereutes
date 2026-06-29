@@ -135,15 +135,25 @@ type Model struct {
 	helping bool           // true while the help overlay is shown
 }
 
-// Builds a Model showing mrs, driving approve/merge through client.
-func New(client Client, mrs []types.MR) Model {
-	return Model{
+// Option customizes a Model at construction, injecting the optional
+// dependencies that back the group-filter, open and refresh keys. A key whose
+// dependency is not injected is a no-op.
+type Option func(*Model)
+
+// Builds a Model showing mrs, driving approve/merge through client. Optional
+// dependencies (group key, browser open, refresh) are supplied via opts.
+func New(client Client, mrs []types.MR, opts ...Option) Model {
+	model := Model{
 		client:   client,
 		mrs:      mrs,
 		filtered: mrs,
 		selected: make(map[int]bool),
 		method:   defaultMergeMethod,
 	}
+	for _, opt := range opts {
+		opt(&model)
+	}
+	return model
 }
 
 // Returns the merge requests the model was built with.
