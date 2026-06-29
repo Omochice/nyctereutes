@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -759,11 +760,22 @@ func TestCISuccessGlyphIsColored(t *testing.T) {
 }
 
 func TestCIStatusesUseDistinctColors(t *testing.T) {
-	success := styledCISymbol(ciStatusSuccess)
-	failure := styledCISymbol(ciStatusFailure)
-	pending := styledCISymbol(ciStatusPending)
+	// Compare only the ANSI color sequences, not the whole rendered string: the
+	// glyphs already differ, so full-string comparison would pass even if the
+	// colors were identical or missing. The SGR sequences are extracted generically
+	// so the assertion does not depend on the implementation's color values.
+	sgr := regexp.MustCompile("\x1b\\[[0-9;]*m")
+	colorSeq := func(status string) string {
+		return strings.Join(sgr.FindAllString(styledCISymbol(status), -1), "")
+	}
+	success := colorSeq(ciStatusSuccess)
+	failure := colorSeq(ciStatusFailure)
+	pending := colorSeq(ciStatusPending)
+	if success == "" || failure == "" || pending == "" {
+		t.Fatalf("each status should emit a color sequence: %q %q %q", success, failure, pending)
+	}
 	if success == failure || failure == pending || success == pending {
-		t.Errorf("CI statuses should render distinct colors: %q %q %q", success, failure, pending)
+		t.Errorf("CI statuses should use distinct colors: %q %q %q", success, failure, pending)
 	}
 }
 
