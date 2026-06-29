@@ -9,6 +9,7 @@ import (
 	"github.com/Omochice/nyctereutes/internal/config"
 	"github.com/Omochice/nyctereutes/internal/gitlab"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/tui"
 	"github.com/Omochice/nyctereutes/internal/types"
 	"github.com/Omochice/nyctereutes/internal/ui"
 )
@@ -46,7 +47,13 @@ func (s scopeFlags) resolve(ctx context.Context, runner glab.Runner) (gitlab.Sea
 }
 
 type depCommand struct {
-	inout *cli.ProcInout
+	scopeFlags
+
+	inout  *cli.ProcInout
+	runner glab.Runner
+	// Starts the interactive TUI; it is a field so tests can substitute a fake
+	// instead of driving a real terminal program.
+	launch func(tui.Model) error
 
 	List    *depListCommand    `command:"list" description:"list dependency MRs"`
 	Approve *depApproveCommand `command:"approve" description:"bulk approve a group of MRs"`
@@ -55,18 +62,34 @@ type depCommand struct {
 
 func newDepCommand(inout *cli.ProcInout, runner glab.Runner) *depCommand {
 	return &depCommand{
-		inout:   inout,
+		inout:  inout,
+		runner: runner,
+		launch: func(model tui.Model) error {
+			return tui.Run(model, inout.Stdin, inout.Stdout)
+		},
 		List:    &depListCommand{inout: inout, runner: runner},
 		Approve: &depApproveCommand{inout: inout, runner: runner},
 		Merge:   &depMergeCommand{inout: inout, runner: runner},
 	}
 }
 
-// Runs when "dep" is invoked with no subcommand. It is reserved for a future
-// TUI; for now it reports that it is not implemented.
+// Runs when "dep" is invoked with no subcommand: it searches the configured
+// scope and opens the interactive TUI, or prints the empty message and exits
+// without launching when nothing matches.
 func (c *depCommand) Execute(_ []string) error {
-	_, _ = fmt.Fprintln(c.inout.Stderr, "not implemented")
-	return errNotImplemented
+	ctx := context.Background()
+	params, _ := c.resolve(ctx, c.runner)
+
+	client := gitlab.NewClient(c.runner)
+	mrs, err := client.SearchMRs(ctx, params)
+	if err != nil {
+		return fmt.Errorf("search MRs: %w", err)
+	}
+	if len(mrs) == 0 {
+		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
+		return nil
+	}
+	return c.launch(tui.New(client, mrs))
 }
 
 type depListCommand struct {
