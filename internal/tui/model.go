@@ -317,13 +317,14 @@ func (m Model) cycleSetting(name string) Model {
 // Returns the merge method following current in the squash/merge/rebase cycle,
 // wrapping around; an unknown current resets to the first method.
 func nextMergeMethod(current string) string {
-	cycle := []string{methodSquash, methodMerge, methodRebase}
-	for index, method := range cycle {
-		if method == current {
-			return cycle[(index+1)%len(cycle)]
-		}
+	switch current {
+	case methodSquash:
+		return methodMerge
+	case methodMerge:
+		return methodRebase
+	default:
+		return methodSquash
 	}
-	return cycle[0]
 }
 
 // Shifts the cursor by delta, staying within the visible list.
