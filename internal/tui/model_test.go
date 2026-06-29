@@ -880,6 +880,22 @@ func TestGroupFilterNoopWithoutDependency(t *testing.T) {
 	}
 }
 
+func TestGroupFilterClearsWhenVisibleEmpty(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter) // filter to the cursor MR's group
+	model = press(model, keySearch)
+	model = typeRunes(model, "zzz-no-match") // narrow the visible list to empty
+	model = press(model, keyEnter)
+	if len(model.visible()) != 0 {
+		t.Fatalf("precondition: expected an empty visible list")
+	}
+
+	model = press(model, keyGroupFilter) // must still clear the group filter
+	if model.groupFilter != "" {
+		t.Errorf("group filter = %q, want cleared even with an empty visible list", model.groupFilter)
+	}
+}
+
 func TestOpenInvokesOpenWithCursorMR(t *testing.T) {
 	var opened []int
 	open := func(mr types.MR) error { opened = append(opened, mr.IID); return nil }

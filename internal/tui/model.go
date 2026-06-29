@@ -412,12 +412,23 @@ func (m Model) editList(name string) Model {
 }
 
 // Filters the list to the cursor MR's package@version group, or clears the
-// filter when it already matches that group (a toggle). It is a no-op when no
-// group-key dependency is injected or no MR is under the cursor.
+// filter when it already matches that group (a toggle). With no MR under the
+// cursor it can only clear an active filter, and it is a no-op when no group-key
+// dependency is injected.
 func (m Model) toggleGroupFilter() Model {
-	visible := m.visible()
-	if m.groupKeyOf == nil || len(visible) == 0 {
+	if m.groupKeyOf == nil {
 		return m
+	}
+	visible := m.visible()
+	// With no MR under the cursor there is no group to switch to, but an active
+	// filter must still be clearable - otherwise a filter that hid everything
+	// (via search or refresh) would be stuck on with no way to turn it off.
+	if len(visible) == 0 {
+		if m.groupFilter == "" {
+			return m
+		}
+		m.groupFilter = ""
+		return m.applyFilters()
 	}
 	key := m.groupKeyOf(visible[m.cursor])
 	if m.groupFilter == key {
