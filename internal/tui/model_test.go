@@ -615,3 +615,44 @@ func TestModeStartsAtApproveAndCycles(t *testing.T) {
 		}
 	}
 }
+
+func TestMergeMethodStartsAtSquashAndCycles(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	if model.method != "squash" {
+		t.Fatalf("initial merge method = %q, want squash", model.method)
+	}
+
+	want := []string{"merge", "rebase", "squash"}
+	for _, wantMethod := range want {
+		model = press(model, keyMergeMethod)
+		if model.method != wantMethod {
+			t.Errorf("after M merge method = %q, want %q", model.method, wantMethod)
+		}
+	}
+}
+
+func TestMergeRunsWithSelectedMethod(t *testing.T) {
+	fake := &fakeClient{}
+	model := New(fake, sampleMRs())
+	model = press(model, keyMode)        // mode -> merge
+	model = press(model, keyMergeMethod) // method squash -> merge
+	model = press(model, keySpace)       // select first MR
+	next, cmd := model.Update(key(keyRun))
+	drain(asModel(next), cmd)
+
+	if len(fake.mergeMethod) != 1 || fake.mergeMethod[0] != "merge" {
+		t.Errorf("merge methods = %v, want [merge]", fake.mergeMethod)
+	}
+}
+
+func TestListViewShowsMergeMethod(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	if !strings.Contains(model.View().Content, "squash") {
+		t.Fatalf("list view should show the default merge method\n%s", model.View().Content)
+	}
+
+	model = press(model, keyMergeMethod) // squash -> merge
+	if !strings.Contains(model.View().Content, "merge") {
+		t.Errorf("list view should show the cycled merge method\n%s", model.View().Content)
+	}
+}

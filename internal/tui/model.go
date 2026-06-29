@@ -52,20 +52,21 @@ func (md mode) label() string {
 
 // Key names as returned by tea.KeyPressMsg.String().
 const (
-	keyDown      = "j"
-	keyUp        = "k"
-	keySpace     = "space"
-	keyEnter     = "enter"
-	keyEscape    = "esc"
-	keyBackspace = "backspace"
-	keyQuit      = "q"
-	keyInterrupt = "ctrl+c"
-	keySearch    = "/"
-	keyHelp      = "?"
-	keySelectAll = "a"
-	keyClear     = "d"
-	keyMode      = "m"
-	keyRun       = "x"
+	keyDown        = "j"
+	keyUp          = "k"
+	keySpace       = "space"
+	keyEnter       = "enter"
+	keyEscape      = "esc"
+	keyBackspace   = "backspace"
+	keyQuit        = "q"
+	keyInterrupt   = "ctrl+c"
+	keySearch      = "/"
+	keyHelp        = "?"
+	keySelectAll   = "a"
+	keyClear       = "d"
+	keyMode        = "m"
+	keyMergeMethod = "M"
+	keyRun         = "x"
 )
 
 // The screen the model is currently showing.
@@ -280,8 +281,21 @@ func (m Model) editList(name string) Model {
 		m.selected = make(map[int]bool)
 	case keyMode:
 		m.mode = (m.mode + 1) % modeCount
+	case keyMergeMethod:
+		m.method = nextMergeMethod(m.method)
 	}
 	return m
+}
+
+// Returns the merge method following current in mergeMethodCycle, wrapping
+// around; an unknown current resets to the first method.
+func nextMergeMethod(current string) string {
+	for index, method := range mergeMethodCycle {
+		if method == current {
+			return mergeMethodCycle[(index+1)%len(mergeMethodCycle)]
+		}
+	}
+	return mergeMethodCycle[0]
 }
 
 // Shifts the cursor by delta, staying within the visible list.
@@ -407,6 +421,7 @@ const helpText = `Keybindings
   a/d        select all / clear
   /          search (enter to apply, esc to cancel)
   m          change mode (approve / merge / approve & merge)
+  M          change merge method (squash / merge / rebase)
   x          run the current mode on selected MRs
   ?          toggle this help
   q/ctrl+c   quit
@@ -438,7 +453,8 @@ func (m Model) renderList() string {
 	if m.searching {
 		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
 	} else {
-		fmt.Fprintf(&builder, "\nmode: %s  (m: change, x: run, ?: help, q: quit)\n", m.modeLabel())
+		fmt.Fprintf(&builder, "\nmode: %s  method: %s  (m: mode, M: method, x: run, ?: help, q: quit)\n",
+			m.modeLabel(), m.method)
 	}
 	return builder.String()
 }
