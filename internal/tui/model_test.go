@@ -754,7 +754,7 @@ func TestCISuccessGlyphIsColored(t *testing.T) {
 	if !strings.Contains(out, ansiEscape) {
 		t.Errorf("success glyph should be colored, got %q", out)
 	}
-	if !strings.Contains(out, ciSymbol(ciStatusSuccess)) {
+	if !strings.Contains(out, "✓") {
 		t.Errorf("colored glyph should still contain the plain glyph, got %q", out)
 	}
 }
