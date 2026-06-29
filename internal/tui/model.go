@@ -352,17 +352,17 @@ func (m Model) updateList(name string) (Model, tea.Cmd) {
 	}
 }
 
-// Re-fetches the MR list through the injected refresh function, clearing the
-// selection and entering the refreshing state. It is a no-op when no refresh
-// dependency is injected.
+// Re-fetches the MR list through the injected refresh function, entering the
+// refreshing state. It is a no-op when no refresh dependency is injected or a
+// refresh is already in flight.
 func (m Model) startRefresh() (Model, tea.Cmd) {
 	// Ignore r while a refresh is already in flight: overlapping fetches could
 	// finish out of order and let a slower, older result overwrite a newer list.
 	if m.refresh == nil || m.loading {
 		return m, nil
 	}
-	m.selected = make(map[int]bool)
-	m.cursor = 0
+	// Leave the selection and cursor untouched here: a successful refresh clears
+	// them via applyFilters, while a failed one keeps the unchanged list usable.
 	m.errMsg = ""
 	m.loading = true
 	refresh := m.refresh

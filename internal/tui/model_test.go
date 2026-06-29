@@ -982,6 +982,16 @@ func TestRefreshNoopWithoutDependency(t *testing.T) {
 	}
 }
 
+func TestRefreshFailureKeepsSelection(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return nil, errExternal }))
+	model = press(model, keySpace) // select IID 12
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := selectedIIDs(model); len(got) != 1 || got[0] != 12 {
+		t.Errorf("selection = %v, want [12] kept when the refresh fails", got)
+	}
+}
+
 func TestRefreshIgnoredWhileLoading(t *testing.T) {
 	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
 	next, _ := model.Update(key(keyRefresh)) // first refresh: now loading
