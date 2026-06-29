@@ -52,21 +52,22 @@ func (md mode) label() string {
 
 // Key names as returned by tea.KeyPressMsg.String().
 const (
-	keyDown        = "j"
-	keyUp          = "k"
-	keySpace       = "space"
-	keyEnter       = "enter"
-	keyEscape      = "esc"
-	keyBackspace   = "backspace"
-	keyQuit        = "q"
-	keyInterrupt   = "ctrl+c"
-	keySearch      = "/"
-	keyHelp        = "?"
-	keySelectAll   = "a"
-	keyClear       = "d"
-	keyMode        = "m"
-	keyMergeMethod = "M"
-	keyRun         = "x"
+	keyDown          = "j"
+	keyUp            = "k"
+	keySpace         = "space"
+	keyEnter         = "enter"
+	keyEscape        = "esc"
+	keyBackspace     = "backspace"
+	keyQuit          = "q"
+	keyInterrupt     = "ctrl+c"
+	keySearch        = "/"
+	keyHelp          = "?"
+	keySelectAll     = "a"
+	keyClear         = "d"
+	keyMode          = "m"
+	keyMergeMethod   = "M"
+	keyRequireChecks = "c"
+	keyRun           = "x"
 )
 
 // The screen the model is currently showing.
@@ -113,6 +114,10 @@ type Model struct {
 	mode     mode
 	// The merge method applied when running merge or approve & merge; cycled by M.
 	method string
+	// Toggled by c. When true the list shows only CI-passing MRs and merges use
+	// GitLab's auto-merge gate; when false the list shows everything and merges
+	// run immediately. It defaults to false (off).
+	requireChecks bool
 	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
 	// True while the user types a query; searchBuf holds the in-progress text
@@ -283,6 +288,9 @@ func (m Model) editList(name string) Model {
 		m.mode = (m.mode + 1) % modeCount
 	case keyMergeMethod:
 		m.method = nextMergeMethod(m.method)
+	case keyRequireChecks:
+		m.requireChecks = !m.requireChecks
+		m = m.applyFilters()
 	}
 	return m
 }
@@ -322,10 +330,8 @@ func (m Model) updateSearch(keyMsg tea.KeyPressMsg) Model {
 	switch keyMsg.String() {
 	case keyEnter:
 		m.filter = m.searchBuf
-		m.filtered = filterMRs(m.mrs, m.filter)
 		m.searching = false
-		m.selected = make(map[int]bool)
-		m.cursor = 0
+		m = m.applyFilters()
 	case keyEscape:
 		m.searching = false
 		m.searchBuf = ""
@@ -367,7 +373,7 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd {
 	// Capture only what the command needs so it does not pin the whole Model
 	// (its MR slices, results and selection map) alive while it runs.
-	client, currentMode, method := m.client, m.mode, m.method
+	client, currentMode, method, autoMerge := m.client, m.mode, m.method, m.requireChecks
 	return func() tea.Msg {
 		semaphore <- struct{}{}
 		defer func() { <-semaphore }()
@@ -378,15 +384,41 @@ func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd
 			err = client.ApproveMR(ctx, mergeRequest.Project, mergeRequest.IID)
 		}
 		if err == nil && (currentMode == modeMerge || currentMode == modeApproveMerge) {
-			err = client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, method, true)
+			err = client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, method, autoMerge)
 		}
 		return mrResultMsg{mr: mergeRequest, err: err}
 	}
 }
 
-// Returns the MRs that pass the current filter, in display order.
+// Returns the MRs that pass the current filters, in display order.
 func (m Model) visible() []types.MR {
 	return m.filtered
+}
+
+// Recomputes the cached visible list from the search query and the
+// require-checks toggle, then resets the selection and cursor because the
+// indices they referenced no longer apply. The combined result is cached so it
+// is not recomputed on every render or keystroke.
+func (m Model) applyFilters() Model {
+	out := filterMRs(m.mrs, m.filter)
+	if m.requireChecks {
+		out = filterCISuccess(out)
+	}
+	m.filtered = out
+	m.selected = make(map[int]bool)
+	m.cursor = 0
+	return m
+}
+
+// Keeps only MRs whose pipeline has succeeded, used when require-checks is on.
+func filterCISuccess(mrs []types.MR) []types.MR {
+	var out []types.MR
+	for _, mergeRequest := range mrs {
+		if mergeRequest.CIStatus == "success" {
+			out = append(out, mergeRequest)
+		}
+	}
+	return out
 }
 
 // Narrows mrs to those matching query; an empty query keeps them all.
@@ -422,6 +454,7 @@ const helpText = `Keybindings
   /          search (enter to apply, esc to cancel)
   m          change mode (approve / merge / approve & merge)
   M          change merge method (squash / merge / rebase)
+  c          toggle require-checks (show only CI-passing, auto-merge)
   x          run the current mode on selected MRs
   ?          toggle this help
   q/ctrl+c   quit
@@ -453,8 +486,8 @@ func (m Model) renderList() string {
 	if m.searching {
 		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
 	} else {
-		fmt.Fprintf(&builder, "\nmode: %s  method: %s  (m: mode, M: method, x: run, ?: help, q: quit)\n",
-			m.modeLabel(), m.method)
+		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s  (m: mode, M: method, c: checks, x: run, ?: help, q: quit)\n",
+			m.modeLabel(), m.method, onOff(m.requireChecks))
 	}
 	return builder.String()
 }
@@ -483,6 +516,14 @@ func matchesFilter(mergeRequest types.MR, lowered string) bool {
 	return strings.Contains(strings.ToLower(mergeRequest.Title), lowered) ||
 		strings.Contains(strings.ToLower(mergeRequest.Project), lowered) ||
 		strings.Contains(strconv.Itoa(mergeRequest.IID), lowered)
+}
+
+// Renders a toggle state for the status line.
+func onOff(enabled bool) string {
+	if enabled {
+		return "on"
+	}
+	return "off"
 }
 
 // Maps a normalized pipeline status to a single-column glyph.

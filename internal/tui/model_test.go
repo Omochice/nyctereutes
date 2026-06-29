@@ -508,7 +508,7 @@ func TestApproveModeRunsApproveOnly(t *testing.T) {
 	}
 }
 
-func TestMergeModeMergesWithSquashAutoMerge(t *testing.T) {
+func TestMergeModeMergesWithSquashImmediate(t *testing.T) {
 	fake := &fakeClient{}
 	model := New(fake, sampleMRs())
 	model = press(model, keyMode)  // mode -> merge
@@ -522,8 +522,9 @@ func TestMergeModeMergesWithSquashAutoMerge(t *testing.T) {
 	if len(fake.merged) != 1 {
 		t.Fatalf("merged %d MRs, want 1", len(fake.merged))
 	}
-	if fake.mergeMethod[0] != defaultMergeMethod || !fake.mergeAuto[0] {
-		t.Errorf("merge called with method=%q auto=%v, want squash/true", fake.mergeMethod[0], fake.mergeAuto[0])
+	// require-checks defaults off, so merge is immediate rather than auto-merge.
+	if fake.mergeMethod[0] != defaultMergeMethod || fake.mergeAuto[0] {
+		t.Errorf("merge called with method=%q auto=%v, want squash/false", fake.mergeMethod[0], fake.mergeAuto[0])
 	}
 }
 
@@ -654,5 +655,91 @@ func TestListViewShowsMergeMethod(t *testing.T) {
 	model = press(model, keyMergeMethod) // squash -> merge
 	if !strings.Contains(model.View().Content, "merge") {
 		t.Errorf("list view should show the cycled merge method\n%s", model.View().Content)
+	}
+}
+
+func TestRequireChecksDefaultsOffShowingAllMRs(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	if model.requireChecks {
+		t.Fatalf("require-checks should default to off")
+	}
+	if got := visibleIIDs(model); len(got) != 3 {
+		t.Errorf("visible = %v, want all 3 MRs when require-checks is off", got)
+	}
+}
+
+func TestRequireChecksTogglesOnAndOff(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+
+	model = press(model, keyRequireChecks)
+	if !model.requireChecks {
+		t.Fatalf("c should turn require-checks on")
+	}
+
+	model = press(model, keyRequireChecks)
+	if model.requireChecks {
+		t.Errorf("a second c should turn require-checks off")
+	}
+}
+
+func TestRequireChecksOnShowsOnlyCISuccess(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs()) // IID 12 success, 13 failure, 14 pending
+	model = press(model, keyRequireChecks)
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 12 {
+		t.Errorf("visible = %v, want only the CI-success MR [12]", got)
+	}
+}
+
+func TestRequireChecksOnMergesWithAutoMerge(t *testing.T) {
+	fake := &fakeClient{}
+	model := New(fake, sampleMRs())
+	model = press(model, keyRequireChecks) // require-checks on -> visible only IID 12
+	model = press(model, keyMode)          // mode -> merge
+	model = press(model, keySpace)         // select the only visible MR (IID 12)
+	next, cmd := model.Update(key(keyRun))
+	drain(asModel(next), cmd)
+
+	if len(fake.mergeAuto) != 1 || !fake.mergeAuto[0] {
+		t.Errorf("merge auto-merge flags = %v, want [true] with require-checks on", fake.mergeAuto)
+	}
+}
+
+func TestRequireChecksToggleClearsSelection(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySelectAll) // select all visible
+	if len(selectedIIDs(model)) == 0 {
+		t.Fatalf("precondition: expected a selection before toggling")
+	}
+
+	model = press(model, keyRequireChecks)
+	if got := selectedIIDs(model); len(got) != 0 {
+		t.Errorf("selection = %v, want cleared after toggling require-checks", got)
+	}
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 after toggling require-checks", model.cursor)
+	}
+}
+
+func TestRequireChecksFilterComposesWithSearch(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	model = press(model, keySearch)
+	model = typeRunes(model, "Bump") // matches IID 12 (success) and 13 (failure)
+	model = press(model, keyEnter)
+	model = press(model, keyRequireChecks) // narrow to CI success
+
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 12 {
+		t.Errorf("visible = %v, want [12] (search and CI filter combined)", got)
+	}
+}
+
+func TestListViewShowsRequireChecksState(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	if !strings.Contains(model.View().Content, "require-checks: off") {
+		t.Fatalf("list view should show require-checks off by default\n%s", model.View().Content)
+	}
+
+	model = press(model, keyRequireChecks)
+	if !strings.Contains(model.View().Content, "require-checks: on") {
+		t.Errorf("list view should show require-checks on after toggling\n%s", model.View().Content)
 	}
 }
