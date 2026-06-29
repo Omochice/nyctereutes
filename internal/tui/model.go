@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/Omochice/nyctereutes/internal/types"
 )
@@ -524,10 +525,10 @@ func (m Model) renderRow(index int, mergeRequest types.MR) string {
 	}
 	warn := " "
 	if mergeRequest.UnmergeableReason != "" {
-		warn = "⚠"
+		warn = styledWarn()
 	}
 	return fmt.Sprintf("%s %s %s %s %s !%d - %s",
-		cursor, checkbox, ciSymbol(mergeRequest.CIStatus), warn,
+		cursor, checkbox, styledCISymbol(mergeRequest.CIStatus), warn,
 		pathShorten(mergeRequest.Project), mergeRequest.IID, mergeRequest.Title)
 }
 
@@ -547,19 +548,58 @@ func onOff(enabled bool) string {
 	return "off"
 }
 
-// The pipeline status marking an MR as passing; used by the CI filter and glyph.
-const ciStatusSuccess = "success"
+// The normalized pipeline statuses; ciStatusSuccess also gates the CI filter.
+const (
+	ciStatusSuccess = "success"
+	ciStatusFailure = "failure"
+	ciStatusPending = "pending"
+)
 
-// Maps a normalized pipeline status to a single-column glyph.
+// ANSI 256-color indices used to tint the status column and warning marker,
+// matching the upstream glab-dep palette.
+const (
+	colorGreen  = "42"
+	colorRed    = "196"
+	colorYellow = "226"
+	colorGray   = "240"
+)
+
+// The marker shown for an MR that cannot be merged.
+const warnGlyph = "⚠"
+
+// Renders the CI glyph for status tinted by pipeline outcome, matching the
+// upstream palette: a known status is bold and colored, while an unknown status
+// is dimmed gray.
+func styledCISymbol(status string) string {
+	glyph := ciSymbol(status)
+	switch status {
+	case ciStatusSuccess:
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorGreen)).Render(glyph)
+	case ciStatusFailure:
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorRed)).Render(glyph)
+	case ciStatusPending:
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorYellow)).Render(glyph)
+	default:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorGray)).Render(glyph)
+	}
+}
+
+// Renders the unmergeable warning marker in bold red.
+func styledWarn() string {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorRed)).Render(warnGlyph)
+}
+
+// Maps a normalized pipeline status to a single-column glyph, matching the
+// upstream glab-dep markers.
 func ciSymbol(status string) string {
 	switch status {
 	case ciStatusSuccess:
 		return "✓"
-	case "failure":
+	case ciStatusFailure:
 		return "✗"
-	case "pending":
-		return "◌"
+	case ciStatusPending:
+		return "●"
 	default:
-		return " "
+		return "-"
 	}
 }

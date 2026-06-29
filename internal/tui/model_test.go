@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -741,5 +742,65 @@ func TestListViewShowsRequireChecksState(t *testing.T) {
 	model = press(model, keyRequireChecks)
 	if !strings.Contains(model.View().Content, "require-checks: on") {
 		t.Errorf("list view should show require-checks on after toggling\n%s", model.View().Content)
+	}
+}
+
+// ansiEscape is the prefix every lipgloss color sequence starts with; its
+// presence marks a string as colored.
+const ansiEscape = "\x1b["
+
+func TestCISuccessGlyphIsColored(t *testing.T) {
+	out := styledCISymbol(ciStatusSuccess)
+	if !strings.Contains(out, ansiEscape) {
+		t.Errorf("success glyph should be colored, got %q", out)
+	}
+	if !strings.Contains(out, "✓") {
+		t.Errorf("colored glyph should still contain the plain glyph, got %q", out)
+	}
+}
+
+func TestCIStatusesUseDistinctColors(t *testing.T) {
+	// Compare only the ANSI color sequences, not the whole rendered string: the
+	// glyphs already differ, so full-string comparison would pass even if the
+	// colors were identical or missing. The SGR sequences are extracted generically
+	// so the assertion does not depend on the implementation's color values.
+	sgr := regexp.MustCompile("\x1b\\[[0-9;]*m")
+	colorSeq := func(status string) string {
+		return strings.Join(sgr.FindAllString(styledCISymbol(status), -1), "")
+	}
+	success := colorSeq(ciStatusSuccess)
+	failure := colorSeq(ciStatusFailure)
+	pending := colorSeq(ciStatusPending)
+	if success == "" || failure == "" || pending == "" {
+		t.Fatalf("each status should emit a color sequence: %q %q %q", success, failure, pending)
+	}
+	if success == failure || failure == pending || success == pending {
+		t.Errorf("CI statuses should use distinct colors: %q %q %q", success, failure, pending)
+	}
+}
+
+func TestUnknownCIGlyphIsDimmed(t *testing.T) {
+	out := styledCISymbol("")
+	if !strings.Contains(out, ansiEscape) {
+		t.Errorf("unknown status glyph should be dimmed gray, got %q", out)
+	}
+	if !strings.Contains(out, "-") {
+		t.Errorf("unknown status should render the dash marker, got %q", out)
+	}
+}
+
+func TestUnmergeableMarkerIsColored(t *testing.T) {
+	if !strings.Contains(styledWarn(), ansiEscape) {
+		t.Errorf("warning marker should be colored, got %q", styledWarn())
+	}
+}
+
+func TestMergeableRowHasNoWarningMarker(t *testing.T) {
+	mrs := []types.MR{
+		{IID: 1, Project: "group/x", Title: "Bump foo from 1 to 2", CIStatus: ciStatusSuccess},
+	}
+	model := New(&fakeClient{}, mrs)
+	if strings.Contains(model.View().Content, "⚠") {
+		t.Errorf("mergeable MR should not show a warning marker\n%s", model.View().Content)
 	}
 }
