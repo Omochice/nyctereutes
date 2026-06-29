@@ -102,6 +102,13 @@ func (c *depCommand) Execute(_ []string) error {
 			}
 			return nil
 		}),
+		tui.WithRefresh(func() ([]types.MR, error) {
+			refreshed, err := client.SearchMRs(context.Background(), params)
+			if err != nil {
+				return nil, fmt.Errorf("search MRs: %w", err)
+			}
+			return refreshed, nil
+		}),
 	)
 	return c.launch(model)
 }

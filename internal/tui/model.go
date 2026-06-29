@@ -70,6 +70,7 @@ const (
 	keyRequireChecks = "c"
 	keyGroupFilter   = "g"
 	keyOpen          = "o"
+	keyRefresh       = "r"
 	keyRun           = "x"
 )
 
@@ -109,6 +110,12 @@ type mrResultMsg actionResult
 // Sent back to Update when an o keypress finishes opening an MR in the browser.
 type openDoneMsg struct{ err error }
 
+// Sent back to Update when an r keypress finishes re-fetching the MR list.
+type refreshDoneMsg struct {
+	mrs []types.MR
+	err error
+}
+
 // The bubbletea model backing the interactive dep view.
 type Model struct {
 	client Client
@@ -134,6 +141,10 @@ type Model struct {
 	groupKeyOf func(types.MR) string
 	// Opens an MR in the browser; nil leaves the o key a no-op.
 	open func(types.MR) error
+	// Re-fetches the MR list from the forge; nil leaves the r key a no-op.
+	refresh func() ([]types.MR, error)
+	// True while a refresh is in flight, so the view shows a refreshing state.
+	loading bool
 	// The most recent open/refresh failure, shown on the list until the next attempt.
 	errMsg string
 	// When non-empty, restricts the visible MRs to those matching it.
@@ -181,6 +192,11 @@ func WithOpen(fn func(types.MR) error) Option {
 	return func(m *Model) { m.open = fn }
 }
 
+// WithRefresh injects the function that re-fetches the MR list, enabling the r key.
+func WithRefresh(fn func() ([]types.MR, error)) Option {
+	return func(m *Model) { m.refresh = fn }
+}
+
 // Returns the merge requests the model was built with.
 func (m Model) MRs() []types.MR { return m.mrs }
 
@@ -197,6 +213,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.recordResult(typed), nil
 	case openDoneMsg:
 		return m.recordError(typed.err), nil
+	case refreshDoneMsg:
+		return m.recordRefresh(typed), nil
 	case tea.KeyPressMsg:
 		return m.handleKey(typed)
 	default:
@@ -210,6 +228,8 @@ func (m Model) View() tea.View {
 	switch {
 	case m.helping:
 		return tea.NewView(helpText)
+	case m.loading:
+		return tea.NewView("Refreshing...\n")
 	case m.phase == phaseExecuting:
 		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
 	case m.phase == phaseComplete:
@@ -242,6 +262,20 @@ func (m Model) recordError(err error) Model {
 		m.errMsg = ""
 	}
 	return m
+}
+
+// Folds a finished refresh into the model: on success it swaps in the new MRs
+// and re-applies the active filters, while a failure keeps the old list and
+// reports the error. Either way the refreshing state ends.
+func (m Model) recordRefresh(result refreshDoneMsg) Model {
+	m.loading = false
+	if result.err != nil {
+		m.errMsg = result.err.Error()
+		return m
+	}
+	m.errMsg = ""
+	m.mrs = result.mrs
+	return m.applyFilters()
 }
 
 // Routes a key press to the active screen so list edits and runs
@@ -312,8 +346,28 @@ func (m Model) updateList(name string) (Model, tea.Cmd) {
 		return m.startExecution()
 	case keyOpen:
 		return m.openCursor()
+	case keyRefresh:
+		return m.startRefresh()
 	default:
 		return m.editList(name), nil
+	}
+}
+
+// Re-fetches the MR list through the injected refresh function, clearing the
+// selection and entering the refreshing state. It is a no-op when no refresh
+// dependency is injected.
+func (m Model) startRefresh() (Model, tea.Cmd) {
+	if m.refresh == nil {
+		return m, nil
+	}
+	m.selected = make(map[int]bool)
+	m.cursor = 0
+	m.errMsg = ""
+	m.loading = true
+	refresh := m.refresh
+	return m, func() tea.Msg {
+		mrs, err := refresh()
+		return refreshDoneMsg{mrs: mrs, err: err}
 	}
 }
 
@@ -576,6 +630,7 @@ const helpText = `Keybindings
   c          toggle require-checks (show only CI-passing, auto-merge)
   g          filter to the cursor MR's group (toggle)
   o          open the cursor MR in the browser
+  r          refresh the MR list
   x          run the current mode on selected MRs
   ?          toggle this help
   q/ctrl+c   quit

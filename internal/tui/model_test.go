@@ -917,3 +917,67 @@ func TestOpenNoopWithoutDependency(t *testing.T) {
 		t.Errorf("o should be a no-op without an open dependency")
 	}
 }
+
+func TestRefreshReplacesMRs(t *testing.T) {
+	refreshed := []types.MR{{IID: 99, Project: "g/new", Title: "Bump x from 1 to 2", CIStatus: ciStatusSuccess}}
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return refreshed, nil }))
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 99 {
+		t.Errorf("visible = %v, want [99] after refresh", got)
+	}
+}
+
+func TestRefreshShowsRefreshingView(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	next, _ := model.Update(key(keyRefresh))
+	if !strings.Contains(asModel(next).View().Content, "Refreshing") {
+		t.Errorf("view should show the refreshing state\n%s", asModel(next).View().Content)
+	}
+}
+
+func TestRefreshReappliesFilters(t *testing.T) {
+	refreshed := []types.MR{
+		{IID: 1, Project: "g/a", Title: "Bump lodash from 2 to 3", CIStatus: ciStatusSuccess},
+		{IID: 2, Project: "g/b", Title: "Bump axios from 1 to 2", CIStatus: ciStatusSuccess},
+	}
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return refreshed, nil }))
+	model = press(model, keySearch)
+	model = typeRunes(model, "lodash")
+	model = press(model, keyEnter)
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 1 {
+		t.Errorf("visible = %v, want [1] (search filter reapplied after refresh)", got)
+	}
+}
+
+func TestRefreshFailureKeepsOldMRsAndShowsError(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return nil, errExternal }))
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := visibleIIDs(model); len(got) != 3 {
+		t.Errorf("visible = %v, want the old 3 MRs kept on refresh failure", got)
+	}
+	if !strings.Contains(model.View().Content, errExternal.Error()) {
+		t.Errorf("view should show the refresh error\n%s", model.View().Content)
+	}
+}
+
+func TestRefreshClearsSelection(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	model = press(model, keySpace) // select IID 12
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := selectedIIDs(model); len(got) != 0 {
+		t.Errorf("selection = %v, want cleared after refresh", got)
+	}
+}
+
+func TestRefreshNoopWithoutDependency(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	_, cmd := model.Update(key(keyRefresh))
+	if cmd != nil {
+		t.Errorf("r should be a no-op without a refresh dependency")
+	}
+}
