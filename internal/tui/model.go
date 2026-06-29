@@ -68,6 +68,7 @@ const (
 	keyMode          = "m"
 	keyMergeMethod   = "M"
 	keyRequireChecks = "c"
+	keyGroupFilter   = "g"
 	keyRun           = "x"
 )
 
@@ -122,6 +123,11 @@ type Model struct {
 	// GitLab's auto-merge gate; when false the list shows everything and merges
 	// run immediately. It defaults to false (off).
 	requireChecks bool
+	// When non-empty, restricts the visible MRs to those in this package@version
+	// group; toggled by g against the cursor MR's group.
+	groupFilter string
+	// Returns an MR's package@version group key; nil leaves the g key a no-op.
+	groupKeyOf func(types.MR) string
 	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
 	// True while the user types a query; searchBuf holds the in-progress text
@@ -154,6 +160,12 @@ func New(client Client, mrs []types.MR, opts ...Option) Model {
 		opt(&model)
 	}
 	return model
+}
+
+// WithGroupKey injects the function that maps an MR to its package@version group
+// key, enabling the g key to filter to the cursor MR's group.
+func WithGroupKey(fn func(types.MR) string) Option {
+	return func(m *Model) { m.groupKeyOf = fn }
 }
 
 // Returns the merge requests the model was built with.
@@ -294,10 +306,29 @@ func (m Model) editList(name string) Model {
 		m = m.selectAll()
 	case keyClear:
 		m.selected = make(map[int]bool)
+	case keyGroupFilter:
+		m = m.toggleGroupFilter()
 	default:
 		m = m.cycleSetting(name)
 	}
 	return m
+}
+
+// Filters the list to the cursor MR's package@version group, or clears the
+// filter when it already matches that group (a toggle). It is a no-op when no
+// group-key dependency is injected or no MR is under the cursor.
+func (m Model) toggleGroupFilter() Model {
+	visible := m.visible()
+	if m.groupKeyOf == nil || len(visible) == 0 {
+		return m
+	}
+	key := m.groupKeyOf(visible[m.cursor])
+	if m.groupFilter == key {
+		m.groupFilter = ""
+	} else {
+		m.groupFilter = key
+	}
+	return m.applyFilters()
 }
 
 // Toggles the selection of the MR under the cursor. It guards against an empty
@@ -433,6 +464,9 @@ func (m Model) visible() []types.MR {
 // is not recomputed on every render or keystroke.
 func (m Model) applyFilters() Model {
 	out := filterMRs(m.mrs, m.filter)
+	if m.groupFilter != "" && m.groupKeyOf != nil {
+		out = filterGroup(out, m.groupFilter, m.groupKeyOf)
+	}
 	if m.requireChecks {
 		out = filterCISuccess(out)
 	}
@@ -440,6 +474,17 @@ func (m Model) applyFilters() Model {
 	m.selected = make(map[int]bool)
 	m.cursor = 0
 	return m
+}
+
+// Keeps only MRs whose group key equals key, used when a group filter is active.
+func filterGroup(mrs []types.MR, key string, groupKeyOf func(types.MR) string) []types.MR {
+	var out []types.MR
+	for _, mergeRequest := range mrs {
+		if groupKeyOf(mergeRequest) == key {
+			out = append(out, mergeRequest)
+		}
+	}
+	return out
 }
 
 // Keeps only MRs whose pipeline has succeeded, used when require-checks is on.
@@ -487,6 +532,7 @@ const helpText = `Keybindings
   m          change mode (approve / merge / approve & merge)
   M          change merge method (squash / merge / rebase)
   c          toggle require-checks (show only CI-passing, auto-merge)
+  g          filter to the cursor MR's group (toggle)
   x          run the current mode on selected MRs
   ?          toggle this help
   q/ctrl+c   quit
@@ -518,10 +564,18 @@ func (m Model) renderList() string {
 	if m.searching {
 		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
 	} else {
-		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s  (m/M/c change, x run, ? help, q quit)\n",
-			m.modeLabel(), m.method, onOff(m.requireChecks))
+		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s%s  (? for help)\n",
+			m.modeLabel(), m.method, onOff(m.requireChecks), m.groupSuffix())
 	}
 	return builder.String()
+}
+
+// groupSuffix renders the active group filter for the status line, or nothing.
+func (m Model) groupSuffix() string {
+	if m.groupFilter == "" {
+		return ""
+	}
+	return "  group: " + m.groupFilter
 }
 
 func (m Model) renderRow(index int, mergeRequest types.MR) string {

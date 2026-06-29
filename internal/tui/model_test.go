@@ -804,3 +804,76 @@ func TestMergeableRowHasNoWarningMarker(t *testing.T) {
 		t.Errorf("mergeable MR should not show a warning marker\n%s", model.View().Content)
 	}
 }
+
+// groupMRs and gkByTitle back the group-filter tests: two lodash MRs and one
+// axios MR, keyed by the package word in the title.
+func groupMRs() []types.MR {
+	return []types.MR{
+		{IID: 1, Project: "group/p", Title: "Bump lodash from 1 to 2", CIStatus: ciStatusSuccess},
+		{IID: 2, Project: "group/q", Title: "Bump lodash from 1 to 2", CIStatus: ciStatusSuccess},
+		{IID: 3, Project: "group/r", Title: "Bump axios from 1 to 2", CIStatus: ciStatusSuccess},
+	}
+}
+
+func gkByTitle(mr types.MR) string {
+	if strings.Contains(mr.Title, "lodash") {
+		return "lodash@1"
+	}
+	return "axios@1"
+}
+
+func TestGroupFilterNarrowsToCursorGroup(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter) // cursor on IID 1 (lodash)
+	if got := visibleIIDs(model); len(got) != 2 || got[0] != 1 || got[1] != 2 {
+		t.Errorf("visible = %v, want [1 2] (lodash group)", got)
+	}
+}
+
+func TestGroupFilterTogglesOff(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter, keyGroupFilter) // on then off
+	if got := visibleIIDs(model); len(got) != 3 {
+		t.Errorf("visible = %v, want all 3 after toggling the group filter off", got)
+	}
+}
+
+func TestGroupFilterClearsSelectionAndCursor(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyDown, keySpace) // move and select IID 2
+	model = press(model, keyGroupFilter)
+	if got := selectedIIDs(model); len(got) != 0 {
+		t.Errorf("selection = %v, want cleared after group filter", got)
+	}
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 after group filter", model.cursor)
+	}
+}
+
+func TestGroupFilterComposesWithSearch(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keySearch)
+	model = typeRunes(model, "group/q") // matches only IID 2
+	model = press(model, keyEnter)
+	model = press(model, keyGroupFilter) // cursor on IID 2 (lodash); group lodash
+	// Search keeps only IID 2; the lodash group keeps IID 1 and 2; the intersection is IID 2.
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 2 {
+		t.Errorf("visible = %v, want [2] (search and group combined)", got)
+	}
+}
+
+func TestGroupFilterShownInStatus(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter)
+	if !strings.Contains(model.View().Content, "lodash@1") {
+		t.Errorf("status should show the active group key\n%s", model.View().Content)
+	}
+}
+
+func TestGroupFilterNoopWithoutDependency(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs()) // no WithGroupKey injected
+	model = press(model, keyGroupFilter)
+	if got := visibleIIDs(model); len(got) != 3 {
+		t.Errorf("visible = %v, want all 3 when no group-key dependency is injected", got)
+	}
+}

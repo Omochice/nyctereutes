@@ -47,9 +47,9 @@ func TestGroupKeyMatchesGroupMRs(t *testing.T) {
 		t.Errorf("GroupKey = %q, want lodash@4.17.21", got)
 	}
 
-	unparsed := types.MR{IID: 7, Project: "g/b", Title: "Refactor the build"}
-	if got := GroupKey(unparsed, nil); got != "unparsed:g/b!7" {
-		t.Errorf("GroupKey for an unparsed title = %q, want unparsed:g/b!7", got)
+	unparsed := types.MR{IID: 7, Project: "g/c", Title: "Refactor the build"}
+	if got := GroupKey(unparsed, nil); got != "unparsed:g/c!7" {
+		t.Errorf("GroupKey for an unparsed title = %q, want unparsed:g/c!7", got)
 	}
 }
 

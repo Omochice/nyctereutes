@@ -78,7 +78,7 @@ func newDepCommand(inout *cli.ProcInout, runner glab.Runner) *depCommand {
 // without launching when nothing matches.
 func (c *depCommand) Execute(_ []string) error {
 	ctx := context.Background()
-	params, _ := c.resolve(ctx, c.runner)
+	params, patterns := c.resolve(ctx, c.runner)
 
 	client := gitlab.NewClient(c.runner)
 	mrs, err := client.SearchMRs(ctx, params)
@@ -89,7 +89,10 @@ func (c *depCommand) Execute(_ []string) error {
 		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
 		return nil
 	}
-	return c.launch(tui.New(client, mrs))
+	model := tui.New(client, mrs, tui.WithGroupKey(func(mr types.MR) string {
+		return gitlab.GroupKey(mr, patterns)
+	}))
+	return c.launch(model)
 }
 
 type depListCommand struct {
