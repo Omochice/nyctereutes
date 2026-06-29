@@ -743,3 +743,49 @@ func TestListViewShowsRequireChecksState(t *testing.T) {
 		t.Errorf("list view should show require-checks on after toggling\n%s", model.View().Content)
 	}
 }
+
+// ansiEscape is the prefix every lipgloss color sequence starts with; its
+// presence marks a string as colored.
+const ansiEscape = "\x1b["
+
+func TestCISuccessGlyphIsColored(t *testing.T) {
+	out := styledCISymbol(ciStatusSuccess)
+	if !strings.Contains(out, ansiEscape) {
+		t.Errorf("success glyph should be colored, got %q", out)
+	}
+	if !strings.Contains(out, ciSymbol(ciStatusSuccess)) {
+		t.Errorf("colored glyph should still contain the plain glyph, got %q", out)
+	}
+}
+
+func TestCIStatusesUseDistinctColors(t *testing.T) {
+	success := styledCISymbol(ciStatusSuccess)
+	failure := styledCISymbol(ciStatusFailure)
+	pending := styledCISymbol(ciStatusPending)
+	if success == failure || failure == pending || success == pending {
+		t.Errorf("CI statuses should render distinct colors: %q %q %q", success, failure, pending)
+	}
+}
+
+func TestUnknownCIGlyphIsNotColored(t *testing.T) {
+	out := styledCISymbol("")
+	if strings.Contains(out, ansiEscape) {
+		t.Errorf("unknown status glyph should not be colored, got %q", out)
+	}
+}
+
+func TestUnmergeableMarkerIsColored(t *testing.T) {
+	if !strings.Contains(styledWarn(), ansiEscape) {
+		t.Errorf("warning marker should be colored, got %q", styledWarn())
+	}
+}
+
+func TestMergeableRowHasNoWarningMarker(t *testing.T) {
+	mrs := []types.MR{
+		{IID: 1, Project: "group/x", Title: "Bump foo from 1 to 2", CIStatus: ciStatusSuccess},
+	}
+	model := New(&fakeClient{}, mrs)
+	if strings.Contains(model.View().Content, "⚠") {
+		t.Errorf("mergeable MR should not show a warning marker\n%s", model.View().Content)
+	}
+}

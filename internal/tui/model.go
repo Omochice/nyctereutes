@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/Omochice/nyctereutes/internal/types"
 )
@@ -524,10 +525,10 @@ func (m Model) renderRow(index int, mergeRequest types.MR) string {
 	}
 	warn := " "
 	if mergeRequest.UnmergeableReason != "" {
-		warn = "⚠"
+		warn = styledWarn()
 	}
 	return fmt.Sprintf("%s %s %s %s %s !%d - %s",
-		cursor, checkbox, ciSymbol(mergeRequest.CIStatus), warn,
+		cursor, checkbox, styledCISymbol(mergeRequest.CIStatus), warn,
 		pathShorten(mergeRequest.Project), mergeRequest.IID, mergeRequest.Title)
 }
 
@@ -547,17 +548,51 @@ func onOff(enabled bool) string {
 	return "off"
 }
 
-// The pipeline status marking an MR as passing; used by the CI filter and glyph.
-const ciStatusSuccess = "success"
+// The normalized pipeline statuses; ciStatusSuccess also gates the CI filter.
+const (
+	ciStatusSuccess = "success"
+	ciStatusFailure = "failure"
+	ciStatusPending = "pending"
+)
+
+// ANSI 16-color indices used to tint the status column and warning marker.
+const (
+	colorGreen  = "2"
+	colorRed    = "1"
+	colorYellow = "3"
+)
+
+// The marker shown for an MR that cannot be merged.
+const warnGlyph = "⚠"
+
+// Renders the CI glyph for status tinted by pipeline outcome. An unknown status
+// is left unstyled so the column keeps its width without adding color.
+func styledCISymbol(status string) string {
+	style := lipgloss.NewStyle()
+	switch status {
+	case ciStatusSuccess:
+		style = style.Foreground(lipgloss.Color(colorGreen))
+	case ciStatusFailure:
+		style = style.Foreground(lipgloss.Color(colorRed))
+	case ciStatusPending:
+		style = style.Foreground(lipgloss.Color(colorYellow))
+	}
+	return style.Render(ciSymbol(status))
+}
+
+// Renders the unmergeable warning marker in red.
+func styledWarn() string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorRed)).Render(warnGlyph)
+}
 
 // Maps a normalized pipeline status to a single-column glyph.
 func ciSymbol(status string) string {
 	switch status {
 	case ciStatusSuccess:
 		return "✓"
-	case "failure":
+	case ciStatusFailure:
 		return "✗"
-	case "pending":
+	case ciStatusPending:
 		return "◌"
 	default:
 		return " "

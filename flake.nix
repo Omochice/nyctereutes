@@ -110,7 +110,7 @@
           pname = "nyctereutes";
           version = "0.1.0";
           src = self;
-          vendorHash = "sha256-V+ep8hb9cZP4gWdwdMIqeiDscyh+a9BaHL7WH+WEyso=";
+          vendorHash = "sha256-COVjeG3dC5JjIvwVbBRsatfevKZtK6PjUkUG1LsOksQ=";
         };
         # Run golangci-lint by reusing buildGoModule's module fetching so the
         # dependency type information is available inside the sealed
