@@ -1,6 +1,6 @@
 package gitlab
 
-import "github.com/Omochice/nyctereutes/internal/textlist"
+import "github.com/Omochice/nyctereutes/internal/dep/textlist"
 
 // The GitLab username searched for when neither the --author flag nor
 // dep.author is set. Renovate is the de facto dependency bot on GitLab.

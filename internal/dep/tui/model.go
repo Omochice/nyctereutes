@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/Omochice/nyctereutes/internal/types"
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
 // The subset of gitlab.Client the TUI drives. It is an interface so

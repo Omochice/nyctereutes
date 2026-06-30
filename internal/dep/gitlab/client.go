@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 	"github.com/Omochice/nyctereutes/internal/glab"
-	"github.com/Omochice/nyctereutes/internal/types"
 )
 
 const (

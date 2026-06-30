@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/internal/dep/tui"
 	"github.com/Omochice/nyctereutes/internal/glab"
-	"github.com/Omochice/nyctereutes/internal/tui"
 )
 
 var detailPath = regexp.MustCompile(`merge_requests/\d+$`)

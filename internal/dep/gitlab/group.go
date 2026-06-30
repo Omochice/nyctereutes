@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/Omochice/nyctereutes/internal/parser"
-	"github.com/Omochice/nyctereutes/internal/types"
+	"github.com/Omochice/nyctereutes/internal/dep/parser"
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
 // Buckets merge requests by the "package@version" key parsed from each title.
