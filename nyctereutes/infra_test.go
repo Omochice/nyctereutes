@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+var errInfra404 = errors.New("glab api: exit status 1\n404 Project Not Found")
+
 // fakeInfraGlab answers `glab api projects/<enc>` from a project map; an absent
 // project yields a 404 error so the importer treats it as missing.
 type fakeInfraGlab struct {
@@ -19,7 +21,7 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 		if body, ok := f.projects[path]; ok {
 			return []byte(body), nil
 		}
-		return nil, errors.New("glab api: exit status 1\n404 Project Not Found")
+		return nil, errInfra404
 	}
 	return nil, nil
 }
