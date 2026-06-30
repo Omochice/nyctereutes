@@ -1016,3 +1016,18 @@ func TestRefreshIgnoredWhileLoading(t *testing.T) {
 		t.Errorf("a second r while a refresh is in flight should be ignored")
 	}
 }
+
+func TestListKeysIgnoredWhileRefreshing(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	model = press(model, keySpace)           // select an MR
+	next, _ := model.Update(key(keyRefresh)) // enter the refreshing state
+	model = asModel(next)
+
+	after, cmd := model.Update(key(keyRun)) // x must not start an execution mid-refresh
+	if asModel(after).phase == phaseExecuting {
+		t.Errorf("x should be ignored while refreshing, but execution started")
+	}
+	if cmd != nil {
+		t.Errorf("x while refreshing should produce no command")
+	}
+}

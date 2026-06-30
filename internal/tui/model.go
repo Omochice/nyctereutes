@@ -81,6 +81,7 @@ const (
 	phaseList phase = iota
 	phaseExecuting
 	phaseComplete
+	phaseRefreshing
 )
 
 // The merge methods glab accepts, passed through to MergeMR.
@@ -139,7 +140,6 @@ type Model struct {
 	groupKeyOf  func(types.MR) string
 	open        func(types.MR) error
 	refresh     func() ([]types.MR, error)
-	loading     bool
 	errMsg      string
 	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
@@ -222,7 +222,7 @@ func (m Model) View() tea.View {
 	switch {
 	case m.helping:
 		return tea.NewView(helpText)
-	case m.loading:
+	case m.phase == phaseRefreshing:
 		return tea.NewView("Refreshing...\n")
 	case m.phase == phaseExecuting:
 		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
@@ -262,7 +262,7 @@ func (m Model) recordError(err error) Model {
 // and re-applies the active filters, while a failure keeps the old list and
 // reports the error. Either way the refreshing state ends.
 func (m Model) recordRefresh(result refreshDoneMsg) Model {
-	m.loading = false
+	m.phase = phaseList
 	m = m.recordError(result.err)
 	if result.err != nil {
 		return m
@@ -347,18 +347,16 @@ func (m Model) updateList(name string) (Model, tea.Cmd) {
 }
 
 // Re-fetches the MR list through the injected refresh function, entering the
-// refreshing state. It is a no-op when no refresh dependency is injected or a
-// refresh is already in flight.
+// refreshing screen so list keys are blocked until it reports back. It is a
+// no-op when no refresh dependency is injected.
 func (m Model) startRefresh() (Model, tea.Cmd) {
-	// Ignore r while a refresh is already in flight: overlapping fetches could
-	// finish out of order and let a slower, older result overwrite a newer list.
-	if m.refresh == nil || m.loading {
+	if m.refresh == nil {
 		return m, nil
 	}
 	// Leave the selection and cursor untouched here: a successful refresh clears
 	// them via applyFilters, while a failed one keeps the unchanged list usable.
 	m.errMsg = ""
-	m.loading = true
+	m.phase = phaseRefreshing
 	refresh := m.refresh
 	return m, func() tea.Msg {
 		mrs, err := refresh()
