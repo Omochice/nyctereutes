@@ -19,14 +19,14 @@ func run(args []string) (exit int, stderr string) {
 	return exit, errBuf.String()
 }
 
-func TestInfraIsNotImplemented(t *testing.T) {
+func TestInfraRequiresSubcommand(t *testing.T) {
 	exit, stderr := run([]string{"infra"})
 
 	if exit != 1 {
 		t.Errorf("want exit status 1, got %d", exit)
 	}
-	if !strings.Contains(stderr, "not implemented") {
-		t.Errorf("want stderr to contain %q, got %q", "not implemented", stderr)
+	if !strings.Contains(stderr, "import") {
+		t.Errorf("want stderr to list the import subcommand, got %q", stderr)
 	}
 }
 

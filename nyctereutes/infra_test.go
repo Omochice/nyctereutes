@@ -1,0 +1,78 @@
+package nyctereutes
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+)
+
+// fakeInfraGlab answers `glab api projects/<enc>` from a project map; an absent
+// project yields a 404 error so the importer treats it as missing.
+type fakeInfraGlab struct {
+	projects map[string]string // "owner/name" -> project JSON
+}
+
+func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "api" && strings.HasPrefix(args[1], "projects/") {
+		path := strings.ReplaceAll(strings.TrimPrefix(args[1], "projects/"), "%2F", "/")
+		if body, ok := f.projects[path]; ok {
+			return []byte(body), nil
+		}
+		return nil, errors.New("glab api: exit status 1\n404 Project Not Found")
+	}
+	return nil, nil
+}
+
+const projJSON = `{"description":"a tool","visibility":"private","topics":["go"],"archived":false}`
+
+func TestInfraImportEmitsYAML(t *testing.T) {
+	runner := &fakeInfraGlab{projects: map[string]string{"group/proj": projJSON}}
+	exit, stdout, _ := runDep(runner, "infra", "import", "group/proj")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	for _, want := range []string{"kind: Repository", "name: proj", "owner: group", "a tool"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+}
+
+func TestInfraImportSeparatesMultipleDocs(t *testing.T) {
+	runner := &fakeInfraGlab{projects: map[string]string{
+		"group/a": projJSON,
+		"group/b": projJSON,
+	}}
+	exit, stdout, _ := runDep(runner, "infra", "import", "group/a", "group/b")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	if !strings.Contains(stdout, "\n---\n") {
+		t.Errorf("multiple docs should be separated by ---\n%s", stdout)
+	}
+}
+
+func TestInfraImportRequiresTarget(t *testing.T) {
+	exit, _, _ := runDep(&fakeInfraGlab{}, "infra", "import")
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when no project is given", exit)
+	}
+}
+
+func TestInfraImportContinuesPastMissing(t *testing.T) {
+	runner := &fakeInfraGlab{projects: map[string]string{"group/ok": projJSON}}
+	exit, stdout, stderr := runDep(runner, "infra", "import", "group/missing", "group/ok")
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a project is missing", exit)
+	}
+	if !strings.Contains(stdout, "name: ok") {
+		t.Errorf("the existing project should still be exported\n%s", stdout)
+	}
+	if !strings.Contains(stderr, "missing") {
+		t.Errorf("the missing project should be reported on stderr\n%s", stderr)
+	}
+}
