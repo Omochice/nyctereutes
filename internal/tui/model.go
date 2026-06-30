@@ -68,6 +68,9 @@ const (
 	keyMode          = "m"
 	keyMergeMethod   = "M"
 	keyRequireChecks = "c"
+	keyGroupFilter   = "g"
+	keyOpen          = "o"
+	keyRefresh       = "r"
 	keyRun           = "x"
 )
 
@@ -78,6 +81,7 @@ const (
 	phaseList phase = iota
 	phaseExecuting
 	phaseComplete
+	phaseRefreshing
 )
 
 // The merge methods glab accepts, passed through to MergeMR.
@@ -104,6 +108,15 @@ type actionResult struct {
 // Sent back to Update when one MR's action finishes.
 type mrResultMsg actionResult
 
+// Sent back to Update when an o keypress finishes opening an MR in the browser.
+type openDoneMsg struct{ err error }
+
+// Sent back to Update when an r keypress finishes re-fetching the MR list.
+type refreshDoneMsg struct {
+	mrs []types.MR
+	err error
+}
+
 // The bubbletea model backing the interactive dep view.
 type Model struct {
 	client Client
@@ -122,6 +135,12 @@ type Model struct {
 	// GitLab's auto-merge gate; when false the list shows everything and merges
 	// run immediately. It defaults to false (off).
 	requireChecks bool
+	// When non-empty, restricts the visible MRs to this package@version group.
+	groupFilter string
+	groupKeyOf  func(types.MR) string
+	open        func(types.MR) error
+	refresh     func() ([]types.MR, error)
+	errMsg      string
 	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
 	// True while the user types a query; searchBuf holds the in-progress text
@@ -135,15 +154,41 @@ type Model struct {
 	helping bool           // true while the help overlay is shown
 }
 
-// Builds a Model showing mrs, driving approve/merge through client.
-func New(client Client, mrs []types.MR) Model {
-	return Model{
+// Customizes a Model at construction, injecting the optional dependencies that
+// back the group-filter, open and refresh keys. A key whose dependency is not
+// injected is a no-op.
+type Option func(*Model)
+
+// Builds a Model showing mrs, driving approve/merge through client. Optional
+// dependencies (group key, browser open, refresh) are supplied via opts.
+func New(client Client, mrs []types.MR, opts ...Option) Model {
+	model := Model{
 		client:   client,
 		mrs:      mrs,
 		filtered: mrs,
 		selected: make(map[int]bool),
 		method:   defaultMergeMethod,
 	}
+	for _, opt := range opts {
+		opt(&model)
+	}
+	return model
+}
+
+// Injects the function that maps an MR to its package@version group key,
+// enabling the g key to filter to the cursor MR's group.
+func WithGroupKey(fn func(types.MR) string) Option {
+	return func(m *Model) { m.groupKeyOf = fn }
+}
+
+// Injects the function that opens an MR in the browser, enabling the o key.
+func WithOpen(fn func(types.MR) error) Option {
+	return func(m *Model) { m.open = fn }
+}
+
+// Injects the function that re-fetches the MR list, enabling the r key.
+func WithRefresh(fn func() ([]types.MR, error)) Option {
+	return func(m *Model) { m.refresh = fn }
 }
 
 // Returns the merge requests the model was built with.
@@ -160,6 +205,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch typed := msg.(type) {
 	case mrResultMsg:
 		return m.recordResult(typed), nil
+	case openDoneMsg:
+		return m.recordError(typed.err), nil
+	case refreshDoneMsg:
+		return m.recordRefresh(typed), nil
 	case tea.KeyPressMsg:
 		return m.handleKey(typed)
 	default:
@@ -173,6 +222,8 @@ func (m Model) View() tea.View {
 	switch {
 	case m.helping:
 		return tea.NewView(helpText)
+	case m.phase == phaseRefreshing:
+		return tea.NewView("Refreshing...\n")
 	case m.phase == phaseExecuting:
 		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
 	case m.phase == phaseComplete:
@@ -194,6 +245,30 @@ func (m Model) recordResult(result mrResultMsg) Model {
 		m.phase = phaseComplete
 	}
 	return m
+}
+
+// Records an external action's outcome: a failure becomes the status error line,
+// while success clears any prior error.
+func (m Model) recordError(err error) Model {
+	if err != nil {
+		m.errMsg = err.Error()
+	} else {
+		m.errMsg = ""
+	}
+	return m
+}
+
+// Folds a finished refresh into the model: on success it swaps in the new MRs
+// and re-applies the active filters, while a failure keeps the old list and
+// reports the error. Either way the refreshing state ends.
+func (m Model) recordRefresh(result refreshDoneMsg) Model {
+	m.phase = phaseList
+	m = m.recordError(result.err)
+	if result.err != nil {
+		return m
+	}
+	m.mrs = result.mrs
+	return m.applyFilters()
 }
 
 // Routes a key press to the active screen so list edits and runs
@@ -262,8 +337,44 @@ func (m Model) updateList(name string) (Model, tea.Cmd) {
 		return m, tea.Quit
 	case keyRun:
 		return m.startExecution()
+	case keyOpen:
+		return m.openCursor()
+	case keyRefresh:
+		return m.startRefresh()
 	default:
 		return m.editList(name), nil
+	}
+}
+
+// Re-fetches the MR list through the injected refresh function, entering the
+// refreshing screen so list keys are blocked until it reports back. It is a
+// no-op when no refresh dependency is injected.
+func (m Model) startRefresh() (Model, tea.Cmd) {
+	if m.refresh == nil {
+		return m, nil
+	}
+	// Leave the selection and cursor untouched here: a successful refresh clears
+	// them via applyFilters, while a failed one keeps the unchanged list usable.
+	m.errMsg = ""
+	m.phase = phaseRefreshing
+	refresh := m.refresh
+	return m, func() tea.Msg {
+		mrs, err := refresh()
+		return refreshDoneMsg{mrs: mrs, err: err}
+	}
+}
+
+// Opens the cursor MR in the browser through the injected open function. It is a
+// no-op when no open dependency is injected or no MR is under the cursor.
+func (m Model) openCursor() (Model, tea.Cmd) {
+	visible := m.visible()
+	if m.open == nil || len(visible) == 0 {
+		return m, nil
+	}
+	m.errMsg = ""
+	open, mergeRequest := m.open, visible[m.cursor]
+	return m, func() tea.Msg {
+		return openDoneMsg{err: open(mergeRequest)}
 	}
 }
 
@@ -284,10 +395,40 @@ func (m Model) editList(name string) Model {
 		m = m.selectAll()
 	case keyClear:
 		m.selected = make(map[int]bool)
+	case keyGroupFilter:
+		m = m.toggleGroupFilter()
 	default:
 		m = m.cycleSetting(name)
 	}
 	return m
+}
+
+// Filters the list to the cursor MR's package@version group, or clears the
+// filter when it already matches that group (a toggle). With no MR under the
+// cursor it can only clear an active filter, and it is a no-op when no group-key
+// dependency is injected.
+func (m Model) toggleGroupFilter() Model {
+	if m.groupKeyOf == nil {
+		return m
+	}
+	visible := m.visible()
+	// With no MR under the cursor there is no group to switch to, but an active
+	// filter must still be clearable - otherwise a filter that hid everything
+	// (via search or refresh) would be stuck on with no way to turn it off.
+	if len(visible) == 0 {
+		if m.groupFilter == "" {
+			return m
+		}
+		m.groupFilter = ""
+		return m.applyFilters()
+	}
+	key := m.groupKeyOf(visible[m.cursor])
+	if m.groupFilter == key {
+		m.groupFilter = ""
+	} else {
+		m.groupFilter = key
+	}
+	return m.applyFilters()
 }
 
 // Toggles the selection of the MR under the cursor. It guards against an empty
@@ -423,6 +564,9 @@ func (m Model) visible() []types.MR {
 // is not recomputed on every render or keystroke.
 func (m Model) applyFilters() Model {
 	out := filterMRs(m.mrs, m.filter)
+	if m.groupFilter != "" && m.groupKeyOf != nil {
+		out = filterGroup(out, m.groupFilter, m.groupKeyOf)
+	}
 	if m.requireChecks {
 		out = filterCISuccess(out)
 	}
@@ -430,6 +574,17 @@ func (m Model) applyFilters() Model {
 	m.selected = make(map[int]bool)
 	m.cursor = 0
 	return m
+}
+
+// Keeps only MRs whose group key equals key, used when a group filter is active.
+func filterGroup(mrs []types.MR, key string, groupKeyOf func(types.MR) string) []types.MR {
+	var out []types.MR
+	for _, mergeRequest := range mrs {
+		if groupKeyOf(mergeRequest) == key {
+			out = append(out, mergeRequest)
+		}
+	}
+	return out
 }
 
 // Keeps only MRs whose pipeline has succeeded, used when require-checks is on.
@@ -477,6 +632,9 @@ const helpText = `Keybindings
   m          change mode (approve / merge / approve & merge)
   M          change merge method (squash / merge / rebase)
   c          toggle require-checks (show only CI-passing, auto-merge)
+  g          filter to the cursor MR's group (toggle)
+  o          open the cursor MR in the browser
+  r          refresh the MR list
   x          run the current mode on selected MRs
   ?          toggle this help
   q/ctrl+c   quit
@@ -508,10 +666,21 @@ func (m Model) renderList() string {
 	if m.searching {
 		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
 	} else {
-		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s  (m/M/c change, x run, ? help, q quit)\n",
-			m.modeLabel(), m.method, onOff(m.requireChecks))
+		fmt.Fprintf(&builder, "\nmode: %s  method: %s  require-checks: %s%s  (? for help)\n",
+			m.modeLabel(), m.method, onOff(m.requireChecks), m.groupSuffix())
+	}
+	if m.errMsg != "" {
+		fmt.Fprintf(&builder, "error: %s\n", m.errMsg)
 	}
 	return builder.String()
+}
+
+// Renders the active group filter for the status line, or nothing.
+func (m Model) groupSuffix() string {
+	if m.groupFilter == "" {
+		return ""
+	}
+	return "  group: " + m.groupFilter
 }
 
 func (m Model) renderRow(index int, mergeRequest types.MR) string {

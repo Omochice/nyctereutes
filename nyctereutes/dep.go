@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/config"
@@ -78,7 +79,7 @@ func newDepCommand(inout *cli.ProcInout, runner glab.Runner) *depCommand {
 // without launching when nothing matches.
 func (c *depCommand) Execute(_ []string) error {
 	ctx := context.Background()
-	params, _ := c.resolve(ctx, c.runner)
+	params, patterns := c.resolve(ctx, c.runner)
 
 	client := gitlab.NewClient(c.runner)
 	mrs, err := client.SearchMRs(ctx, params)
@@ -89,7 +90,25 @@ func (c *depCommand) Execute(_ []string) error {
 		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
 		return nil
 	}
-	return c.launch(tui.New(client, mrs))
+	model := tui.New(
+		client, mrs,
+		tui.WithGroupKey(gitlab.GroupKeyFunc(patterns)),
+		tui.WithOpen(func(mr types.MR) error {
+			_, err := c.runner.Run(ctx, "mr", "view", strconv.Itoa(mr.IID), "-R", mr.Project, "--web")
+			if err != nil {
+				return fmt.Errorf("open MR in browser: %w", err)
+			}
+			return nil
+		}),
+		tui.WithRefresh(func() ([]types.MR, error) {
+			refreshed, err := client.SearchMRs(ctx, params)
+			if err != nil {
+				return nil, fmt.Errorf("search MRs: %w", err)
+			}
+			return refreshed, nil
+		}),
+	)
+	return c.launch(model)
 }
 
 type depListCommand struct {

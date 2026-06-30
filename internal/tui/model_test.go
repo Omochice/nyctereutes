@@ -17,6 +17,8 @@ import (
 
 var errApprove = errors.New("approve failed")
 
+var errExternal = errors.New("external failed")
+
 // fakeClient records the approve/merge calls the model issues so tests can
 // assert on them without a real glab.
 type fakeClient struct {
@@ -802,5 +804,230 @@ func TestMergeableRowHasNoWarningMarker(t *testing.T) {
 	model := New(&fakeClient{}, mrs)
 	if strings.Contains(model.View().Content, "⚠") {
 		t.Errorf("mergeable MR should not show a warning marker\n%s", model.View().Content)
+	}
+}
+
+// groupMRs and gkByTitle back the group-filter tests: two lodash MRs and one
+// axios MR, keyed by the package word in the title.
+func groupMRs() []types.MR {
+	return []types.MR{
+		{IID: 1, Project: "group/p", Title: "Bump lodash from 1 to 2", CIStatus: ciStatusSuccess},
+		{IID: 2, Project: "group/q", Title: "Bump lodash from 1 to 2", CIStatus: ciStatusSuccess},
+		{IID: 3, Project: "group/r", Title: "Bump axios from 1 to 2", CIStatus: ciStatusSuccess},
+	}
+}
+
+func gkByTitle(mr types.MR) string {
+	if strings.Contains(mr.Title, "lodash") {
+		return "lodash@1"
+	}
+	return "axios@1"
+}
+
+func TestGroupFilterNarrowsToCursorGroup(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter) // cursor on IID 1 (lodash)
+	if got := visibleIIDs(model); len(got) != 2 || got[0] != 1 || got[1] != 2 {
+		t.Errorf("visible = %v, want [1 2] (lodash group)", got)
+	}
+}
+
+func TestGroupFilterTogglesOff(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter, keyGroupFilter) // on then off
+	if got := visibleIIDs(model); len(got) != 3 {
+		t.Errorf("visible = %v, want all 3 after toggling the group filter off", got)
+	}
+}
+
+func TestGroupFilterClearsSelectionAndCursor(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyDown, keySpace) // move and select IID 2
+	model = press(model, keyGroupFilter)
+	if got := selectedIIDs(model); len(got) != 0 {
+		t.Errorf("selection = %v, want cleared after group filter", got)
+	}
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 after group filter", model.cursor)
+	}
+}
+
+func TestGroupFilterComposesWithSearch(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keySearch)
+	model = typeRunes(model, "group/q") // matches only IID 2
+	model = press(model, keyEnter)
+	model = press(model, keyGroupFilter) // cursor on IID 2 (lodash); group lodash
+	// Search keeps only IID 2; the lodash group keeps IID 1 and 2; the intersection is IID 2.
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 2 {
+		t.Errorf("visible = %v, want [2] (search and group combined)", got)
+	}
+}
+
+func TestGroupFilterShownInStatus(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter)
+	if !strings.Contains(model.View().Content, "lodash@1") {
+		t.Errorf("status should show the active group key\n%s", model.View().Content)
+	}
+}
+
+func TestGroupFilterNoopWithoutDependency(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs()) // no WithGroupKey injected
+	model = press(model, keyGroupFilter)
+	if got := visibleIIDs(model); len(got) != 3 {
+		t.Errorf("visible = %v, want all 3 when no group-key dependency is injected", got)
+	}
+}
+
+func TestGroupFilterClearsWhenVisibleEmpty(t *testing.T) {
+	model := New(&fakeClient{}, groupMRs(), WithGroupKey(gkByTitle))
+	model = press(model, keyGroupFilter) // filter to the cursor MR's group
+	model = press(model, keySearch)
+	model = typeRunes(model, "zzz-no-match") // narrow the visible list to empty
+	model = press(model, keyEnter)
+	if len(model.visible()) != 0 {
+		t.Fatalf("precondition: expected an empty visible list")
+	}
+
+	model = press(model, keyGroupFilter) // must still clear the group filter
+	if model.groupFilter != "" {
+		t.Errorf("group filter = %q, want cleared even with an empty visible list", model.groupFilter)
+	}
+}
+
+func TestOpenInvokesOpenWithCursorMR(t *testing.T) {
+	var opened []int
+	open := func(mr types.MR) error { opened = append(opened, mr.IID); return nil }
+	model := New(&fakeClient{}, sampleMRs(), WithOpen(open))
+	model = press(model, keyDown) // cursor on IID 13
+	next, cmd := model.Update(key(keyOpen))
+	drain(asModel(next), cmd)
+	if len(opened) != 1 || opened[0] != 13 {
+		t.Errorf("opened = %v, want [13]", opened)
+	}
+}
+
+func TestOpenStaysOnList(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithOpen(func(types.MR) error { return nil }))
+	next, cmd := model.Update(key(keyOpen))
+	model = drain(asModel(next), cmd)
+	if model.phase != phaseList {
+		t.Errorf("phase = %v, want list after a successful open", model.phase)
+	}
+}
+
+func TestOpenFailureShowsError(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithOpen(func(types.MR) error { return errExternal }))
+	next, cmd := model.Update(key(keyOpen))
+	model = drain(asModel(next), cmd)
+	if !strings.Contains(model.View().Content, errExternal.Error()) {
+		t.Errorf("view should show the open error\n%s", model.View().Content)
+	}
+}
+
+func TestOpenNoopWithoutDependency(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	_, cmd := model.Update(key(keyOpen))
+	if cmd != nil {
+		t.Errorf("o should be a no-op without an open dependency")
+	}
+}
+
+func TestRefreshReplacesMRs(t *testing.T) {
+	refreshed := []types.MR{{IID: 99, Project: "g/new", Title: "Bump x from 1 to 2", CIStatus: ciStatusSuccess}}
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return refreshed, nil }))
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 99 {
+		t.Errorf("visible = %v, want [99] after refresh", got)
+	}
+}
+
+func TestRefreshShowsRefreshingView(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	next, _ := model.Update(key(keyRefresh))
+	if !strings.Contains(asModel(next).View().Content, "Refreshing") {
+		t.Errorf("view should show the refreshing state\n%s", asModel(next).View().Content)
+	}
+}
+
+func TestRefreshReappliesFilters(t *testing.T) {
+	refreshed := []types.MR{
+		{IID: 1, Project: "g/a", Title: "Bump lodash from 2 to 3", CIStatus: ciStatusSuccess},
+		{IID: 2, Project: "g/b", Title: "Bump axios from 1 to 2", CIStatus: ciStatusSuccess},
+	}
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return refreshed, nil }))
+	model = press(model, keySearch)
+	model = typeRunes(model, "lodash")
+	model = press(model, keyEnter)
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := visibleIIDs(model); len(got) != 1 || got[0] != 1 {
+		t.Errorf("visible = %v, want [1] (search filter reapplied after refresh)", got)
+	}
+}
+
+func TestRefreshFailureKeepsOldMRsAndShowsError(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return nil, errExternal }))
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := visibleIIDs(model); len(got) != 3 {
+		t.Errorf("visible = %v, want the old 3 MRs kept on refresh failure", got)
+	}
+	if !strings.Contains(model.View().Content, errExternal.Error()) {
+		t.Errorf("view should show the refresh error\n%s", model.View().Content)
+	}
+}
+
+func TestRefreshClearsSelection(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	model = press(model, keySpace) // select IID 12
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := selectedIIDs(model); len(got) != 0 {
+		t.Errorf("selection = %v, want cleared after refresh", got)
+	}
+}
+
+func TestRefreshNoopWithoutDependency(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	_, cmd := model.Update(key(keyRefresh))
+	if cmd != nil {
+		t.Errorf("r should be a no-op without a refresh dependency")
+	}
+}
+
+func TestRefreshFailureKeepsSelection(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return nil, errExternal }))
+	model = press(model, keySpace) // select IID 12
+	next, cmd := model.Update(key(keyRefresh))
+	model = drain(asModel(next), cmd)
+	if got := selectedIIDs(model); len(got) != 1 || got[0] != 12 {
+		t.Errorf("selection = %v, want [12] kept when the refresh fails", got)
+	}
+}
+
+func TestRefreshIgnoredWhileLoading(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	next, _ := model.Update(key(keyRefresh)) // first refresh: now loading
+	model = asModel(next)
+	if _, cmd := model.Update(key(keyRefresh)); cmd != nil {
+		t.Errorf("a second r while a refresh is in flight should be ignored")
+	}
+}
+
+func TestListKeysIgnoredWhileRefreshing(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs(), WithRefresh(func() ([]types.MR, error) { return sampleMRs(), nil }))
+	model = press(model, keySpace)           // select an MR
+	next, _ := model.Update(key(keyRefresh)) // enter the refreshing state
+	model = asModel(next)
+
+	after, cmd := model.Update(key(keyRun)) // x must not start an execution mid-refresh
+	if asModel(after).phase == phaseExecuting {
+		t.Errorf("x should be ignored while refreshing, but execution started")
+	}
+	if cmd != nil {
+		t.Errorf("x while refreshing should produce no command")
 	}
 }
