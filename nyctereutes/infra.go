@@ -76,7 +76,7 @@ func (c *infraImportCommand) Execute(args []string) error {
 		if emitted > 0 {
 			_, _ = fmt.Fprintln(c.inout.Stdout, "---")
 		}
-		_, _ = fmt.Fprint(c.inout.Stdout, string(data))
+		_, _ = c.inout.Stdout.Write(data)
 		emitted++
 	}
 
