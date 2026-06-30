@@ -3,7 +3,7 @@ package gitlab
 import (
 	"testing"
 
-	"github.com/Omochice/nyctereutes/internal/types"
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
 const projectA = "g/a"

@@ -7,8 +7,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/Omochice/nyctereutes/internal/dep/textlist"
 	"github.com/Omochice/nyctereutes/internal/glab"
-	"github.com/Omochice/nyctereutes/internal/textlist"
 )
 
 // Holds the dep.* values read from glab config.

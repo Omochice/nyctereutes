@@ -7,12 +7,12 @@ import (
 	"strconv"
 
 	"github.com/Omochice/nyctereutes/cli"
-	"github.com/Omochice/nyctereutes/internal/config"
-	"github.com/Omochice/nyctereutes/internal/gitlab"
+	"github.com/Omochice/nyctereutes/internal/dep/config"
+	"github.com/Omochice/nyctereutes/internal/dep/gitlab"
+	"github.com/Omochice/nyctereutes/internal/dep/tui"
+	"github.com/Omochice/nyctereutes/internal/dep/types"
+	"github.com/Omochice/nyctereutes/internal/dep/ui"
 	"github.com/Omochice/nyctereutes/internal/glab"
-	"github.com/Omochice/nyctereutes/internal/tui"
-	"github.com/Omochice/nyctereutes/internal/types"
-	"github.com/Omochice/nyctereutes/internal/ui"
 )
 
 var (

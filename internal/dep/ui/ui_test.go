@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Omochice/nyctereutes/internal/types"
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
 const (

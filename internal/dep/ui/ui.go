@@ -11,7 +11,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/Omochice/nyctereutes/internal/types"
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
 // The cell padding passed to tabwriter.

@@ -12,7 +12,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/Omochice/nyctereutes/internal/types"
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
 var errApprove = errors.New("approve failed")
