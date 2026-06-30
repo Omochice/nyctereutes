@@ -94,14 +94,14 @@ func (c *depCommand) Execute(_ []string) error {
 		client, mrs,
 		tui.WithGroupKey(gitlab.GroupKeyFunc(patterns)),
 		tui.WithOpen(func(mr types.MR) error {
-			_, err := c.runner.Run(context.Background(), "mr", "view", strconv.Itoa(mr.IID), "-R", mr.Project, "--web")
+			_, err := c.runner.Run(ctx, "mr", "view", strconv.Itoa(mr.IID), "-R", mr.Project, "--web")
 			if err != nil {
 				return fmt.Errorf("open MR in browser: %w", err)
 			}
 			return nil
 		}),
 		tui.WithRefresh(func() ([]types.MR, error) {
-			refreshed, err := client.SearchMRs(context.Background(), params)
+			refreshed, err := client.SearchMRs(ctx, params)
 			if err != nil {
 				return nil, fmt.Errorf("search MRs: %w", err)
 			}
