@@ -134,19 +134,13 @@ type Model struct {
 	// GitLab's auto-merge gate; when false the list shows everything and merges
 	// run immediately. It defaults to false (off).
 	requireChecks bool
-	// When non-empty, restricts the visible MRs to those in this package@version
-	// group; toggled by g against the cursor MR's group.
+	// When non-empty, restricts the visible MRs to this package@version group.
 	groupFilter string
-	// Returns an MR's package@version group key; nil leaves the g key a no-op.
-	groupKeyOf func(types.MR) string
-	// Opens an MR in the browser; nil leaves the o key a no-op.
-	open func(types.MR) error
-	// Re-fetches the MR list from the forge; nil leaves the r key a no-op.
-	refresh func() ([]types.MR, error)
-	// True while a refresh is in flight, so the view shows a refreshing state.
-	loading bool
-	// The most recent open/refresh failure, shown on the list until the next attempt.
-	errMsg string
+	groupKeyOf  func(types.MR) string
+	open        func(types.MR) error
+	refresh     func() ([]types.MR, error)
+	loading     bool
+	errMsg      string
 	// When non-empty, restricts the visible MRs to those matching it.
 	filter string
 	// True while the user types a query; searchBuf holds the in-progress text
@@ -160,9 +154,9 @@ type Model struct {
 	helping bool           // true while the help overlay is shown
 }
 
-// Option customizes a Model at construction, injecting the optional
-// dependencies that back the group-filter, open and refresh keys. A key whose
-// dependency is not injected is a no-op.
+// Customizes a Model at construction, injecting the optional dependencies that
+// back the group-filter, open and refresh keys. A key whose dependency is not
+// injected is a no-op.
 type Option func(*Model)
 
 // Builds a Model showing mrs, driving approve/merge through client. Optional
@@ -181,18 +175,18 @@ func New(client Client, mrs []types.MR, opts ...Option) Model {
 	return model
 }
 
-// WithGroupKey injects the function that maps an MR to its package@version group
-// key, enabling the g key to filter to the cursor MR's group.
+// Injects the function that maps an MR to its package@version group key,
+// enabling the g key to filter to the cursor MR's group.
 func WithGroupKey(fn func(types.MR) string) Option {
 	return func(m *Model) { m.groupKeyOf = fn }
 }
 
-// WithOpen injects the function that opens an MR in the browser, enabling the o key.
+// Injects the function that opens an MR in the browser, enabling the o key.
 func WithOpen(fn func(types.MR) error) Option {
 	return func(m *Model) { m.open = fn }
 }
 
-// WithRefresh injects the function that re-fetches the MR list, enabling the r key.
+// Injects the function that re-fetches the MR list, enabling the r key.
 func WithRefresh(fn func() ([]types.MR, error)) Option {
 	return func(m *Model) { m.refresh = fn }
 }
@@ -683,7 +677,7 @@ func (m Model) renderList() string {
 	return builder.String()
 }
 
-// groupSuffix renders the active group filter for the status line, or nothing.
+// Renders the active group filter for the status line, or nothing.
 func (m Model) groupSuffix() string {
 	if m.groupFilter == "" {
 		return ""
