@@ -3,9 +3,10 @@
 package manifest
 
 const (
-	// The schema version stamped on every manifest document. It stays
-	// "gh-infra/v1" so manifests interchange with the upstream gh-infra format.
-	APIVersion = "gh-infra/v1"
+	// The schema version stamped on every manifest document. It is
+	// nyctereutes-specific, not gh-infra's: the platform is GitLab and the fields
+	// and value shapes differ, so the two formats are not interchangeable.
+	APIVersion = "nyctereutes/v1"
 
 	// KindRepository tags a document describing a single GitLab project.
 	KindRepository = "Repository"
