@@ -48,30 +48,29 @@ func (c *infraImportCommand) Execute(args []string) error {
 
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
-	failures := 0
+	fail := func(format string, msgArgs ...any) {
+		_, _ = fmt.Fprintf(c.inout.Stderr, format, msgArgs...)
+	}
+
 	emitted := 0
 	for _, target := range args {
 		owner, name, ok := splitTarget(target)
 		if !ok {
-			_, _ = fmt.Fprintf(c.inout.Stderr, "skip %q: not in <owner/project> form\n", target)
-			failures++
+			fail("skip %q: not in <owner/project> form\n", target)
 			continue
 		}
 		state, err := client.FetchRepository(ctx, owner, name)
 		if err != nil {
-			_, _ = fmt.Fprintf(c.inout.Stderr, "fetch %s: %v\n", target, err)
-			failures++
+			fail("fetch %s: %v\n", target, err)
 			continue
 		}
 		if state.IsNew {
-			_, _ = fmt.Fprintf(c.inout.Stderr, "project %s not found on GitLab\n", target)
-			failures++
+			fail("project %s not found on GitLab\n", target)
 			continue
 		}
 		data, err := goyaml.Marshal(repository.ToManifest(state))
 		if err != nil {
-			_, _ = fmt.Fprintf(c.inout.Stderr, "marshal %s: %v\n", target, err)
-			failures++
+			fail("marshal %s: %v\n", target, err)
 			continue
 		}
 		if emitted > 0 {
@@ -81,8 +80,9 @@ func (c *infraImportCommand) Execute(args []string) error {
 		emitted++
 	}
 
-	if failures > 0 {
-		return fmt.Errorf("%w: %d of %d", errSomeImportsFailed, failures, len(args))
+	// Every target that did not emit a document failed one of the checks above.
+	if emitted < len(args) {
+		return fmt.Errorf("%w: %d of %d", errSomeImportsFailed, len(args)-emitted, len(args))
 	}
 	return nil
 }
