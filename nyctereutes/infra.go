@@ -61,7 +61,8 @@ func (c *infraImportCommand) Execute(args []string) error {
 		}
 		state, err := client.FetchRepository(ctx, owner, name)
 		if err != nil {
-			fail("fetch %s: %v\n", target, err)
+			// The error already carries "fetch project <owner>/<name>" context.
+			fail("%v\n", err)
 			continue
 		}
 		if state.IsNew {
