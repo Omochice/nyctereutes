@@ -35,11 +35,13 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	return nil, errInfra404
 }
 
+const targetGroupProj = "group/proj"
+
 const projJSON = `{"description":"a tool","visibility":"private","topics":["go"],"archived":false}`
 
 func TestInfraImportEmitsYAML(t *testing.T) {
-	runner := &fakeInfraGlab{projects: map[string]string{"group/proj": projJSON}}
-	exit, stdout, _ := runDep(runner, "infra", "import", "group/proj")
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -51,10 +53,26 @@ func TestInfraImportEmitsYAML(t *testing.T) {
 	}
 }
 
+func TestInfraImportEmitsFeatureAccessLevels(t *testing.T) {
+	withFeatures := `{"description":"d","visibility":"private","topics":[],"archived":false,` +
+		`"issues_access_level":"enabled","wiki_access_level":"disabled"}`
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: withFeatures}}
+	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	for _, want := range []string{"features:", "issues: enabled", "wiki: disabled"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+}
+
 func TestInfraImportKeepsEmptyTopics(t *testing.T) {
 	noTopics := `{"description":"d","visibility":"private","topics":[],"archived":false}`
-	runner := &fakeInfraGlab{projects: map[string]string{"group/proj": noTopics}}
-	exit, stdout, _ := runDep(runner, "infra", "import", "group/proj")
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: noTopics}}
+	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
