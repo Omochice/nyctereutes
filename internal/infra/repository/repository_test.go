@@ -118,3 +118,10 @@ func TestToManifest(t *testing.T) {
 		t.Errorf("features.snippets = %v, want nil when the access level is absent", doc.Spec.Features.Snippets)
 	}
 }
+
+func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
+	doc := ToManifest(&CurrentState{Owner: "group", Name: "proj", Visibility: visibilityPrivate})
+	if doc.Spec.Features != nil {
+		t.Errorf("spec.features = %v, want nil when no access level was reported", doc.Spec.Features)
+	}
+}
