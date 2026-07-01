@@ -159,9 +159,9 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 		{"model_registry_access_level", "model_registry"},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.yamlKey, func(t *testing.T) {
-			projectJSON := fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, tc.apiField)
+	for _, feature := range cases {
+		t.Run(feature.yamlKey, func(t *testing.T) {
+			projectJSON := fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, feature.apiField)
 			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
 				return []byte(projectJSON), nil
 			})
@@ -185,10 +185,10 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 				t.Fatalf("unmarshal: %v\n%s", err, out)
 			}
 			if got := len(doc.Spec.Features); got != 1 {
-				t.Fatalf("spec.features has %d keys, want exactly 1 (%q)\n%s", got, tc.yamlKey, out)
+				t.Fatalf("spec.features has %d keys, want exactly 1 (%q)\n%s", got, feature.yamlKey, out)
 			}
-			if got := doc.Spec.Features[tc.yamlKey]; got != levelEnabled {
-				t.Errorf("spec.features.%s = %q, want %q\n%s", tc.yamlKey, got, levelEnabled, out)
+			if got := doc.Spec.Features[feature.yamlKey]; got != levelEnabled {
+				t.Errorf("spec.features.%s = %q, want %q\n%s", feature.yamlKey, got, levelEnabled, out)
 			}
 		})
 	}

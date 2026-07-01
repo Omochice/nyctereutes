@@ -64,6 +64,18 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 		return nil, fmt.Errorf("fetch project %s/%s: %w", owner, name, err)
 	}
 
+	state, err := parseProject(out)
+	if err != nil {
+		return nil, fmt.Errorf("parse project %s/%s: %w", owner, name, err)
+	}
+	state.Owner = owner
+	state.Name = name
+	return state, nil
+}
+
+// Unmarshals a `glab api projects/:id` response into a CurrentState. Owner and
+// Name are not carried by the response and are set by the caller.
+func parseProject(out []byte) (*CurrentState, error) {
 	var raw struct {
 		Description                      string   `json:"description"`
 		Visibility                       string   `json:"visibility"`
@@ -90,12 +102,10 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 		ModelRegistryAccessLevel         string   `json:"model_registry_access_level"`
 	}
 	if err := json.Unmarshal(out, &raw); err != nil {
-		return nil, fmt.Errorf("parse project %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("unmarshal project json: %w", err)
 	}
 
 	return &CurrentState{
-		Owner:                            owner,
-		Name:                             name,
 		Description:                      raw.Description,
 		Archived:                         raw.Archived,
 		Visibility:                       raw.Visibility,
