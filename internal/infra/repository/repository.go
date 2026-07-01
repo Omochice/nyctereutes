@@ -21,8 +21,7 @@ type CurrentState struct {
 	Archived    bool
 	Visibility  string
 	Topics      []string
-	// Per-feature access levels ("disabled"/"private"/"enabled"); empty when the
-	// GitLab response did not carry the field.
+	// Per-feature access levels; empty when GitLab did not report the field.
 	IssuesAccessLevel            string
 	MergeRequestsAccessLevel     string
 	WikiAccessLevel              string
@@ -110,8 +109,8 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 	}
 }
 
-// Builds the features block from the reported access levels, or returns nil when
-// none were reported so the whole block is omitted rather than emitted empty.
+// Builds the features block, or nil when no access level was reported so the
+// whole block is omitted rather than emitted empty.
 func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	features := manifest.RepositoryFeatures{
 		Issues:            accessLevel(state.IssuesAccessLevel),
@@ -127,8 +126,7 @@ func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	return &features
 }
 
-// Returns a pointer to a feature access level, or nil when GitLab did not report
-// one so the field is omitted rather than emitted as an empty value.
+// nil for an unreported level, so omitempty drops the field.
 func accessLevel(level string) *string {
 	if level == "" {
 		return nil
