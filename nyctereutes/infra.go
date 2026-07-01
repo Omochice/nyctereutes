@@ -89,11 +89,17 @@ func (c *infraImportCommand) Execute(args []string) error {
 }
 
 // Splits an "<owner>/<project>" target into its owner (which may itself be a
-// nested group path) and the trailing project name.
+// nested group path) and the trailing project name. A leading or doubled slash
+// is rejected so a malformed target is reported as such rather than encoded into
+// a bogus path that GitLab answers with a misleading 404.
 func splitTarget(target string) (owner, name string, ok bool) {
 	i := strings.LastIndex(target, "/")
 	if i <= 0 || i == len(target)-1 {
 		return "", "", false
 	}
-	return target[:i], target[i+1:], true
+	owner, name = target[:i], target[i+1:]
+	if strings.HasPrefix(owner, "/") || strings.HasSuffix(owner, "/") {
+		return "", "", false
+	}
+	return owner, name, true
 }

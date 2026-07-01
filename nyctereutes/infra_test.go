@@ -100,3 +100,17 @@ func TestInfraImportContinuesPastMissing(t *testing.T) {
 		t.Errorf("the missing project should be reported on stderr\n%s", stderr)
 	}
 }
+
+func TestInfraImportRejectsMalformedTarget(t *testing.T) {
+	for _, target := range []string{"/group/proj", "group//proj"} {
+		t.Run(target, func(t *testing.T) {
+			exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "import", target)
+			if exit != 1 {
+				t.Errorf("exit = %d, want 1 for a malformed target", exit)
+			}
+			if !strings.Contains(stderr, "not in <owner/project> form") {
+				t.Errorf("a malformed target should be reported as malformed, not fetched\n%s", stderr)
+			}
+		})
+	}
+}
