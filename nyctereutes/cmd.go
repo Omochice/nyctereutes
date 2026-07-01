@@ -24,9 +24,9 @@ func (c *stubCommand) Execute(_ []string) error {
 }
 
 type options struct {
-	Dep   *depCommand  `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
-	Infra *stubCommand `command:"infra" description:"manage infrastructure"`
-	Help  *stubCommand `command:"help" description:"show help"`
+	Dep   *depCommand   `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
+	Infra *infraCommand `command:"infra" description:"manage infrastructure"`
+	Help  *stubCommand  `command:"help" description:"show help"`
 }
 
 // The production entry point; it drives the real glab CLI.
@@ -39,7 +39,7 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:   newDepCommand(inout, runner),
-		Infra: &stubCommand{inout: inout},
+		Infra: newInfraCommand(inout, runner),
 		Help:  &stubCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
