@@ -29,8 +29,10 @@ type RepositoryMetadata struct {
 // The GitLab project basic settings. Pointer fields distinguish "unset" (omitted
 // from YAML) from a zero value that is an intentional setting.
 type RepositorySpec struct {
-	Description *string  `yaml:"description,omitempty"`
-	Visibility  *string  `yaml:"visibility,omitempty"`
-	Archived    *bool    `yaml:"archived,omitempty"`
-	Topics      []string `yaml:"topics,omitempty"`
+	Description *string `yaml:"description,omitempty"`
+	Visibility  *string `yaml:"visibility,omitempty"`
+	Archived    *bool   `yaml:"archived,omitempty"`
+	// No omitempty: an explicit empty topic list must survive export so the YAML
+	// fully represents the project's current state.
+	Topics []string `yaml:"topics"`
 }

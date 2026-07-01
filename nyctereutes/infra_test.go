@@ -51,6 +51,19 @@ func TestInfraImportEmitsYAML(t *testing.T) {
 	}
 }
 
+func TestInfraImportKeepsEmptyTopics(t *testing.T) {
+	noTopics := `{"description":"d","visibility":"private","topics":[],"archived":false}`
+	runner := &fakeInfraGlab{projects: map[string]string{"group/proj": noTopics}}
+	exit, stdout, _ := runDep(runner, "infra", "import", "group/proj")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	if !strings.Contains(stdout, "topics: []") {
+		t.Errorf("an empty topic list should be exported as 'topics: []'\n%s", stdout)
+	}
+}
+
 func TestInfraImportSeparatesMultipleDocs(t *testing.T) {
 	runner := &fakeInfraGlab{projects: map[string]string{
 		"group/a": projJSON,
