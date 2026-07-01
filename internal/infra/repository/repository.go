@@ -41,6 +41,7 @@ type CurrentState struct {
 	RequirementsAccessLevel          string
 	ModelExperimentsAccessLevel      string
 	ModelRegistryAccessLevel         string
+	PackageRegistryAccessLevel       string
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -100,6 +101,7 @@ func parseProject(out []byte) (*CurrentState, error) {
 		RequirementsAccessLevel          string   `json:"requirements_access_level"`
 		ModelExperimentsAccessLevel      string   `json:"model_experiments_access_level"`
 		ModelRegistryAccessLevel         string   `json:"model_registry_access_level"`
+		PackageRegistryAccessLevel       string   `json:"package_registry_access_level"`
 	}
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("unmarshal project json: %w", err)
@@ -129,6 +131,7 @@ func parseProject(out []byte) (*CurrentState, error) {
 		RequirementsAccessLevel:          raw.RequirementsAccessLevel,
 		ModelExperimentsAccessLevel:      raw.ModelExperimentsAccessLevel,
 		ModelRegistryAccessLevel:         raw.ModelRegistryAccessLevel,
+		PackageRegistryAccessLevel:       raw.PackageRegistryAccessLevel,
 	}, nil
 }
 
@@ -181,6 +184,7 @@ func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 		Requirements:          accessLevel(state.RequirementsAccessLevel),
 		ModelExperiments:      accessLevel(state.ModelExperimentsAccessLevel),
 		ModelRegistry:         accessLevel(state.ModelRegistryAccessLevel),
+		PackageRegistry:       accessLevel(state.PackageRegistryAccessLevel),
 	}
 	if features == (manifest.RepositoryFeatures{}) {
 		return nil

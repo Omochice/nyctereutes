@@ -39,7 +39,8 @@ type RepositorySpec struct {
 }
 
 // The per-feature access levels of a GitLab project. Each value is one of
-// "disabled", "private" or "enabled"; an unset feature is omitted.
+// "disabled", "private" or "enabled" ("pages" additionally allows "public");
+// an unset feature is omitted.
 type RepositoryFeatures struct {
 	Issues        *string `yaml:"issues,omitempty"`
 	MergeRequests *string `yaml:"merge_requests,omitempty"`
@@ -62,4 +63,5 @@ type RepositoryFeatures struct {
 	Requirements          *string `yaml:"requirements,omitempty"`
 	ModelExperiments      *string `yaml:"model_experiments,omitempty"`
 	ModelRegistry         *string `yaml:"model_registry,omitempty"`
+	PackageRegistry       *string `yaml:"package_registry,omitempty"`
 }
