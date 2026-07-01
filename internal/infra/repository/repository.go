@@ -105,16 +105,26 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Visibility:  new(state.Visibility),
 			Archived:    new(state.Archived),
 			Topics:      state.Topics,
-			Features: &manifest.RepositoryFeatures{
-				Issues:            accessLevel(state.IssuesAccessLevel),
-				MergeRequests:     accessLevel(state.MergeRequestsAccessLevel),
-				Wiki:              accessLevel(state.WikiAccessLevel),
-				CICD:              accessLevel(state.BuildsAccessLevel),
-				Snippets:          accessLevel(state.SnippetsAccessLevel),
-				ContainerRegistry: accessLevel(state.ContainerRegistryAccessLevel),
-			},
+			Features:    toFeatures(state),
 		},
 	}
+}
+
+// Builds the features block from the reported access levels, or returns nil when
+// none were reported so the whole block is omitted rather than emitted empty.
+func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
+	features := manifest.RepositoryFeatures{
+		Issues:            accessLevel(state.IssuesAccessLevel),
+		MergeRequests:     accessLevel(state.MergeRequestsAccessLevel),
+		Wiki:              accessLevel(state.WikiAccessLevel),
+		CICD:              accessLevel(state.BuildsAccessLevel),
+		Snippets:          accessLevel(state.SnippetsAccessLevel),
+		ContainerRegistry: accessLevel(state.ContainerRegistryAccessLevel),
+	}
+	if features == (manifest.RepositoryFeatures{}) {
+		return nil
+	}
+	return &features
 }
 
 // Returns a pointer to a feature access level, or nil when GitLab did not report
