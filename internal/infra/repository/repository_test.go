@@ -3,8 +3,11 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+
+	goyaml "github.com/goccy/go-yaml"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
@@ -129,5 +132,64 @@ func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
 	doc := ToManifest(&CurrentState{Owner: ownerGroup, Name: nameProj, Visibility: visibilityPrivate})
 	if doc.Spec.Features != nil {
 		t.Errorf("spec.features = %v, want nil when no access level was reported", doc.Spec.Features)
+	}
+}
+
+// Each GitLab *_access_level toggle must round-trip to its own spec.features key.
+// One toggle can differ from the naming pattern (ci maps to builds_access_level),
+// so each mapping is isolated: only the field under test is present in the API
+// response, and the emitted features block must contain exactly that one key.
+func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
+	cases := []struct {
+		apiField string
+		yamlKey  string
+	}{
+		{"repository_access_level", "repository"},
+		{"forking_access_level", "forking"},
+		{"pages_access_level", "pages"},
+		{"releases_access_level", "releases"},
+		{"environments_access_level", "environments"},
+		{"security_and_compliance_access_level", "security_and_compliance"},
+		{"analytics_access_level", "analytics"},
+		{"feature_flags_access_level", "feature_flags"},
+		{"infrastructure_access_level", "infrastructure"},
+		{"monitor_access_level", "monitor"},
+		{"requirements_access_level", "requirements"},
+		{"model_experiments_access_level", "model_experiments"},
+		{"model_registry_access_level", "model_registry"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.yamlKey, func(t *testing.T) {
+			projectJSON := fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, tc.apiField)
+			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+				return []byte(projectJSON), nil
+			})
+
+			state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+			if err != nil {
+				t.Fatalf("FetchRepository: %v", err)
+			}
+
+			out, err := goyaml.Marshal(ToManifest(state))
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+
+			var doc struct {
+				Spec struct {
+					Features map[string]string `yaml:"features"`
+				} `yaml:"spec"`
+			}
+			if err := goyaml.Unmarshal(out, &doc); err != nil {
+				t.Fatalf("unmarshal: %v\n%s", err, out)
+			}
+			if got := len(doc.Spec.Features); got != 1 {
+				t.Fatalf("spec.features has %d keys, want exactly 1 (%q)\n%s", got, tc.yamlKey, out)
+			}
+			if got := doc.Spec.Features[tc.yamlKey]; got != levelEnabled {
+				t.Errorf("spec.features.%s = %q, want %q\n%s", tc.yamlKey, got, levelEnabled, out)
+			}
+		})
 	}
 }
