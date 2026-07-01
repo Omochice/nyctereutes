@@ -41,9 +41,10 @@ type RepositorySpec struct {
 // The per-feature access levels of a GitLab project. Each value is one of
 // "disabled", "private" or "enabled"; an unset feature is omitted.
 type RepositoryFeatures struct {
-	Issues            *string `yaml:"issues,omitempty"`
-	MergeRequests     *string `yaml:"merge_requests,omitempty"`
-	Wiki              *string `yaml:"wiki,omitempty"`
+	Issues        *string `yaml:"issues,omitempty"`
+	MergeRequests *string `yaml:"merge_requests,omitempty"`
+	Wiki          *string `yaml:"wiki,omitempty"`
+	// CICD is GitLab's builds_access_level, exposed under the friendlier "ci" key.
 	CICD              *string `yaml:"ci,omitempty"`
 	Snippets          *string `yaml:"snippets,omitempty"`
 	ContainerRegistry *string `yaml:"container_registry,omitempty"`
