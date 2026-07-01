@@ -157,6 +157,7 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 		{"requirements_access_level", "requirements"},
 		{"model_experiments_access_level", "model_experiments"},
 		{"model_registry_access_level", "model_registry"},
+		{"package_registry_access_level", "package_registry"},
 	}
 
 	for _, feature := range cases {
@@ -192,4 +193,19 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 			}
 		})
 	}
+}
+
+// pages_access_level is the one toggle that also accepts "public". Access levels
+// are stored and emitted as raw strings, so this value must survive untouched
+// rather than being restricted to the three-value set the others use.
+func TestToManifestPreservesPagesPublicAccessLevel(t *testing.T) {
+	doc := ToManifest(&CurrentState{
+		Owner:            ownerGroup,
+		Name:             nameProj,
+		PagesAccessLevel: "public",
+	})
+	if doc.Spec.Features == nil {
+		t.Fatal("spec.features = nil, want populated")
+	}
+	wantPtr(t, "features.pages", doc.Spec.Features.Pages, "public")
 }
