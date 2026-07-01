@@ -42,9 +42,9 @@ type RepositorySpec struct {
 // "disabled", "private" or "enabled"; an unset feature is omitted.
 type RepositoryFeatures struct {
 	Issues            *string `yaml:"issues,omitempty"`
-	MergeRequests     *string `yaml:"mergeRequests,omitempty"`
+	MergeRequests     *string `yaml:"merge_requests,omitempty"`
 	Wiki              *string `yaml:"wiki,omitempty"`
 	CICD              *string `yaml:"ci,omitempty"`
 	Snippets          *string `yaml:"snippets,omitempty"`
-	ContainerRegistry *string `yaml:"containerRegistry,omitempty"`
+	ContainerRegistry *string `yaml:"container_registry,omitempty"`
 }

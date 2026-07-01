@@ -55,14 +55,22 @@ func TestInfraImportEmitsYAML(t *testing.T) {
 
 func TestInfraImportEmitsFeatureAccessLevels(t *testing.T) {
 	withFeatures := `{"description":"d","visibility":"private","topics":[],"archived":false,` +
-		`"issues_access_level":"enabled","wiki_access_level":"disabled"}`
+		`"issues_access_level":"enabled","wiki_access_level":"disabled",` +
+		`"merge_requests_access_level":"private","container_registry_access_level":"enabled"}`
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: withFeatures}}
 	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
-	for _, want := range []string{"features:", "issues: enabled", "wiki: disabled"} {
+	// Multi-word feature keys are snake_case, matching gh-infra and the GitLab API.
+	for _, want := range []string{
+		"features:",
+		"issues: enabled",
+		"wiki: disabled",
+		"merge_requests: private",
+		"container_registry: enabled",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout missing %q\n%s", want, stdout)
 		}
