@@ -21,6 +21,13 @@ type CurrentState struct {
 	Archived    bool
 	Visibility  string
 	Topics      []string
+	// Per-feature access levels; empty when GitLab did not report the field.
+	IssuesAccessLevel            string
+	MergeRequestsAccessLevel     string
+	WikiAccessLevel              string
+	BuildsAccessLevel            string
+	SnippetsAccessLevel          string
+	ContainerRegistryAccessLevel string
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -45,22 +52,34 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 	}
 
 	var raw struct {
-		Description string   `json:"description"`
-		Visibility  string   `json:"visibility"`
-		Topics      []string `json:"topics"`
-		Archived    bool     `json:"archived"`
+		Description                  string   `json:"description"`
+		Visibility                   string   `json:"visibility"`
+		Topics                       []string `json:"topics"`
+		Archived                     bool     `json:"archived"`
+		IssuesAccessLevel            string   `json:"issues_access_level"`
+		MergeRequestsAccessLevel     string   `json:"merge_requests_access_level"`
+		WikiAccessLevel              string   `json:"wiki_access_level"`
+		BuildsAccessLevel            string   `json:"builds_access_level"`
+		SnippetsAccessLevel          string   `json:"snippets_access_level"`
+		ContainerRegistryAccessLevel string   `json:"container_registry_access_level"`
 	}
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("parse project %s/%s: %w", owner, name, err)
 	}
 
 	return &CurrentState{
-		Owner:       owner,
-		Name:        name,
-		Description: raw.Description,
-		Archived:    raw.Archived,
-		Visibility:  raw.Visibility,
-		Topics:      raw.Topics,
+		Owner:                        owner,
+		Name:                         name,
+		Description:                  raw.Description,
+		Archived:                     raw.Archived,
+		Visibility:                   raw.Visibility,
+		Topics:                       raw.Topics,
+		IssuesAccessLevel:            raw.IssuesAccessLevel,
+		MergeRequestsAccessLevel:     raw.MergeRequestsAccessLevel,
+		WikiAccessLevel:              raw.WikiAccessLevel,
+		BuildsAccessLevel:            raw.BuildsAccessLevel,
+		SnippetsAccessLevel:          raw.SnippetsAccessLevel,
+		ContainerRegistryAccessLevel: raw.ContainerRegistryAccessLevel,
 	}, nil
 }
 
@@ -85,6 +104,32 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Visibility:  new(state.Visibility),
 			Archived:    new(state.Archived),
 			Topics:      state.Topics,
+			Features:    toFeatures(state),
 		},
 	}
+}
+
+// Builds the features block, or nil when no access level was reported so the
+// whole block is omitted rather than emitted empty.
+func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
+	features := manifest.RepositoryFeatures{
+		Issues:            accessLevel(state.IssuesAccessLevel),
+		MergeRequests:     accessLevel(state.MergeRequestsAccessLevel),
+		Wiki:              accessLevel(state.WikiAccessLevel),
+		CICD:              accessLevel(state.BuildsAccessLevel),
+		Snippets:          accessLevel(state.SnippetsAccessLevel),
+		ContainerRegistry: accessLevel(state.ContainerRegistryAccessLevel),
+	}
+	if features == (manifest.RepositoryFeatures{}) {
+		return nil
+	}
+	return &features
+}
+
+// nil for an unreported level, so omitempty drops the field.
+func accessLevel(level string) *string {
+	if level == "" {
+		return nil
+	}
+	return new(level)
 }

@@ -34,5 +34,18 @@ type RepositorySpec struct {
 	Archived    *bool   `yaml:"archived,omitempty"`
 	// No omitempty: an explicit empty topic list must survive export so the YAML
 	// fully represents the project's current state.
-	Topics []string `yaml:"topics"`
+	Topics   []string            `yaml:"topics"`
+	Features *RepositoryFeatures `yaml:"features,omitempty"`
+}
+
+// The per-feature access levels of a GitLab project. Each value is one of
+// "disabled", "private" or "enabled"; an unset feature is omitted.
+type RepositoryFeatures struct {
+	Issues        *string `yaml:"issues,omitempty"`
+	MergeRequests *string `yaml:"merge_requests,omitempty"`
+	Wiki          *string `yaml:"wiki,omitempty"`
+	// GitLab's builds_access_level, exposed under the friendlier "ci" key.
+	CICD              *string `yaml:"ci,omitempty"`
+	Snippets          *string `yaml:"snippets,omitempty"`
+	ContainerRegistry *string `yaml:"container_registry,omitempty"`
 }
