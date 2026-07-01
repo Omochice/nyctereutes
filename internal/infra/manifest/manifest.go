@@ -48,4 +48,18 @@ type RepositoryFeatures struct {
 	CICD              *string `yaml:"ci,omitempty"`
 	Snippets          *string `yaml:"snippets,omitempty"`
 	ContainerRegistry *string `yaml:"container_registry,omitempty"`
+	Repository        *string `yaml:"repository,omitempty"`
+	Forking           *string `yaml:"forking,omitempty"`
+	Pages             *string `yaml:"pages,omitempty"`
+	Releases          *string `yaml:"releases,omitempty"`
+	Environments      *string `yaml:"environments,omitempty"`
+	// GitLab's security_and_compliance_access_level.
+	SecurityAndCompliance *string `yaml:"security_and_compliance,omitempty"`
+	Analytics             *string `yaml:"analytics,omitempty"`
+	FeatureFlags          *string `yaml:"feature_flags,omitempty"`
+	Infrastructure        *string `yaml:"infrastructure,omitempty"`
+	Monitor               *string `yaml:"monitor,omitempty"`
+	Requirements          *string `yaml:"requirements,omitempty"`
+	ModelExperiments      *string `yaml:"model_experiments,omitempty"`
+	ModelRegistry         *string `yaml:"model_registry,omitempty"`
 }
