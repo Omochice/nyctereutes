@@ -9,7 +9,10 @@ import (
 	"testing"
 )
 
-var errInfra404 = errors.New("glab api: exit status 1\n404 Project Not Found")
+var (
+	errInfra404       = errors.New("glab api: exit status 1\n404 Project Not Found")
+	errUnexpectedGlab = errors.New("unexpected glab call")
+)
 
 // fakeInfraGlab answers `glab api projects/<enc>` from a project map; an absent
 // project yields a 404 error so the importer treats it as missing. Any other
@@ -20,11 +23,11 @@ type fakeInfraGlab struct {
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if len(args) != 2 || args[0] != "api" || !strings.HasPrefix(args[1], "projects/") {
-		return nil, fmt.Errorf("unexpected glab call: %v", args)
+		return nil, fmt.Errorf("%w: %v", errUnexpectedGlab, args)
 	}
 	path, err := url.PathUnescape(strings.TrimPrefix(args[1], "projects/"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode glab path: %w", err)
 	}
 	if body, ok := f.projects[path]; ok {
 		return []byte(body), nil
