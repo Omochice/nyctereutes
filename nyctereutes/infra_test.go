@@ -3,6 +3,8 @@ package nyctereutes
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -10,20 +12,24 @@ import (
 var errInfra404 = errors.New("glab api: exit status 1\n404 Project Not Found")
 
 // fakeInfraGlab answers `glab api projects/<enc>` from a project map; an absent
-// project yields a 404 error so the importer treats it as missing.
+// project yields a 404 error so the importer treats it as missing. Any other
+// glab invocation is an error so unexpected calls fail the test loudly.
 type fakeInfraGlab struct {
 	projects map[string]string // "owner/name" -> project JSON
 }
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
-	if len(args) >= 2 && args[0] == "api" && strings.HasPrefix(args[1], "projects/") {
-		path := strings.ReplaceAll(strings.TrimPrefix(args[1], "projects/"), "%2F", "/")
-		if body, ok := f.projects[path]; ok {
-			return []byte(body), nil
-		}
-		return nil, errInfra404
+	if len(args) != 2 || args[0] != "api" || !strings.HasPrefix(args[1], "projects/") {
+		return nil, fmt.Errorf("unexpected glab call: %v", args)
 	}
-	return nil, nil
+	path, err := url.PathUnescape(strings.TrimPrefix(args[1], "projects/"))
+	if err != nil {
+		return nil, err
+	}
+	if body, ok := f.projects[path]; ok {
+		return []byte(body), nil
+	}
+	return nil, errInfra404
 }
 
 const projJSON = `{"description":"a tool","visibility":"private","topics":["go"],"archived":false}`
