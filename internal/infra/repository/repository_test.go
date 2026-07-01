@@ -15,6 +15,8 @@ const (
 	visibilityPrivate = "private"
 	levelEnabled      = "enabled"
 	levelDisabled     = "disabled"
+	ownerGroup        = "group"
+	nameProj          = "proj"
 )
 
 const sampleProjectJSON = `{"description":"a tool","visibility":"private","topics":["go","cli"],"archived":true,` +
@@ -26,8 +28,12 @@ var errGlab404 = errors.New("glab api projects/x: exit status 1\n404 Project Not
 // wantPtr fails the test unless got points to want.
 func wantPtr(t *testing.T, name string, got *string, want string) {
 	t.Helper()
-	if got == nil || *got != want {
-		t.Errorf("%s = %v, want %q", name, got, want)
+	if got == nil {
+		t.Errorf("%s = nil, want %q", name, want)
+		return
+	}
+	if *got != want {
+		t.Errorf("%s = %q, want %q", name, *got, want)
 	}
 }
 
@@ -83,8 +89,8 @@ func TestFetchRepositoryNotFoundIsNew(t *testing.T) {
 
 func TestToManifest(t *testing.T) {
 	state := &CurrentState{
-		Owner:             "group",
-		Name:              "proj",
+		Owner:             ownerGroup,
+		Name:              nameProj,
 		Description:       sampleDescription,
 		Archived:          true,
 		Visibility:        visibilityPrivate,
@@ -101,7 +107,7 @@ func TestToManifest(t *testing.T) {
 	if doc.Kind != manifest.KindRepository {
 		t.Errorf("kind = %q, want %q", doc.Kind, manifest.KindRepository)
 	}
-	if (doc.Metadata != manifest.RepositoryMetadata{Name: "proj", Owner: "group"}) {
+	if (doc.Metadata != manifest.RepositoryMetadata{Name: nameProj, Owner: ownerGroup}) {
 		t.Errorf("metadata = %+v, want name=proj owner=group", doc.Metadata)
 	}
 	wantPtr(t, "spec.description", doc.Spec.Description, sampleDescription)
@@ -120,7 +126,7 @@ func TestToManifest(t *testing.T) {
 }
 
 func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
-	doc := ToManifest(&CurrentState{Owner: "group", Name: "proj", Visibility: visibilityPrivate})
+	doc := ToManifest(&CurrentState{Owner: ownerGroup, Name: nameProj, Visibility: visibilityPrivate})
 	if doc.Spec.Features != nil {
 		t.Errorf("spec.features = %v, want nil when no access level was reported", doc.Spec.Features)
 	}
