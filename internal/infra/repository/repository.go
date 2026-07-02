@@ -21,27 +21,28 @@ type CurrentState struct {
 	Archived    bool
 	Visibility  string
 	Topics      []string
-	// Per-feature access levels; empty when GitLab did not report the field.
+	// Per-feature access levels, in GitLab settings-UI display order; empty
+	// when GitLab did not report the field.
 	IssuesAccessLevel                string
-	MergeRequestsAccessLevel         string
-	WikiAccessLevel                  string
-	BuildsAccessLevel                string
-	SnippetsAccessLevel              string
-	ContainerRegistryAccessLevel     string
 	RepositoryAccessLevel            string
+	MergeRequestsAccessLevel         string
 	ForkingAccessLevel               string
-	PagesAccessLevel                 string
-	ReleasesAccessLevel              string
-	EnvironmentsAccessLevel          string
-	SecurityAndComplianceAccessLevel string
+	BuildsAccessLevel                string
+	ContainerRegistryAccessLevel     string
 	AnalyticsAccessLevel             string
-	FeatureFlagsAccessLevel          string
-	InfrastructureAccessLevel        string
-	MonitorAccessLevel               string
 	RequirementsAccessLevel          string
+	SecurityAndComplianceAccessLevel string
+	WikiAccessLevel                  string
+	SnippetsAccessLevel              string
+	PackageRegistryAccessLevel       string
 	ModelExperimentsAccessLevel      string
 	ModelRegistryAccessLevel         string
-	PackageRegistryAccessLevel       string
+	PagesAccessLevel                 string
+	MonitorAccessLevel               string
+	EnvironmentsAccessLevel          string
+	FeatureFlagsAccessLevel          string
+	InfrastructureAccessLevel        string
+	ReleasesAccessLevel              string
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -83,25 +84,25 @@ func parseProject(out []byte) (*CurrentState, error) {
 		Topics                           []string `json:"topics"`
 		Archived                         bool     `json:"archived"`
 		IssuesAccessLevel                string   `json:"issues_access_level"`
-		MergeRequestsAccessLevel         string   `json:"merge_requests_access_level"`
-		WikiAccessLevel                  string   `json:"wiki_access_level"`
-		BuildsAccessLevel                string   `json:"builds_access_level"`
-		SnippetsAccessLevel              string   `json:"snippets_access_level"`
-		ContainerRegistryAccessLevel     string   `json:"container_registry_access_level"`
 		RepositoryAccessLevel            string   `json:"repository_access_level"`
+		MergeRequestsAccessLevel         string   `json:"merge_requests_access_level"`
 		ForkingAccessLevel               string   `json:"forking_access_level"`
-		PagesAccessLevel                 string   `json:"pages_access_level"`
-		ReleasesAccessLevel              string   `json:"releases_access_level"`
-		EnvironmentsAccessLevel          string   `json:"environments_access_level"`
-		SecurityAndComplianceAccessLevel string   `json:"security_and_compliance_access_level"`
+		BuildsAccessLevel                string   `json:"builds_access_level"`
+		ContainerRegistryAccessLevel     string   `json:"container_registry_access_level"`
 		AnalyticsAccessLevel             string   `json:"analytics_access_level"`
-		FeatureFlagsAccessLevel          string   `json:"feature_flags_access_level"`
-		InfrastructureAccessLevel        string   `json:"infrastructure_access_level"`
-		MonitorAccessLevel               string   `json:"monitor_access_level"`
 		RequirementsAccessLevel          string   `json:"requirements_access_level"`
+		SecurityAndComplianceAccessLevel string   `json:"security_and_compliance_access_level"`
+		WikiAccessLevel                  string   `json:"wiki_access_level"`
+		SnippetsAccessLevel              string   `json:"snippets_access_level"`
+		PackageRegistryAccessLevel       string   `json:"package_registry_access_level"`
 		ModelExperimentsAccessLevel      string   `json:"model_experiments_access_level"`
 		ModelRegistryAccessLevel         string   `json:"model_registry_access_level"`
-		PackageRegistryAccessLevel       string   `json:"package_registry_access_level"`
+		PagesAccessLevel                 string   `json:"pages_access_level"`
+		MonitorAccessLevel               string   `json:"monitor_access_level"`
+		EnvironmentsAccessLevel          string   `json:"environments_access_level"`
+		FeatureFlagsAccessLevel          string   `json:"feature_flags_access_level"`
+		InfrastructureAccessLevel        string   `json:"infrastructure_access_level"`
+		ReleasesAccessLevel              string   `json:"releases_access_level"`
 	}
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("unmarshal project json: %w", err)
@@ -113,25 +114,25 @@ func parseProject(out []byte) (*CurrentState, error) {
 		Visibility:                       raw.Visibility,
 		Topics:                           raw.Topics,
 		IssuesAccessLevel:                raw.IssuesAccessLevel,
-		MergeRequestsAccessLevel:         raw.MergeRequestsAccessLevel,
-		WikiAccessLevel:                  raw.WikiAccessLevel,
-		BuildsAccessLevel:                raw.BuildsAccessLevel,
-		SnippetsAccessLevel:              raw.SnippetsAccessLevel,
-		ContainerRegistryAccessLevel:     raw.ContainerRegistryAccessLevel,
 		RepositoryAccessLevel:            raw.RepositoryAccessLevel,
+		MergeRequestsAccessLevel:         raw.MergeRequestsAccessLevel,
 		ForkingAccessLevel:               raw.ForkingAccessLevel,
-		PagesAccessLevel:                 raw.PagesAccessLevel,
-		ReleasesAccessLevel:              raw.ReleasesAccessLevel,
-		EnvironmentsAccessLevel:          raw.EnvironmentsAccessLevel,
-		SecurityAndComplianceAccessLevel: raw.SecurityAndComplianceAccessLevel,
+		BuildsAccessLevel:                raw.BuildsAccessLevel,
+		ContainerRegistryAccessLevel:     raw.ContainerRegistryAccessLevel,
 		AnalyticsAccessLevel:             raw.AnalyticsAccessLevel,
-		FeatureFlagsAccessLevel:          raw.FeatureFlagsAccessLevel,
-		InfrastructureAccessLevel:        raw.InfrastructureAccessLevel,
-		MonitorAccessLevel:               raw.MonitorAccessLevel,
 		RequirementsAccessLevel:          raw.RequirementsAccessLevel,
+		SecurityAndComplianceAccessLevel: raw.SecurityAndComplianceAccessLevel,
+		WikiAccessLevel:                  raw.WikiAccessLevel,
+		SnippetsAccessLevel:              raw.SnippetsAccessLevel,
+		PackageRegistryAccessLevel:       raw.PackageRegistryAccessLevel,
 		ModelExperimentsAccessLevel:      raw.ModelExperimentsAccessLevel,
 		ModelRegistryAccessLevel:         raw.ModelRegistryAccessLevel,
-		PackageRegistryAccessLevel:       raw.PackageRegistryAccessLevel,
+		PagesAccessLevel:                 raw.PagesAccessLevel,
+		MonitorAccessLevel:               raw.MonitorAccessLevel,
+		EnvironmentsAccessLevel:          raw.EnvironmentsAccessLevel,
+		FeatureFlagsAccessLevel:          raw.FeatureFlagsAccessLevel,
+		InfrastructureAccessLevel:        raw.InfrastructureAccessLevel,
+		ReleasesAccessLevel:              raw.ReleasesAccessLevel,
 	}, nil
 }
 
@@ -166,25 +167,25 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	features := manifest.RepositoryFeatures{
 		Issues:                accessLevel(state.IssuesAccessLevel),
-		MergeRequests:         accessLevel(state.MergeRequestsAccessLevel),
-		Wiki:                  accessLevel(state.WikiAccessLevel),
-		CICD:                  accessLevel(state.BuildsAccessLevel),
-		Snippets:              accessLevel(state.SnippetsAccessLevel),
-		ContainerRegistry:     accessLevel(state.ContainerRegistryAccessLevel),
 		Repository:            accessLevel(state.RepositoryAccessLevel),
+		MergeRequests:         accessLevel(state.MergeRequestsAccessLevel),
 		Forking:               accessLevel(state.ForkingAccessLevel),
-		Pages:                 accessLevel(state.PagesAccessLevel),
-		Releases:              accessLevel(state.ReleasesAccessLevel),
-		Environments:          accessLevel(state.EnvironmentsAccessLevel),
-		SecurityAndCompliance: accessLevel(state.SecurityAndComplianceAccessLevel),
+		CICD:                  accessLevel(state.BuildsAccessLevel),
+		ContainerRegistry:     accessLevel(state.ContainerRegistryAccessLevel),
 		Analytics:             accessLevel(state.AnalyticsAccessLevel),
-		FeatureFlags:          accessLevel(state.FeatureFlagsAccessLevel),
-		Infrastructure:        accessLevel(state.InfrastructureAccessLevel),
-		Monitor:               accessLevel(state.MonitorAccessLevel),
 		Requirements:          accessLevel(state.RequirementsAccessLevel),
+		SecurityAndCompliance: accessLevel(state.SecurityAndComplianceAccessLevel),
+		Wiki:                  accessLevel(state.WikiAccessLevel),
+		Snippets:              accessLevel(state.SnippetsAccessLevel),
+		PackageRegistry:       accessLevel(state.PackageRegistryAccessLevel),
 		ModelExperiments:      accessLevel(state.ModelExperimentsAccessLevel),
 		ModelRegistry:         accessLevel(state.ModelRegistryAccessLevel),
-		PackageRegistry:       accessLevel(state.PackageRegistryAccessLevel),
+		Pages:                 accessLevel(state.PagesAccessLevel),
+		Monitor:               accessLevel(state.MonitorAccessLevel),
+		Environments:          accessLevel(state.EnvironmentsAccessLevel),
+		FeatureFlags:          accessLevel(state.FeatureFlagsAccessLevel),
+		Infrastructure:        accessLevel(state.InfrastructureAccessLevel),
+		Releases:              accessLevel(state.ReleasesAccessLevel),
 	}
 	if features == (manifest.RepositoryFeatures{}) {
 		return nil
