@@ -219,3 +219,59 @@ func TestToManifestPreservesPublicAccessLevel(t *testing.T) {
 	wantPtr(t, "features.pages", doc.Spec.Features.Pages, "public")
 	wantPtr(t, "features.package_registry", doc.Spec.Features.PackageRegistry, "public")
 }
+
+// spec.features keys must be emitted in the GitLab settings-UI display order.
+// The order is carried only by the field declaration order of
+// manifest.RepositoryFeatures, so a struct reorder would silently change the
+// output without this pin.
+func TestToManifestEmitsFeaturesInSettingsUIOrder(t *testing.T) {
+	state := &CurrentState{
+		Owner:                            ownerGroup,
+		Name:                             nameProj,
+		IssuesAccessLevel:                levelEnabled,
+		RepositoryAccessLevel:            levelEnabled,
+		MergeRequestsAccessLevel:         levelEnabled,
+		ForkingAccessLevel:               levelEnabled,
+		BuildsAccessLevel:                levelEnabled,
+		ContainerRegistryAccessLevel:     levelEnabled,
+		AnalyticsAccessLevel:             levelEnabled,
+		RequirementsAccessLevel:          levelEnabled,
+		SecurityAndComplianceAccessLevel: levelEnabled,
+		WikiAccessLevel:                  levelEnabled,
+		SnippetsAccessLevel:              levelEnabled,
+		PackageRegistryAccessLevel:       levelEnabled,
+		ModelExperimentsAccessLevel:      levelEnabled,
+		ModelRegistryAccessLevel:         levelEnabled,
+		PagesAccessLevel:                 levelEnabled,
+		MonitorAccessLevel:               levelEnabled,
+		EnvironmentsAccessLevel:          levelEnabled,
+		FeatureFlagsAccessLevel:          levelEnabled,
+		InfrastructureAccessLevel:        levelEnabled,
+		ReleasesAccessLevel:              levelEnabled,
+	}
+
+	out, err := goyaml.Marshal(ToManifest(state))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	wantOrder := []string{
+		"issues", "repository", "merge_requests", "forking", "ci",
+		"container_registry", "analytics", "requirements", "security_and_compliance",
+		"wiki", "snippets", "package_registry", "model_experiments", "model_registry",
+		"pages", "monitor", "environments", "feature_flags", "infrastructure", "releases",
+	}
+	yamlText := string(out)
+	start := strings.Index(yamlText, "features:")
+	if start < 0 {
+		t.Fatalf("features block missing\n%s", out)
+	}
+	section := yamlText[start:]
+	for _, key := range wantOrder {
+		idx := strings.Index(section, key+":")
+		if idx < 0 {
+			t.Fatalf("features.%s missing or out of settings-UI order\n%s", key, out)
+		}
+		section = section[idx+len(key):]
+	}
+}
