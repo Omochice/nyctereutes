@@ -40,27 +40,29 @@ type RepositorySpec struct {
 
 // The per-feature access levels of a GitLab project. Each value is one of
 // "disabled", "private" or "enabled" ("pages" and "package_registry"
-// additionally allow "public"); an unset feature is omitted.
+// additionally allow "public"); an unset feature is omitted. Fields follow the
+// settings-UI display order rather than the API's, so the emitted YAML reads
+// like the settings page.
 type RepositoryFeatures struct {
 	Issues        *string `yaml:"issues,omitempty"`
+	Repository    *string `yaml:"repository,omitempty"`
 	MergeRequests *string `yaml:"merge_requests,omitempty"`
-	Wiki          *string `yaml:"wiki,omitempty"`
+	Forking       *string `yaml:"forking,omitempty"`
 	// GitLab's builds_access_level, exposed under the friendlier "ci" key.
 	CICD                  *string `yaml:"ci,omitempty"`
-	Snippets              *string `yaml:"snippets,omitempty"`
 	ContainerRegistry     *string `yaml:"container_registry,omitempty"`
-	Repository            *string `yaml:"repository,omitempty"`
-	Forking               *string `yaml:"forking,omitempty"`
-	Pages                 *string `yaml:"pages,omitempty"`
-	Releases              *string `yaml:"releases,omitempty"`
-	Environments          *string `yaml:"environments,omitempty"`
-	SecurityAndCompliance *string `yaml:"security_and_compliance,omitempty"`
 	Analytics             *string `yaml:"analytics,omitempty"`
-	FeatureFlags          *string `yaml:"feature_flags,omitempty"`
-	Infrastructure        *string `yaml:"infrastructure,omitempty"`
-	Monitor               *string `yaml:"monitor,omitempty"`
 	Requirements          *string `yaml:"requirements,omitempty"`
+	SecurityAndCompliance *string `yaml:"security_and_compliance,omitempty"`
+	Wiki                  *string `yaml:"wiki,omitempty"`
+	Snippets              *string `yaml:"snippets,omitempty"`
+	PackageRegistry       *string `yaml:"package_registry,omitempty"`
 	ModelExperiments      *string `yaml:"model_experiments,omitempty"`
 	ModelRegistry         *string `yaml:"model_registry,omitempty"`
-	PackageRegistry       *string `yaml:"package_registry,omitempty"`
+	Pages                 *string `yaml:"pages,omitempty"`
+	Monitor               *string `yaml:"monitor,omitempty"`
+	Environments          *string `yaml:"environments,omitempty"`
+	FeatureFlags          *string `yaml:"feature_flags,omitempty"`
+	Infrastructure        *string `yaml:"infrastructure,omitempty"`
+	Releases              *string `yaml:"releases,omitempty"`
 }
