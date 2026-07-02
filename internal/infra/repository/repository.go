@@ -18,11 +18,11 @@ type CurrentState struct {
 	Name        string
 	IsNew       bool // true when the project does not exist on GitLab
 	Description string
-	Archived    bool
 	Visibility  string
 	Topics      []string
 	// Pointers because JSON has no empty boolean: nil keeps "not reported"
 	// apart from an intentional false.
+	Archived                   *bool
 	RequestAccessEnabled       *bool
 	EnforceAuthChecksOnUploads *bool
 	// Per-feature access levels, in GitLab settings-UI display order; empty
@@ -86,7 +86,7 @@ func parseProject(out []byte) (*CurrentState, error) {
 		Description                      string   `json:"description"`
 		Visibility                       string   `json:"visibility"`
 		Topics                           []string `json:"topics"`
-		Archived                         bool     `json:"archived"`
+		Archived                         *bool    `json:"archived"`
 		RequestAccessEnabled             *bool    `json:"request_access_enabled"`
 		EnforceAuthChecksOnUploads       *bool    `json:"enforce_auth_checks_on_uploads"`
 		IssuesAccessLevel                string   `json:"issues_access_level"`
@@ -165,7 +165,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Visibility:                 new(state.Visibility),
 			RequestAccessEnabled:       state.RequestAccessEnabled,
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
-			Archived:                   new(state.Archived),
+			Archived:                   state.Archived,
 			Topics:                     state.Topics,
 			Features:                   toFeatures(state),
 		},

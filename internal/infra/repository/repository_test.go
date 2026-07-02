@@ -54,7 +54,7 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 	if state.IsNew {
 		t.Errorf("IsNew = true, want false for an existing project")
 	}
-	if !state.Archived {
+	if state.Archived == nil || !*state.Archived {
 		t.Errorf("archived = false, want true")
 	}
 	if want := "api projects/group%2Fsub%2Fproj"; strings.Join(gotArgs, " ") != want {
@@ -95,7 +95,7 @@ func TestToManifest(t *testing.T) {
 		Owner:             ownerGroup,
 		Name:              nameProj,
 		Description:       sampleDescription,
-		Archived:          true,
+		Archived:          new(true),
 		Visibility:        visibilityPrivate,
 		Topics:            []string{"go"},
 		IssuesAccessLevel: levelEnabled,
