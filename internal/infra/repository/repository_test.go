@@ -3,8 +3,11 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+
+	goyaml "github.com/goccy/go-yaml"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
@@ -129,5 +132,147 @@ func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
 	doc := ToManifest(&CurrentState{Owner: ownerGroup, Name: nameProj, Visibility: visibilityPrivate})
 	if doc.Spec.Features != nil {
 		t.Errorf("spec.features = %v, want nil when no access level was reported", doc.Spec.Features)
+	}
+}
+
+type featureAccessLevel struct {
+	apiField string
+	yamlKey  string
+}
+
+// Every GitLab *_access_level field and its spec.features key, in the
+// settings-UI display order the manifest emits. Shared by the mapping and the
+// key-order tests so the 20 pairs are declared once.
+func featureAccessLevels() []featureAccessLevel {
+	return []featureAccessLevel{
+		{"issues_access_level", "issues"},
+		{"repository_access_level", "repository"},
+		{"merge_requests_access_level", "merge_requests"},
+		{"forking_access_level", "forking"},
+		{"builds_access_level", "ci"},
+		{"container_registry_access_level", "container_registry"},
+		{"analytics_access_level", "analytics"},
+		{"requirements_access_level", "requirements"},
+		{"security_and_compliance_access_level", "security_and_compliance"},
+		{"wiki_access_level", "wiki"},
+		{"snippets_access_level", "snippets"},
+		{"package_registry_access_level", "package_registry"},
+		{"model_experiments_access_level", "model_experiments"},
+		{"model_registry_access_level", "model_registry"},
+		{"pages_access_level", "pages"},
+		{"monitor_access_level", "monitor"},
+		{"environments_access_level", "environments"},
+		{"feature_flags_access_level", "feature_flags"},
+		{"infrastructure_access_level", "infrastructure"},
+		{"releases_access_level", "releases"},
+	}
+}
+
+// Each GitLab *_access_level toggle must round-trip to its own spec.features key.
+// One toggle can differ from the naming pattern (ci maps to builds_access_level),
+// so each mapping is isolated: only the field under test is present in the API
+// response, and the emitted features block must contain exactly that one key.
+func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
+	for _, feature := range featureAccessLevels() {
+		t.Run(feature.yamlKey, func(t *testing.T) {
+			projectJSON := fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, feature.apiField)
+			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+				return []byte(projectJSON), nil
+			})
+
+			state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+			if err != nil {
+				t.Fatalf("FetchRepository: %v", err)
+			}
+
+			out, err := goyaml.Marshal(ToManifest(state))
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+
+			var doc struct {
+				Spec struct {
+					Features map[string]string `yaml:"features"`
+				} `yaml:"spec"`
+			}
+			if err := goyaml.Unmarshal(out, &doc); err != nil {
+				t.Fatalf("unmarshal: %v\n%s", err, out)
+			}
+			if got := len(doc.Spec.Features); got != 1 {
+				t.Fatalf("spec.features has %d keys, want exactly 1 (%q)\n%s", got, feature.yamlKey, out)
+			}
+			if got := doc.Spec.Features[feature.yamlKey]; got != levelEnabled {
+				t.Errorf("spec.features.%s = %q, want %q\n%s", feature.yamlKey, got, levelEnabled, out)
+			}
+		})
+	}
+}
+
+// pages_access_level and package_registry_access_level are the two toggles that
+// also accept "public" (the UI labels the latter "Allow anyone to pull from
+// Package Registry"). Access levels are stored and emitted as raw strings, so
+// this value must survive untouched rather than being restricted to the
+// three-value set the others use.
+func TestToManifestPreservesPublicAccessLevel(t *testing.T) {
+	doc := ToManifest(&CurrentState{
+		Owner:                      ownerGroup,
+		Name:                       nameProj,
+		PagesAccessLevel:           "public",
+		PackageRegistryAccessLevel: "public",
+	})
+	if doc.Spec.Features == nil {
+		t.Fatal("spec.features = nil, want populated")
+	}
+	wantPtr(t, "features.pages", doc.Spec.Features.Pages, "public")
+	wantPtr(t, "features.package_registry", doc.Spec.Features.PackageRegistry, "public")
+}
+
+// spec.features keys must be emitted in the GitLab settings-UI display order.
+// The order is carried only by the field declaration order of
+// manifest.RepositoryFeatures, so a struct reorder would silently change the
+// output without this pin.
+func TestToManifestEmitsFeaturesInSettingsUIOrder(t *testing.T) {
+	state := &CurrentState{
+		Owner:                            ownerGroup,
+		Name:                             nameProj,
+		IssuesAccessLevel:                levelEnabled,
+		RepositoryAccessLevel:            levelEnabled,
+		MergeRequestsAccessLevel:         levelEnabled,
+		ForkingAccessLevel:               levelEnabled,
+		BuildsAccessLevel:                levelEnabled,
+		ContainerRegistryAccessLevel:     levelEnabled,
+		AnalyticsAccessLevel:             levelEnabled,
+		RequirementsAccessLevel:          levelEnabled,
+		SecurityAndComplianceAccessLevel: levelEnabled,
+		WikiAccessLevel:                  levelEnabled,
+		SnippetsAccessLevel:              levelEnabled,
+		PackageRegistryAccessLevel:       levelEnabled,
+		ModelExperimentsAccessLevel:      levelEnabled,
+		ModelRegistryAccessLevel:         levelEnabled,
+		PagesAccessLevel:                 levelEnabled,
+		MonitorAccessLevel:               levelEnabled,
+		EnvironmentsAccessLevel:          levelEnabled,
+		FeatureFlagsAccessLevel:          levelEnabled,
+		InfrastructureAccessLevel:        levelEnabled,
+		ReleasesAccessLevel:              levelEnabled,
+	}
+
+	out, err := goyaml.Marshal(ToManifest(state))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	yamlText := string(out)
+	start := strings.Index(yamlText, "features:")
+	if start < 0 {
+		t.Fatalf("features block missing\n%s", out)
+	}
+	section := yamlText[start:]
+	for _, feature := range featureAccessLevels() {
+		idx := strings.Index(section, feature.yamlKey+":")
+		if idx < 0 {
+			t.Fatalf("features.%s missing or out of settings-UI order\n%s", feature.yamlKey, out)
+		}
+		section = section[idx+len(feature.yamlKey):]
 	}
 }
