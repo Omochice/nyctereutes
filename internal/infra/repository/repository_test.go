@@ -144,6 +144,12 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 		apiField string
 		yamlKey  string
 	}{
+		{"issues_access_level", "issues"},
+		{"merge_requests_access_level", "merge_requests"},
+		{"wiki_access_level", "wiki"},
+		{"builds_access_level", "ci"},
+		{"snippets_access_level", "snippets"},
+		{"container_registry_access_level", "container_registry"},
 		{"repository_access_level", "repository"},
 		{"forking_access_level", "forking"},
 		{"pages_access_level", "pages"},
