@@ -350,8 +350,10 @@ func TestToManifestOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
 // Both booleans are options right under Project visibility in the settings UI,
 // so the emitted spec places them between visibility and archived.
 func TestToManifestEmitsVisibilityBooleansAfterVisibility(t *testing.T) {
+	projectJSON := `{"visibility":"private","archived":false,` +
+		`"request_access_enabled":true,"enforce_auth_checks_on_uploads":true}`
 	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-		return []byte(`{"visibility":"private","archived":false,"request_access_enabled":true,"enforce_auth_checks_on_uploads":true}`), nil
+		return []byte(projectJSON), nil
 	})
 
 	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
@@ -364,7 +366,13 @@ func TestToManifestEmitsVisibilityBooleansAfterVisibility(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 	section := string(out)
-	for _, key := range []string{"visibility:", "request_access_enabled:", "enforce_auth_checks_on_uploads:", "archived:"} {
+	wantOrder := []string{
+		"visibility:",
+		"request_access_enabled:",
+		"enforce_auth_checks_on_uploads:",
+		"archived:",
+	}
+	for _, key := range wantOrder {
 		idx := strings.Index(section, key)
 		if idx < 0 {
 			t.Fatalf("%s missing or out of the settings-UI order\n%s", key, out)
