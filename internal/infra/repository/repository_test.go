@@ -135,15 +135,16 @@ func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
 	}
 }
 
-// Each GitLab *_access_level toggle must round-trip to its own spec.features key.
-// One toggle can differ from the naming pattern (ci maps to builds_access_level),
-// so each mapping is isolated: only the field under test is present in the API
-// response, and the emitted features block must contain exactly that one key.
-func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
-	cases := []struct {
-		apiField string
-		yamlKey  string
-	}{
+type featureAccessLevel struct {
+	apiField string
+	yamlKey  string
+}
+
+// Every GitLab *_access_level field and its spec.features key, in the
+// settings-UI display order the manifest emits. Shared by the mapping and the
+// key-order tests so the 20 pairs are declared once.
+func featureAccessLevels() []featureAccessLevel {
+	return []featureAccessLevel{
 		{"issues_access_level", "issues"},
 		{"repository_access_level", "repository"},
 		{"merge_requests_access_level", "merge_requests"},
@@ -165,8 +166,14 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 		{"infrastructure_access_level", "infrastructure"},
 		{"releases_access_level", "releases"},
 	}
+}
 
-	for _, feature := range cases {
+// Each GitLab *_access_level toggle must round-trip to its own spec.features key.
+// One toggle can differ from the naming pattern (ci maps to builds_access_level),
+// so each mapping is isolated: only the field under test is present in the API
+// response, and the emitted features block must contain exactly that one key.
+func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
+	for _, feature := range featureAccessLevels() {
 		t.Run(feature.yamlKey, func(t *testing.T) {
 			projectJSON := fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, feature.apiField)
 			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
@@ -255,23 +262,17 @@ func TestToManifestEmitsFeaturesInSettingsUIOrder(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	wantOrder := []string{
-		"issues", "repository", "merge_requests", "forking", "ci",
-		"container_registry", "analytics", "requirements", "security_and_compliance",
-		"wiki", "snippets", "package_registry", "model_experiments", "model_registry",
-		"pages", "monitor", "environments", "feature_flags", "infrastructure", "releases",
-	}
 	yamlText := string(out)
 	start := strings.Index(yamlText, "features:")
 	if start < 0 {
 		t.Fatalf("features block missing\n%s", out)
 	}
 	section := yamlText[start:]
-	for _, key := range wantOrder {
-		idx := strings.Index(section, key+":")
+	for _, feature := range featureAccessLevels() {
+		idx := strings.Index(section, feature.yamlKey+":")
 		if idx < 0 {
-			t.Fatalf("features.%s missing or out of settings-UI order\n%s", key, out)
+			t.Fatalf("features.%s missing or out of settings-UI order\n%s", feature.yamlKey, out)
 		}
-		section = section[idx+len(key):]
+		section = section[idx+len(feature.yamlKey):]
 	}
 }
