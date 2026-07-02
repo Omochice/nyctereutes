@@ -46,15 +46,14 @@ type RepositoryFeatures struct {
 	MergeRequests *string `yaml:"merge_requests,omitempty"`
 	Wiki          *string `yaml:"wiki,omitempty"`
 	// GitLab's builds_access_level, exposed under the friendlier "ci" key.
-	CICD              *string `yaml:"ci,omitempty"`
-	Snippets          *string `yaml:"snippets,omitempty"`
-	ContainerRegistry *string `yaml:"container_registry,omitempty"`
-	Repository        *string `yaml:"repository,omitempty"`
-	Forking           *string `yaml:"forking,omitempty"`
-	Pages             *string `yaml:"pages,omitempty"`
-	Releases          *string `yaml:"releases,omitempty"`
-	Environments      *string `yaml:"environments,omitempty"`
-	// GitLab's security_and_compliance_access_level.
+	CICD                  *string `yaml:"ci,omitempty"`
+	Snippets              *string `yaml:"snippets,omitempty"`
+	ContainerRegistry     *string `yaml:"container_registry,omitempty"`
+	Repository            *string `yaml:"repository,omitempty"`
+	Forking               *string `yaml:"forking,omitempty"`
+	Pages                 *string `yaml:"pages,omitempty"`
+	Releases              *string `yaml:"releases,omitempty"`
+	Environments          *string `yaml:"environments,omitempty"`
 	SecurityAndCompliance *string `yaml:"security_and_compliance,omitempty"`
 	Analytics             *string `yaml:"analytics,omitempty"`
 	FeatureFlags          *string `yaml:"feature_flags,omitempty"`
