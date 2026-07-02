@@ -21,9 +21,8 @@ type CurrentState struct {
 	Archived    bool
 	Visibility  string
 	Topics      []string
-	// Pointers, unlike the access-level strings below, because JSON has no
-	// empty boolean: nil is the only way to keep "not reported" apart from an
-	// intentional false.
+	// Pointers because JSON has no empty boolean: nil keeps "not reported"
+	// apart from an intentional false.
 	RequestAccessEnabled       *bool
 	EnforceAuthChecksOnUploads *bool
 	// Per-feature access levels, in GitLab settings-UI display order; empty

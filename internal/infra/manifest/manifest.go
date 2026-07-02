@@ -31,8 +31,7 @@ type RepositoryMetadata struct {
 type RepositorySpec struct {
 	Description *string `yaml:"description,omitempty"`
 	Visibility  *string `yaml:"visibility,omitempty"`
-	// Both booleans are options right under Project visibility in the settings
-	// UI, hence their position next to visibility rather than with archived.
+	// Placed after visibility to match their spot in the settings UI.
 	RequestAccessEnabled       *bool `yaml:"request_access_enabled,omitempty"`
 	EnforceAuthChecksOnUploads *bool `yaml:"enforce_auth_checks_on_uploads,omitempty"`
 	Archived                   *bool `yaml:"archived,omitempty"`
