@@ -168,6 +168,26 @@ func featureAccessLevels() []featureAccessLevel {
 	}
 }
 
+// exportYAML runs the import pipeline against a fake glab that returns
+// projectJSON, and returns the manifest YAML it produces.
+func exportYAML(t *testing.T, projectJSON string) string {
+	t.Helper()
+	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+		return []byte(projectJSON), nil
+	})
+
+	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	if err != nil {
+		t.Fatalf("FetchRepository: %v", err)
+	}
+
+	out, err := goyaml.Marshal(ToManifest(state))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return string(out)
+}
+
 // Each GitLab *_access_level toggle must round-trip to its own spec.features key.
 // One toggle can differ from the naming pattern (ci maps to builds_access_level),
 // so each mapping is isolated: only the field under test is present in the API
@@ -175,27 +195,14 @@ func featureAccessLevels() []featureAccessLevel {
 func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 	for _, feature := range featureAccessLevels() {
 		t.Run(feature.yamlKey, func(t *testing.T) {
-			projectJSON := fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, feature.apiField)
-			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-				return []byte(projectJSON), nil
-			})
-
-			state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
-			if err != nil {
-				t.Fatalf("FetchRepository: %v", err)
-			}
-
-			out, err := goyaml.Marshal(ToManifest(state))
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
+			out := exportYAML(t, fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, feature.apiField))
 
 			var doc struct {
 				Spec struct {
 					Features map[string]string `yaml:"features"`
 				} `yaml:"spec"`
 			}
-			if err := goyaml.Unmarshal(out, &doc); err != nil {
+			if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
 				t.Fatalf("unmarshal: %v\n%s", err, out)
 			}
 			if got := len(doc.Spec.Features); got != 1 {
@@ -236,12 +243,12 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 		want        []string
 	}{
 		{
-			name:        "request_access_enabled",
+			name:        "request_access_enabled_true",
 			projectJSON: `{"visibility":"private","request_access_enabled":true,"enforce_auth_checks_on_uploads":false}`,
 			want:        []string{"request_access_enabled: true", "enforce_auth_checks_on_uploads: false"},
 		},
 		{
-			name:        "enforce_auth_checks_on_uploads",
+			name:        "enforce_auth_checks_on_uploads_true",
 			projectJSON: `{"visibility":"private","request_access_enabled":false,"enforce_auth_checks_on_uploads":true}`,
 			want:        []string{"request_access_enabled: false", "enforce_auth_checks_on_uploads: true"},
 		},
@@ -249,21 +256,9 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {
-			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-				return []byte(attr.projectJSON), nil
-			})
-
-			state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
-			if err != nil {
-				t.Fatalf("FetchRepository: %v", err)
-			}
-
-			out, err := goyaml.Marshal(ToManifest(state))
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
+			out := exportYAML(t, attr.projectJSON)
 			for _, want := range attr.want {
-				if !strings.Contains(string(out), want) {
+				if !strings.Contains(out, want) {
 					t.Errorf("yaml missing %q\n%s", want, out)
 				}
 			}
@@ -273,22 +268,10 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 
 // A boolean attribute the API did not return must be omitted, not emitted as
 // false.
-func TestToManifestOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
-	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-		return []byte(`{"visibility":"private"}`), nil
-	})
-
-	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
-	if err != nil {
-		t.Fatalf("FetchRepository: %v", err)
-	}
-
-	out, err := goyaml.Marshal(ToManifest(state))
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+func TestFetchRepositoryOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
+	out := exportYAML(t, `{"visibility":"private"}`)
 	for _, key := range []string{"request_access_enabled", "enforce_auth_checks_on_uploads"} {
-		if strings.Contains(string(out), key) {
+		if strings.Contains(out, key) {
 			t.Errorf("yaml contains %q, want it omitted when the API did not report it\n%s", key, out)
 		}
 	}
