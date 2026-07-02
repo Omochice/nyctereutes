@@ -277,10 +277,8 @@ func TestToManifestEmitsFeaturesInSettingsUIOrder(t *testing.T) {
 	}
 }
 
-// request_access_enabled and enforce_auth_checks_on_uploads are plain booleans
-// on the project, not access levels, so they live directly under spec. The two
-// cases mirror true/false so a swapped mapping between the fields cannot pass,
-// and false must survive export as an intentional setting.
+// The two cases mirror true/false so a swapped mapping between the fields
+// cannot pass, and false must survive export as an intentional setting.
 func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -323,9 +321,8 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 	}
 }
 
-// A boolean attribute the API did not return is indistinguishable from false
-// once parsed into a plain bool, so the pipeline must keep the distinction and
-// omit the key entirely.
+// A boolean attribute the API did not return must be omitted, not emitted as
+// false.
 func TestToManifestOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
 	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
 		return []byte(`{"visibility":"private"}`), nil
@@ -347,8 +344,6 @@ func TestToManifestOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
 	}
 }
 
-// Both booleans are options right under Project visibility in the settings UI,
-// so the emitted spec places them between visibility and archived.
 func TestToManifestEmitsVisibilityBooleansAfterVisibility(t *testing.T) {
 	projectJSON := `{"visibility":"private","archived":false,` +
 		`"request_access_enabled":true,"enforce_auth_checks_on_uploads":true}`
