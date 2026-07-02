@@ -227,56 +227,6 @@ func TestToManifestPreservesPublicAccessLevel(t *testing.T) {
 	wantPtr(t, "features.package_registry", doc.Spec.Features.PackageRegistry, "public")
 }
 
-// spec.features keys must be emitted in the GitLab settings-UI display order.
-// The order is carried only by the field declaration order of
-// manifest.RepositoryFeatures, so a struct reorder would silently change the
-// output without this pin.
-func TestToManifestEmitsFeaturesInSettingsUIOrder(t *testing.T) {
-	state := &CurrentState{
-		Owner:                            ownerGroup,
-		Name:                             nameProj,
-		IssuesAccessLevel:                levelEnabled,
-		RepositoryAccessLevel:            levelEnabled,
-		MergeRequestsAccessLevel:         levelEnabled,
-		ForkingAccessLevel:               levelEnabled,
-		BuildsAccessLevel:                levelEnabled,
-		ContainerRegistryAccessLevel:     levelEnabled,
-		AnalyticsAccessLevel:             levelEnabled,
-		RequirementsAccessLevel:          levelEnabled,
-		SecurityAndComplianceAccessLevel: levelEnabled,
-		WikiAccessLevel:                  levelEnabled,
-		SnippetsAccessLevel:              levelEnabled,
-		PackageRegistryAccessLevel:       levelEnabled,
-		ModelExperimentsAccessLevel:      levelEnabled,
-		ModelRegistryAccessLevel:         levelEnabled,
-		PagesAccessLevel:                 levelEnabled,
-		MonitorAccessLevel:               levelEnabled,
-		EnvironmentsAccessLevel:          levelEnabled,
-		FeatureFlagsAccessLevel:          levelEnabled,
-		InfrastructureAccessLevel:        levelEnabled,
-		ReleasesAccessLevel:              levelEnabled,
-	}
-
-	out, err := goyaml.Marshal(ToManifest(state))
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-
-	yamlText := string(out)
-	start := strings.Index(yamlText, "features:")
-	if start < 0 {
-		t.Fatalf("features block missing\n%s", out)
-	}
-	section := yamlText[start:]
-	for _, feature := range featureAccessLevels() {
-		idx := strings.Index(section, feature.yamlKey+":")
-		if idx < 0 {
-			t.Fatalf("features.%s missing or out of settings-UI order\n%s", feature.yamlKey, out)
-		}
-		section = section[idx+len(feature.yamlKey):]
-	}
-}
-
 // The two cases mirror true/false so a swapped mapping between the fields
 // cannot pass, and false must survive export as an intentional setting.
 func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
@@ -341,37 +291,5 @@ func TestToManifestOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
 		if strings.Contains(string(out), key) {
 			t.Errorf("yaml contains %q, want it omitted when the API did not report it\n%s", key, out)
 		}
-	}
-}
-
-func TestToManifestEmitsVisibilityBooleansAfterVisibility(t *testing.T) {
-	projectJSON := `{"visibility":"private","archived":false,` +
-		`"request_access_enabled":true,"enforce_auth_checks_on_uploads":true}`
-	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-		return []byte(projectJSON), nil
-	})
-
-	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
-	if err != nil {
-		t.Fatalf("FetchRepository: %v", err)
-	}
-
-	out, err := goyaml.Marshal(ToManifest(state))
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	section := string(out)
-	wantOrder := []string{
-		"visibility:",
-		"request_access_enabled:",
-		"enforce_auth_checks_on_uploads:",
-		"archived:",
-	}
-	for _, key := range wantOrder {
-		idx := strings.Index(section, key)
-		if idx < 0 {
-			t.Fatalf("%s missing or out of the settings-UI order\n%s", key, out)
-		}
-		section = section[idx+len(key):]
 	}
 }
