@@ -267,10 +267,10 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 }
 
 // A boolean attribute the API did not return must be omitted, not emitted as
-// false.
-func TestFetchRepositoryOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
+// false. archived is included so all spec booleans share one absence rule.
+func TestFetchRepositoryOmitsBooleansWhenAbsent(t *testing.T) {
 	out := exportYAML(t, `{"visibility":"private"}`)
-	for _, key := range []string{"request_access_enabled", "enforce_auth_checks_on_uploads"} {
+	for _, key := range []string{"request_access_enabled", "enforce_auth_checks_on_uploads", "archived"} {
 		if strings.Contains(out, key) {
 			t.Errorf("yaml contains %q, want it omitted when the API did not report it\n%s", key, out)
 		}
