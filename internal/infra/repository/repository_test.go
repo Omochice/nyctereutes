@@ -276,3 +276,107 @@ func TestToManifestEmitsFeaturesInSettingsUIOrder(t *testing.T) {
 		section = section[idx+len(feature.yamlKey):]
 	}
 }
+
+// request_access_enabled and enforce_auth_checks_on_uploads are plain booleans
+// on the project, not access levels, so they live directly under spec. The two
+// cases mirror true/false so a swapped mapping between the fields cannot pass,
+// and false must survive export as an intentional setting.
+func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
+	cases := []struct {
+		name        string
+		projectJSON string
+		want        []string
+	}{
+		{
+			name:        "request_access_enabled",
+			projectJSON: `{"visibility":"private","request_access_enabled":true,"enforce_auth_checks_on_uploads":false}`,
+			want:        []string{"request_access_enabled: true", "enforce_auth_checks_on_uploads: false"},
+		},
+		{
+			name:        "enforce_auth_checks_on_uploads",
+			projectJSON: `{"visibility":"private","request_access_enabled":false,"enforce_auth_checks_on_uploads":true}`,
+			want:        []string{"request_access_enabled: false", "enforce_auth_checks_on_uploads: true"},
+		},
+	}
+
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+				return []byte(attr.projectJSON), nil
+			})
+
+			state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+			if err != nil {
+				t.Fatalf("FetchRepository: %v", err)
+			}
+
+			out, err := goyaml.Marshal(ToManifest(state))
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			for _, want := range attr.want {
+				if !strings.Contains(string(out), want) {
+					t.Errorf("yaml missing %q\n%s", want, out)
+				}
+			}
+		})
+	}
+}
+
+// A boolean attribute the API did not return is indistinguishable from false
+// once parsed into a plain bool, so the pipeline must keep the distinction and
+// omit the key entirely.
+func TestToManifestOmitsVisibilityBooleansWhenAbsent(t *testing.T) {
+	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+		return []byte(`{"visibility":"private"}`), nil
+	})
+
+	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	if err != nil {
+		t.Fatalf("FetchRepository: %v", err)
+	}
+
+	out, err := goyaml.Marshal(ToManifest(state))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, key := range []string{"request_access_enabled", "enforce_auth_checks_on_uploads"} {
+		if strings.Contains(string(out), key) {
+			t.Errorf("yaml contains %q, want it omitted when the API did not report it\n%s", key, out)
+		}
+	}
+}
+
+// Both booleans are options right under Project visibility in the settings UI,
+// so the emitted spec places them between visibility and archived.
+func TestToManifestEmitsVisibilityBooleansAfterVisibility(t *testing.T) {
+	projectJSON := `{"visibility":"private","archived":false,` +
+		`"request_access_enabled":true,"enforce_auth_checks_on_uploads":true}`
+	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+		return []byte(projectJSON), nil
+	})
+
+	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	if err != nil {
+		t.Fatalf("FetchRepository: %v", err)
+	}
+
+	out, err := goyaml.Marshal(ToManifest(state))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	section := string(out)
+	wantOrder := []string{
+		"visibility:",
+		"request_access_enabled:",
+		"enforce_auth_checks_on_uploads:",
+		"archived:",
+	}
+	for _, key := range wantOrder {
+		idx := strings.Index(section, key)
+		if idx < 0 {
+			t.Fatalf("%s missing or out of the settings-UI order\n%s", key, out)
+		}
+		section = section[idx+len(key):]
+	}
+}
