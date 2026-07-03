@@ -23,6 +23,9 @@ func fullRepository() *Repository {
 			EnforceAuthChecksOnUploads: new(true),
 			Archived:                   new(true),
 			Topics:                     []string{"go"},
+			MergeCommitTemplate:        new("%{title}"),
+			SquashCommitTemplate:       new("%{title}"),
+			MergeRequestsTemplate:      new("%{title}"),
 			Features: &RepositoryFeatures{
 				Issues:                new(levelEnabled),
 				Repository:            new(levelEnabled),

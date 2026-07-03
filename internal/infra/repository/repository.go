@@ -25,6 +25,10 @@ type CurrentState struct {
 	Archived                   *bool
 	RequestAccessEnabled       *bool
 	EnforceAuthChecksOnUploads *bool
+	// Pointers because GitLab reports null for an unset template.
+	MergeCommitTemplate   *string
+	SquashCommitTemplate  *string
+	MergeRequestsTemplate *string
 	// Per-feature access levels, in GitLab settings-UI display order; empty
 	// when GitLab did not report the field.
 	IssuesAccessLevel                string
@@ -89,6 +93,9 @@ func parseProject(out []byte) (*CurrentState, error) {
 		Archived                         *bool    `json:"archived"`
 		RequestAccessEnabled             *bool    `json:"request_access_enabled"`
 		EnforceAuthChecksOnUploads       *bool    `json:"enforce_auth_checks_on_uploads"`
+		MergeCommitTemplate              *string  `json:"merge_commit_template"`
+		SquashCommitTemplate             *string  `json:"squash_commit_template"`
+		MergeRequestsTemplate            *string  `json:"merge_requests_template"`
 		IssuesAccessLevel                string   `json:"issues_access_level"`
 		RepositoryAccessLevel            string   `json:"repository_access_level"`
 		MergeRequestsAccessLevel         string   `json:"merge_requests_access_level"`
@@ -121,6 +128,9 @@ func parseProject(out []byte) (*CurrentState, error) {
 		Topics:                           raw.Topics,
 		RequestAccessEnabled:             raw.RequestAccessEnabled,
 		EnforceAuthChecksOnUploads:       raw.EnforceAuthChecksOnUploads,
+		MergeCommitTemplate:              raw.MergeCommitTemplate,
+		SquashCommitTemplate:             raw.SquashCommitTemplate,
+		MergeRequestsTemplate:            raw.MergeRequestsTemplate,
 		IssuesAccessLevel:                raw.IssuesAccessLevel,
 		RepositoryAccessLevel:            raw.RepositoryAccessLevel,
 		MergeRequestsAccessLevel:         raw.MergeRequestsAccessLevel,
@@ -167,6 +177,9 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
 			Archived:                   state.Archived,
 			Topics:                     state.Topics,
+			MergeCommitTemplate:        state.MergeCommitTemplate,
+			SquashCommitTemplate:       state.SquashCommitTemplate,
+			MergeRequestsTemplate:      state.MergeRequestsTemplate,
 			Features:                   toFeatures(state),
 		},
 	}

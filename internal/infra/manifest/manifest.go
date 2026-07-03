@@ -37,8 +37,13 @@ type RepositorySpec struct {
 	Archived                   *bool `yaml:"archived,omitempty"`
 	// No omitempty: an explicit empty topic list must survive export so the YAML
 	// fully represents the project's current state.
-	Topics   []string            `yaml:"topics"`
-	Features *RepositoryFeatures `yaml:"features,omitempty"`
+	Topics []string `yaml:"topics"`
+	// Commit message and MR description templates from Settings > Merge
+	// requests; GitLab reports null for an unset template, hence pointers.
+	MergeCommitTemplate   *string             `yaml:"merge_commit_template,omitempty"`
+	SquashCommitTemplate  *string             `yaml:"squash_commit_template,omitempty"`
+	MergeRequestsTemplate *string             `yaml:"merge_requests_template,omitempty"`
+	Features              *RepositoryFeatures `yaml:"features,omitempty"`
 }
 
 // The per-feature access levels of a GitLab project. Each value is one of
