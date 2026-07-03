@@ -65,10 +65,10 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 		{"description", string(state.Description), sampleDescription},
 		{"visibility", state.Visibility, visibilityPrivate},
 		{"topics", strings.Join(state.Topics, ","), "go,cli"},
-		{"issues", state.IssuesAccessLevel, levelEnabled},
-		{"wiki", state.WikiAccessLevel, levelDisabled},
-		{"builds", state.BuildsAccessLevel, levelEnabled},
-		{"container_registry", state.ContainerRegistryAccessLevel, visibilityPrivate},
+		{"issues", string(state.IssuesAccessLevel), levelEnabled},
+		{"wiki", string(state.WikiAccessLevel), levelDisabled},
+		{"builds", string(state.BuildsAccessLevel), levelEnabled},
+		{"container_registry", string(state.ContainerRegistryAccessLevel), visibilityPrivate},
 	} {
 		if check.got != check.want {
 			t.Errorf("%s = %q, want %q", check.name, check.got, check.want)
