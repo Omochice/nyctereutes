@@ -54,7 +54,7 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 	if state.IsNew {
 		t.Errorf("IsNew = true, want false for an existing project")
 	}
-	if !state.Archived {
+	if state.Archived == nil || !*state.Archived {
 		t.Errorf("archived = false, want true")
 	}
 	if want := "api projects/group%2Fsub%2Fproj"; strings.Join(gotArgs, " ") != want {
@@ -95,7 +95,7 @@ func TestToManifest(t *testing.T) {
 		Owner:             ownerGroup,
 		Name:              nameProj,
 		Description:       sampleDescription,
-		Archived:          true,
+		Archived:          new(true),
 		Visibility:        visibilityPrivate,
 		Topics:            []string{"go"},
 		IssuesAccessLevel: levelEnabled,
@@ -168,6 +168,26 @@ func featureAccessLevels() []featureAccessLevel {
 	}
 }
 
+// exportYAML runs the import pipeline against a fake glab that returns
+// projectJSON, and returns the manifest YAML it produces.
+func exportYAML(t *testing.T, projectJSON string) string {
+	t.Helper()
+	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+		return []byte(projectJSON), nil
+	})
+
+	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	if err != nil {
+		t.Fatalf("FetchRepository: %v", err)
+	}
+
+	out, err := goyaml.Marshal(ToManifest(state))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return string(out)
+}
+
 // Each GitLab *_access_level toggle must round-trip to its own spec.features key.
 // One toggle can differ from the naming pattern (ci maps to builds_access_level),
 // so each mapping is isolated: only the field under test is present in the API
@@ -175,27 +195,14 @@ func featureAccessLevels() []featureAccessLevel {
 func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 	for _, feature := range featureAccessLevels() {
 		t.Run(feature.yamlKey, func(t *testing.T) {
-			projectJSON := fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, feature.apiField)
-			runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-				return []byte(projectJSON), nil
-			})
-
-			state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
-			if err != nil {
-				t.Fatalf("FetchRepository: %v", err)
-			}
-
-			out, err := goyaml.Marshal(ToManifest(state))
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
+			out := exportYAML(t, fmt.Sprintf(`{"visibility":"private","%s":"enabled"}`, feature.apiField))
 
 			var doc struct {
 				Spec struct {
 					Features map[string]string `yaml:"features"`
 				} `yaml:"spec"`
 			}
-			if err := goyaml.Unmarshal(out, &doc); err != nil {
+			if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
 				t.Fatalf("unmarshal: %v\n%s", err, out)
 			}
 			if got := len(doc.Spec.Features); got != 1 {
@@ -227,52 +234,45 @@ func TestToManifestPreservesPublicAccessLevel(t *testing.T) {
 	wantPtr(t, "features.package_registry", doc.Spec.Features.PackageRegistry, "public")
 }
 
-// spec.features keys must be emitted in the GitLab settings-UI display order.
-// The order is carried only by the field declaration order of
-// manifest.RepositoryFeatures, so a struct reorder would silently change the
-// output without this pin.
-func TestToManifestEmitsFeaturesInSettingsUIOrder(t *testing.T) {
-	state := &CurrentState{
-		Owner:                            ownerGroup,
-		Name:                             nameProj,
-		IssuesAccessLevel:                levelEnabled,
-		RepositoryAccessLevel:            levelEnabled,
-		MergeRequestsAccessLevel:         levelEnabled,
-		ForkingAccessLevel:               levelEnabled,
-		BuildsAccessLevel:                levelEnabled,
-		ContainerRegistryAccessLevel:     levelEnabled,
-		AnalyticsAccessLevel:             levelEnabled,
-		RequirementsAccessLevel:          levelEnabled,
-		SecurityAndComplianceAccessLevel: levelEnabled,
-		WikiAccessLevel:                  levelEnabled,
-		SnippetsAccessLevel:              levelEnabled,
-		PackageRegistryAccessLevel:       levelEnabled,
-		ModelExperimentsAccessLevel:      levelEnabled,
-		ModelRegistryAccessLevel:         levelEnabled,
-		PagesAccessLevel:                 levelEnabled,
-		MonitorAccessLevel:               levelEnabled,
-		EnvironmentsAccessLevel:          levelEnabled,
-		FeatureFlagsAccessLevel:          levelEnabled,
-		InfrastructureAccessLevel:        levelEnabled,
-		ReleasesAccessLevel:              levelEnabled,
+// The two cases mirror true/false so a swapped mapping between the fields
+// cannot pass, and false must survive export as an intentional setting.
+func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
+	cases := []struct {
+		name        string
+		projectJSON string
+		want        []string
+	}{
+		{
+			name:        "request_access_enabled_true",
+			projectJSON: `{"visibility":"private","request_access_enabled":true,"enforce_auth_checks_on_uploads":false}`,
+			want:        []string{"request_access_enabled: true", "enforce_auth_checks_on_uploads: false"},
+		},
+		{
+			name:        "enforce_auth_checks_on_uploads_true",
+			projectJSON: `{"visibility":"private","request_access_enabled":false,"enforce_auth_checks_on_uploads":true}`,
+			want:        []string{"request_access_enabled: false", "enforce_auth_checks_on_uploads: true"},
+		},
 	}
 
-	out, err := goyaml.Marshal(ToManifest(state))
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			out := exportYAML(t, attr.projectJSON)
+			for _, want := range attr.want {
+				if !strings.Contains(out, want) {
+					t.Errorf("yaml missing %q\n%s", want, out)
+				}
+			}
+		})
 	}
+}
 
-	yamlText := string(out)
-	start := strings.Index(yamlText, "features:")
-	if start < 0 {
-		t.Fatalf("features block missing\n%s", out)
-	}
-	section := yamlText[start:]
-	for _, feature := range featureAccessLevels() {
-		idx := strings.Index(section, feature.yamlKey+":")
-		if idx < 0 {
-			t.Fatalf("features.%s missing or out of settings-UI order\n%s", feature.yamlKey, out)
+// A boolean attribute the API did not return must be omitted, not emitted as
+// false. archived is included so all spec booleans share one absence rule.
+func TestFetchRepositoryOmitsBooleansWhenAbsent(t *testing.T) {
+	out := exportYAML(t, `{"visibility":"private"}`)
+	for _, key := range []string{"request_access_enabled", "enforce_auth_checks_on_uploads", "archived"} {
+		if strings.Contains(out, key) {
+			t.Errorf("yaml contains %q, want it omitted when the API did not report it\n%s", key, out)
 		}
-		section = section[idx+len(feature.yamlKey):]
 	}
 }

@@ -18,9 +18,13 @@ type CurrentState struct {
 	Name        string
 	IsNew       bool // true when the project does not exist on GitLab
 	Description string
-	Archived    bool
 	Visibility  string
 	Topics      []string
+	// Pointers because JSON has no empty boolean: nil keeps "not reported"
+	// apart from an intentional false.
+	Archived                   *bool
+	RequestAccessEnabled       *bool
+	EnforceAuthChecksOnUploads *bool
 	// Per-feature access levels, in GitLab settings-UI display order; empty
 	// when GitLab did not report the field.
 	IssuesAccessLevel                string
@@ -82,7 +86,9 @@ func parseProject(out []byte) (*CurrentState, error) {
 		Description                      string   `json:"description"`
 		Visibility                       string   `json:"visibility"`
 		Topics                           []string `json:"topics"`
-		Archived                         bool     `json:"archived"`
+		Archived                         *bool    `json:"archived"`
+		RequestAccessEnabled             *bool    `json:"request_access_enabled"`
+		EnforceAuthChecksOnUploads       *bool    `json:"enforce_auth_checks_on_uploads"`
 		IssuesAccessLevel                string   `json:"issues_access_level"`
 		RepositoryAccessLevel            string   `json:"repository_access_level"`
 		MergeRequestsAccessLevel         string   `json:"merge_requests_access_level"`
@@ -113,6 +119,8 @@ func parseProject(out []byte) (*CurrentState, error) {
 		Archived:                         raw.Archived,
 		Visibility:                       raw.Visibility,
 		Topics:                           raw.Topics,
+		RequestAccessEnabled:             raw.RequestAccessEnabled,
+		EnforceAuthChecksOnUploads:       raw.EnforceAuthChecksOnUploads,
 		IssuesAccessLevel:                raw.IssuesAccessLevel,
 		RepositoryAccessLevel:            raw.RepositoryAccessLevel,
 		MergeRequestsAccessLevel:         raw.MergeRequestsAccessLevel,
@@ -153,11 +161,13 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Owner: state.Owner,
 		},
 		Spec: manifest.RepositorySpec{
-			Description: new(state.Description),
-			Visibility:  new(state.Visibility),
-			Archived:    new(state.Archived),
-			Topics:      state.Topics,
-			Features:    toFeatures(state),
+			Description:                new(state.Description),
+			Visibility:                 new(state.Visibility),
+			RequestAccessEnabled:       state.RequestAccessEnabled,
+			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
+			Archived:                   state.Archived,
+			Topics:                     state.Topics,
+			Features:                   toFeatures(state),
 		},
 	}
 }

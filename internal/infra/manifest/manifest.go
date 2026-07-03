@@ -31,7 +31,10 @@ type RepositoryMetadata struct {
 type RepositorySpec struct {
 	Description *string `yaml:"description,omitempty"`
 	Visibility  *string `yaml:"visibility,omitempty"`
-	Archived    *bool   `yaml:"archived,omitempty"`
+	// Placed after visibility to match their spot in the settings UI.
+	RequestAccessEnabled       *bool `yaml:"request_access_enabled,omitempty"`
+	EnforceAuthChecksOnUploads *bool `yaml:"enforce_auth_checks_on_uploads,omitempty"`
+	Archived                   *bool `yaml:"archived,omitempty"`
 	// No omitempty: an explicit empty topic list must survive export so the YAML
 	// fully represents the project's current state.
 	Topics   []string            `yaml:"topics"`
