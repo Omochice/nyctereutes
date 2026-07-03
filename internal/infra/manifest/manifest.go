@@ -9,9 +9,11 @@ import (
 )
 
 // Encodes a manifest document to YAML. Every emitter goes through this
-// function so the document encoding style has a single owner.
+// function so the document encoding style has a single owner. Multiline
+// values become literal blocks, which requires the LF-normalized values the
+// import produces: a literal block cannot carry a bare CR.
 func Marshal(doc *Repository) ([]byte, error) {
-	out, err := goyaml.Marshal(doc)
+	out, err := goyaml.MarshalWithOptions(doc, goyaml.UseLiteralStyleIfMultiline(true))
 	if err != nil {
 		return nil, fmt.Errorf("marshal manifest: %w", err)
 	}
