@@ -83,40 +83,43 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 	return state, nil
 }
 
+// The subset of the `glab api projects/:id` JSON response the import reads.
+type rawProject struct {
+	Description                      string   `json:"description"`
+	Visibility                       string   `json:"visibility"`
+	Topics                           []string `json:"topics"`
+	Archived                         *bool    `json:"archived"`
+	RequestAccessEnabled             *bool    `json:"request_access_enabled"`
+	EnforceAuthChecksOnUploads       *bool    `json:"enforce_auth_checks_on_uploads"`
+	MergeCommitTemplate              *string  `json:"merge_commit_template"`
+	SquashCommitTemplate             *string  `json:"squash_commit_template"`
+	MergeRequestsTemplate            *string  `json:"merge_requests_template"`
+	IssuesAccessLevel                string   `json:"issues_access_level"`
+	RepositoryAccessLevel            string   `json:"repository_access_level"`
+	MergeRequestsAccessLevel         string   `json:"merge_requests_access_level"`
+	ForkingAccessLevel               string   `json:"forking_access_level"`
+	BuildsAccessLevel                string   `json:"builds_access_level"`
+	ContainerRegistryAccessLevel     string   `json:"container_registry_access_level"`
+	AnalyticsAccessLevel             string   `json:"analytics_access_level"`
+	RequirementsAccessLevel          string   `json:"requirements_access_level"`
+	SecurityAndComplianceAccessLevel string   `json:"security_and_compliance_access_level"`
+	WikiAccessLevel                  string   `json:"wiki_access_level"`
+	SnippetsAccessLevel              string   `json:"snippets_access_level"`
+	PackageRegistryAccessLevel       string   `json:"package_registry_access_level"`
+	ModelExperimentsAccessLevel      string   `json:"model_experiments_access_level"`
+	ModelRegistryAccessLevel         string   `json:"model_registry_access_level"`
+	PagesAccessLevel                 string   `json:"pages_access_level"`
+	MonitorAccessLevel               string   `json:"monitor_access_level"`
+	EnvironmentsAccessLevel          string   `json:"environments_access_level"`
+	FeatureFlagsAccessLevel          string   `json:"feature_flags_access_level"`
+	InfrastructureAccessLevel        string   `json:"infrastructure_access_level"`
+	ReleasesAccessLevel              string   `json:"releases_access_level"`
+}
+
 // Unmarshals a `glab api projects/:id` response into a CurrentState. Owner and
 // Name are not carried by the response and are set by the caller.
 func parseProject(out []byte) (*CurrentState, error) {
-	var raw struct {
-		Description                      string   `json:"description"`
-		Visibility                       string   `json:"visibility"`
-		Topics                           []string `json:"topics"`
-		Archived                         *bool    `json:"archived"`
-		RequestAccessEnabled             *bool    `json:"request_access_enabled"`
-		EnforceAuthChecksOnUploads       *bool    `json:"enforce_auth_checks_on_uploads"`
-		MergeCommitTemplate              *string  `json:"merge_commit_template"`
-		SquashCommitTemplate             *string  `json:"squash_commit_template"`
-		MergeRequestsTemplate            *string  `json:"merge_requests_template"`
-		IssuesAccessLevel                string   `json:"issues_access_level"`
-		RepositoryAccessLevel            string   `json:"repository_access_level"`
-		MergeRequestsAccessLevel         string   `json:"merge_requests_access_level"`
-		ForkingAccessLevel               string   `json:"forking_access_level"`
-		BuildsAccessLevel                string   `json:"builds_access_level"`
-		ContainerRegistryAccessLevel     string   `json:"container_registry_access_level"`
-		AnalyticsAccessLevel             string   `json:"analytics_access_level"`
-		RequirementsAccessLevel          string   `json:"requirements_access_level"`
-		SecurityAndComplianceAccessLevel string   `json:"security_and_compliance_access_level"`
-		WikiAccessLevel                  string   `json:"wiki_access_level"`
-		SnippetsAccessLevel              string   `json:"snippets_access_level"`
-		PackageRegistryAccessLevel       string   `json:"package_registry_access_level"`
-		ModelExperimentsAccessLevel      string   `json:"model_experiments_access_level"`
-		ModelRegistryAccessLevel         string   `json:"model_registry_access_level"`
-		PagesAccessLevel                 string   `json:"pages_access_level"`
-		MonitorAccessLevel               string   `json:"monitor_access_level"`
-		EnvironmentsAccessLevel          string   `json:"environments_access_level"`
-		FeatureFlagsAccessLevel          string   `json:"feature_flags_access_level"`
-		InfrastructureAccessLevel        string   `json:"infrastructure_access_level"`
-		ReleasesAccessLevel              string   `json:"releases_access_level"`
-	}
+	var raw rawProject
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("unmarshal project json: %w", err)
 	}
