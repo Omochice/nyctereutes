@@ -98,7 +98,20 @@ func parseProject(out []byte) (*CurrentState, error) {
 		return nil, fmt.Errorf("unmarshal project json: %w", err)
 	}
 
+	raw.normalizeNewlines()
 	return &CurrentState{rawProject: raw}, nil
+}
+
+// The web UI stores CRLF in free-text fields, and goyaml would carry the CR
+// into the emitted document as mixed line endings, so line breaks are
+// normalized to LF at the wire boundary.
+func (raw *rawProject) normalizeNewlines() {
+	raw.Description = strings.ReplaceAll(raw.Description, "\r\n", "\n")
+	for _, template := range []*string{raw.MergeCommitTemplate, raw.SquashCommitTemplate, raw.MergeRequestsTemplate} {
+		if template != nil {
+			*template = strings.ReplaceAll(*template, "\r\n", "\n")
+		}
+	}
 }
 
 // Reports whether err is a GitLab 404. It matches the status in the glab error
