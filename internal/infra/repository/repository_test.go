@@ -274,6 +274,22 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 	}
 }
 
+// exportSpec runs the import pipeline against a fake glab that returns
+// projectJSON, and returns the emitted YAML together with its decoded spec
+// block.
+func exportSpec(t *testing.T, projectJSON string) (string, map[string]any) {
+	t.Helper()
+	out := exportYAML(t, projectJSON)
+
+	var doc struct {
+		Spec map[string]any `yaml:"spec"`
+	}
+	if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, out)
+	}
+	return out, doc.Spec
+}
+
 // Each commit/description template must round-trip to its own spec key: one
 // template per case, so a swapped mapping between the three cannot pass. The
 // non-selected templates are explicit null — GitLab's wire format for an
@@ -291,19 +307,12 @@ func TestFetchRepositoryMapsMergeTemplates(t *testing.T) {
 				}
 				attrs = append(attrs, fmt.Sprintf("%q:%s", key, value))
 			}
-			out := exportYAML(t, "{"+strings.Join(attrs, ",")+"}")
-
-			var doc struct {
-				Spec map[string]any `yaml:"spec"`
-			}
-			if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
-				t.Fatalf("unmarshal: %v\n%s", err, out)
-			}
-			if got := doc.Spec[field]; got != "%{title}" {
+			out, spec := exportSpec(t, "{"+strings.Join(attrs, ",")+"}")
+			if got := spec[field]; got != "%{title}" {
 				t.Errorf("spec.%s = %v, want %q\n%s", field, got, "%{title}", out)
 			}
 			for _, other := range templates {
-				if _, ok := doc.Spec[other]; other != field && ok {
+				if _, ok := spec[other]; other != field && ok {
 					t.Errorf("spec.%s present, want only %s set\n%s", other, field, out)
 				}
 			}
@@ -340,18 +349,12 @@ func TestFetchRepositoryNormalizesCRLFToLF(t *testing.T) {
 	fields := []string{"description", "merge_commit_template", "squash_commit_template", "merge_requests_template"}
 	for _, field := range fields {
 		t.Run(field, func(t *testing.T) {
-			out := exportYAML(t, fmt.Sprintf(`{"visibility":"private","%s":"a\r\nb\rc"}`, field))
+			out, spec := exportSpec(t, fmt.Sprintf(`{"visibility":"private","%s":"a\r\nb\rc"}`, field))
 
 			if strings.Contains(out, "\r") || strings.Contains(out, `\r`) {
 				t.Errorf("yaml carries CR for %s\n%q", field, out)
 			}
-			var doc struct {
-				Spec map[string]any `yaml:"spec"`
-			}
-			if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
-				t.Fatalf("unmarshal: %v\n%s", err, out)
-			}
-			if got := doc.Spec[field]; got != "a\nb\nc" {
+			if got := spec[field]; got != "a\nb\nc" {
 				t.Errorf("spec.%s = %q, want %q\n%s", field, got, "a\nb\nc", out)
 			}
 		})
