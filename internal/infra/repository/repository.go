@@ -153,26 +153,26 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 // whole block is omitted rather than emitted empty.
 func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	features := manifest.RepositoryFeatures{
-		Issues:                accessLevel(state.IssuesAccessLevel),
-		Repository:            accessLevel(state.RepositoryAccessLevel),
-		MergeRequests:         accessLevel(state.MergeRequestsAccessLevel),
-		Forking:               accessLevel(state.ForkingAccessLevel),
-		CICD:                  accessLevel(state.BuildsAccessLevel),
-		ContainerRegistry:     accessLevel(state.ContainerRegistryAccessLevel),
-		Analytics:             accessLevel(state.AnalyticsAccessLevel),
-		Requirements:          accessLevel(state.RequirementsAccessLevel),
-		SecurityAndCompliance: accessLevel(state.SecurityAndComplianceAccessLevel),
-		Wiki:                  accessLevel(state.WikiAccessLevel),
-		Snippets:              accessLevel(state.SnippetsAccessLevel),
-		PackageRegistry:       accessLevel(state.PackageRegistryAccessLevel),
-		ModelExperiments:      accessLevel(state.ModelExperimentsAccessLevel),
-		ModelRegistry:         accessLevel(state.ModelRegistryAccessLevel),
-		Pages:                 accessLevel(state.PagesAccessLevel),
-		Monitor:               accessLevel(state.MonitorAccessLevel),
-		Environments:          accessLevel(state.EnvironmentsAccessLevel),
-		FeatureFlags:          accessLevel(state.FeatureFlagsAccessLevel),
-		Infrastructure:        accessLevel(state.InfrastructureAccessLevel),
-		Releases:              accessLevel(state.ReleasesAccessLevel),
+		Issues:                optional(state.IssuesAccessLevel),
+		Repository:            optional(state.RepositoryAccessLevel),
+		MergeRequests:         optional(state.MergeRequestsAccessLevel),
+		Forking:               optional(state.ForkingAccessLevel),
+		CICD:                  optional(state.BuildsAccessLevel),
+		ContainerRegistry:     optional(state.ContainerRegistryAccessLevel),
+		Analytics:             optional(state.AnalyticsAccessLevel),
+		Requirements:          optional(state.RequirementsAccessLevel),
+		SecurityAndCompliance: optional(state.SecurityAndComplianceAccessLevel),
+		Wiki:                  optional(state.WikiAccessLevel),
+		Snippets:              optional(state.SnippetsAccessLevel),
+		PackageRegistry:       optional(state.PackageRegistryAccessLevel),
+		ModelExperiments:      optional(state.ModelExperimentsAccessLevel),
+		ModelRegistry:         optional(state.ModelRegistryAccessLevel),
+		Pages:                 optional(state.PagesAccessLevel),
+		Monitor:               optional(state.MonitorAccessLevel),
+		Environments:          optional(state.EnvironmentsAccessLevel),
+		FeatureFlags:          optional(state.FeatureFlagsAccessLevel),
+		Infrastructure:        optional(state.InfrastructureAccessLevel),
+		Releases:              optional(state.ReleasesAccessLevel),
 	}
 	if features == (manifest.RepositoryFeatures{}) {
 		return nil
@@ -180,10 +180,10 @@ func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	return &features
 }
 
-// nil for an unreported level, so omitempty drops the field.
-func accessLevel(level string) *string {
-	if level == "" {
+// nil for a value GitLab did not report, so omitempty drops the field.
+func optional(value string) *string {
+	if value == "" {
 		return nil
 	}
-	return new(level)
+	return new(value)
 }
