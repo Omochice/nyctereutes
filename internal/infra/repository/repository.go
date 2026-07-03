@@ -12,41 +12,15 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// The current basic settings of a GitLab project.
+// The current basic settings of a GitLab project. The embedded rawProject
+// carries every attribute read from the API, so each attribute is declared
+// once; only the fields GitLab does not report live here.
 type CurrentState struct {
-	Owner       string
-	Name        string
-	IsNew       bool // true when the project does not exist on GitLab
-	Description string
-	Visibility  string
-	Topics      []string
-	// Pointers because JSON has no empty boolean: nil keeps "not reported"
-	// apart from an intentional false.
-	Archived                   *bool
-	RequestAccessEnabled       *bool
-	EnforceAuthChecksOnUploads *bool
-	// Per-feature access levels, in GitLab settings-UI display order; empty
-	// when GitLab did not report the field.
-	IssuesAccessLevel                string
-	RepositoryAccessLevel            string
-	MergeRequestsAccessLevel         string
-	ForkingAccessLevel               string
-	BuildsAccessLevel                string
-	ContainerRegistryAccessLevel     string
-	AnalyticsAccessLevel             string
-	RequirementsAccessLevel          string
-	SecurityAndComplianceAccessLevel string
-	WikiAccessLevel                  string
-	SnippetsAccessLevel              string
-	PackageRegistryAccessLevel       string
-	ModelExperimentsAccessLevel      string
-	ModelRegistryAccessLevel         string
-	PagesAccessLevel                 string
-	MonitorAccessLevel               string
-	EnvironmentsAccessLevel          string
-	FeatureFlagsAccessLevel          string
-	InfrastructureAccessLevel        string
-	ReleasesAccessLevel              string
+	rawProject
+
+	Owner string
+	Name  string
+	IsNew bool // true when the project does not exist on GitLab
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -79,69 +53,52 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 	return state, nil
 }
 
+// The subset of the `glab api projects/:id` JSON response the import reads.
+type rawProject struct {
+	Description string   `json:"description"`
+	Visibility  string   `json:"visibility"`
+	Topics      []string `json:"topics"`
+	// Pointer booleans and templates keep "not reported" (JSON absence or
+	// null) apart from an intentional false or empty string.
+	Archived                   *bool   `json:"archived"`
+	RequestAccessEnabled       *bool   `json:"request_access_enabled"`
+	EnforceAuthChecksOnUploads *bool   `json:"enforce_auth_checks_on_uploads"`
+	MergeCommitTemplate        *string `json:"merge_commit_template"`
+	SquashCommitTemplate       *string `json:"squash_commit_template"`
+	MergeRequestsTemplate      *string `json:"merge_requests_template"`
+	// Per-feature access levels, in GitLab settings-UI display order; empty
+	// when GitLab did not report the field.
+	IssuesAccessLevel                string `json:"issues_access_level"`
+	RepositoryAccessLevel            string `json:"repository_access_level"`
+	MergeRequestsAccessLevel         string `json:"merge_requests_access_level"`
+	ForkingAccessLevel               string `json:"forking_access_level"`
+	BuildsAccessLevel                string `json:"builds_access_level"`
+	ContainerRegistryAccessLevel     string `json:"container_registry_access_level"`
+	AnalyticsAccessLevel             string `json:"analytics_access_level"`
+	RequirementsAccessLevel          string `json:"requirements_access_level"`
+	SecurityAndComplianceAccessLevel string `json:"security_and_compliance_access_level"`
+	WikiAccessLevel                  string `json:"wiki_access_level"`
+	SnippetsAccessLevel              string `json:"snippets_access_level"`
+	PackageRegistryAccessLevel       string `json:"package_registry_access_level"`
+	ModelExperimentsAccessLevel      string `json:"model_experiments_access_level"`
+	ModelRegistryAccessLevel         string `json:"model_registry_access_level"`
+	PagesAccessLevel                 string `json:"pages_access_level"`
+	MonitorAccessLevel               string `json:"monitor_access_level"`
+	EnvironmentsAccessLevel          string `json:"environments_access_level"`
+	FeatureFlagsAccessLevel          string `json:"feature_flags_access_level"`
+	InfrastructureAccessLevel        string `json:"infrastructure_access_level"`
+	ReleasesAccessLevel              string `json:"releases_access_level"`
+}
+
 // Unmarshals a `glab api projects/:id` response into a CurrentState. Owner and
 // Name are not carried by the response and are set by the caller.
 func parseProject(out []byte) (*CurrentState, error) {
-	var raw struct {
-		Description                      string   `json:"description"`
-		Visibility                       string   `json:"visibility"`
-		Topics                           []string `json:"topics"`
-		Archived                         *bool    `json:"archived"`
-		RequestAccessEnabled             *bool    `json:"request_access_enabled"`
-		EnforceAuthChecksOnUploads       *bool    `json:"enforce_auth_checks_on_uploads"`
-		IssuesAccessLevel                string   `json:"issues_access_level"`
-		RepositoryAccessLevel            string   `json:"repository_access_level"`
-		MergeRequestsAccessLevel         string   `json:"merge_requests_access_level"`
-		ForkingAccessLevel               string   `json:"forking_access_level"`
-		BuildsAccessLevel                string   `json:"builds_access_level"`
-		ContainerRegistryAccessLevel     string   `json:"container_registry_access_level"`
-		AnalyticsAccessLevel             string   `json:"analytics_access_level"`
-		RequirementsAccessLevel          string   `json:"requirements_access_level"`
-		SecurityAndComplianceAccessLevel string   `json:"security_and_compliance_access_level"`
-		WikiAccessLevel                  string   `json:"wiki_access_level"`
-		SnippetsAccessLevel              string   `json:"snippets_access_level"`
-		PackageRegistryAccessLevel       string   `json:"package_registry_access_level"`
-		ModelExperimentsAccessLevel      string   `json:"model_experiments_access_level"`
-		ModelRegistryAccessLevel         string   `json:"model_registry_access_level"`
-		PagesAccessLevel                 string   `json:"pages_access_level"`
-		MonitorAccessLevel               string   `json:"monitor_access_level"`
-		EnvironmentsAccessLevel          string   `json:"environments_access_level"`
-		FeatureFlagsAccessLevel          string   `json:"feature_flags_access_level"`
-		InfrastructureAccessLevel        string   `json:"infrastructure_access_level"`
-		ReleasesAccessLevel              string   `json:"releases_access_level"`
-	}
+	var raw rawProject
 	if err := json.Unmarshal(out, &raw); err != nil {
 		return nil, fmt.Errorf("unmarshal project json: %w", err)
 	}
 
-	return &CurrentState{
-		Description:                      raw.Description,
-		Archived:                         raw.Archived,
-		Visibility:                       raw.Visibility,
-		Topics:                           raw.Topics,
-		RequestAccessEnabled:             raw.RequestAccessEnabled,
-		EnforceAuthChecksOnUploads:       raw.EnforceAuthChecksOnUploads,
-		IssuesAccessLevel:                raw.IssuesAccessLevel,
-		RepositoryAccessLevel:            raw.RepositoryAccessLevel,
-		MergeRequestsAccessLevel:         raw.MergeRequestsAccessLevel,
-		ForkingAccessLevel:               raw.ForkingAccessLevel,
-		BuildsAccessLevel:                raw.BuildsAccessLevel,
-		ContainerRegistryAccessLevel:     raw.ContainerRegistryAccessLevel,
-		AnalyticsAccessLevel:             raw.AnalyticsAccessLevel,
-		RequirementsAccessLevel:          raw.RequirementsAccessLevel,
-		SecurityAndComplianceAccessLevel: raw.SecurityAndComplianceAccessLevel,
-		WikiAccessLevel:                  raw.WikiAccessLevel,
-		SnippetsAccessLevel:              raw.SnippetsAccessLevel,
-		PackageRegistryAccessLevel:       raw.PackageRegistryAccessLevel,
-		ModelExperimentsAccessLevel:      raw.ModelExperimentsAccessLevel,
-		ModelRegistryAccessLevel:         raw.ModelRegistryAccessLevel,
-		PagesAccessLevel:                 raw.PagesAccessLevel,
-		MonitorAccessLevel:               raw.MonitorAccessLevel,
-		EnvironmentsAccessLevel:          raw.EnvironmentsAccessLevel,
-		FeatureFlagsAccessLevel:          raw.FeatureFlagsAccessLevel,
-		InfrastructureAccessLevel:        raw.InfrastructureAccessLevel,
-		ReleasesAccessLevel:              raw.ReleasesAccessLevel,
-	}, nil
+	return &CurrentState{rawProject: raw}, nil
 }
 
 // Reports whether err is a GitLab 404. It matches the status in the glab error
@@ -167,6 +124,9 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
 			Archived:                   state.Archived,
 			Topics:                     state.Topics,
+			MergeCommitTemplate:        state.MergeCommitTemplate,
+			SquashCommitTemplate:       state.SquashCommitTemplate,
+			MergeRequestsTemplate:      state.MergeRequestsTemplate,
 			Features:                   toFeatures(state),
 		},
 	}

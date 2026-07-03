@@ -92,14 +92,16 @@ func TestFetchRepositoryNotFoundIsNew(t *testing.T) {
 
 func TestToManifest(t *testing.T) {
 	state := &CurrentState{
-		Owner:             ownerGroup,
-		Name:              nameProj,
-		Description:       sampleDescription,
-		Archived:          new(true),
-		Visibility:        visibilityPrivate,
-		Topics:            []string{"go"},
-		IssuesAccessLevel: levelEnabled,
-		WikiAccessLevel:   levelDisabled,
+		Owner: ownerGroup,
+		Name:  nameProj,
+		rawProject: rawProject{
+			Description:       sampleDescription,
+			Archived:          new(true),
+			Visibility:        visibilityPrivate,
+			Topics:            []string{"go"},
+			IssuesAccessLevel: levelEnabled,
+			WikiAccessLevel:   levelDisabled,
+		},
 	}
 
 	doc := ToManifest(state)
@@ -129,7 +131,11 @@ func TestToManifest(t *testing.T) {
 }
 
 func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
-	doc := ToManifest(&CurrentState{Owner: ownerGroup, Name: nameProj, Visibility: visibilityPrivate})
+	doc := ToManifest(&CurrentState{
+		Owner:      ownerGroup,
+		Name:       nameProj,
+		rawProject: rawProject{Visibility: visibilityPrivate},
+	})
 	if doc.Spec.Features != nil {
 		t.Errorf("spec.features = %v, want nil when no access level was reported", doc.Spec.Features)
 	}
@@ -222,10 +228,12 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 // three-value set the others use.
 func TestToManifestPreservesPublicAccessLevel(t *testing.T) {
 	doc := ToManifest(&CurrentState{
-		Owner:                      ownerGroup,
-		Name:                       nameProj,
-		PagesAccessLevel:           "public",
-		PackageRegistryAccessLevel: "public",
+		Owner: ownerGroup,
+		Name:  nameProj,
+		rawProject: rawProject{
+			PagesAccessLevel:           "public",
+			PackageRegistryAccessLevel: "public",
+		},
 	})
 	if doc.Spec.Features == nil {
 		t.Fatal("spec.features = nil, want populated")
@@ -263,6 +271,61 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Each commit/description template must round-trip to its own spec key: one
+// template per case, so a swapped mapping between the three cannot pass. The
+// non-selected templates are explicit null — GitLab's wire format for an
+// unset template — which must be omitted rather than exported as empty.
+func TestFetchRepositoryMapsMergeTemplates(t *testing.T) {
+	templates := []string{"merge_commit_template", "squash_commit_template", "merge_requests_template"}
+	for _, field := range templates {
+		t.Run(field, func(t *testing.T) {
+			attrs := make([]string, 0, 1+len(templates))
+			attrs = append(attrs, `"visibility":"private"`)
+			for _, key := range templates {
+				value := "null"
+				if key == field {
+					value = `"%{title}"`
+				}
+				attrs = append(attrs, fmt.Sprintf("%q:%s", key, value))
+			}
+			out := exportYAML(t, "{"+strings.Join(attrs, ",")+"}")
+
+			var doc struct {
+				Spec map[string]any `yaml:"spec"`
+			}
+			if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
+				t.Fatalf("unmarshal: %v\n%s", err, out)
+			}
+			if got := doc.Spec[field]; got != "%{title}" {
+				t.Errorf("spec.%s = %v, want %q\n%s", field, got, "%{title}", out)
+			}
+			for _, other := range templates {
+				if _, ok := doc.Spec[other]; other != field && ok {
+					t.Errorf("spec.%s present, want only %s set\n%s", other, field, out)
+				}
+			}
+		})
+	}
+}
+
+// Templates hold multiline text, which must survive the YAML round trip
+// byte for byte.
+func TestFetchRepositoryPreservesMultilineTemplate(t *testing.T) {
+	out := exportYAML(t, `{"visibility":"private","merge_commit_template":"%{title}\n\n%{description}"}`)
+
+	var doc struct {
+		Spec struct {
+			MergeCommitTemplate string `yaml:"merge_commit_template"`
+		} `yaml:"spec"`
+	}
+	if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, out)
+	}
+	if want := "%{title}\n\n%{description}"; doc.Spec.MergeCommitTemplate != want {
+		t.Errorf("spec.merge_commit_template = %q, want %q\n%s", doc.Spec.MergeCommitTemplate, want, out)
 	}
 }
 

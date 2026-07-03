@@ -23,6 +23,9 @@ func fullRepository() *Repository {
 			EnforceAuthChecksOnUploads: new(true),
 			Archived:                   new(true),
 			Topics:                     []string{"go"},
+			MergeCommitTemplate:        new("%{title}"),
+			SquashCommitTemplate:       new("%{title}"),
+			MergeRequestsTemplate:      new("%{title}"),
 			Features: &RepositoryFeatures{
 				Issues:                new(levelEnabled),
 				Repository:            new(levelEnabled),
@@ -54,7 +57,9 @@ func fullRepository() *Repository {
 func settingsUIKeyOrder() []string {
 	return []string{
 		"description", "visibility", "request_access_enabled",
-		"enforce_auth_checks_on_uploads", "archived", "topics", "features",
+		"enforce_auth_checks_on_uploads", "archived", "topics",
+		"merge_commit_template", "squash_commit_template", "merge_requests_template",
+		"features",
 		"issues", "repository", "merge_requests", "forking", "ci",
 		"container_registry", "analytics", "requirements", "security_and_compliance",
 		"wiki", "snippets", "package_registry", "model_experiments", "model_registry",
