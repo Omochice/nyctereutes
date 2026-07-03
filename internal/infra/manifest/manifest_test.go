@@ -3,8 +3,6 @@ package manifest
 import (
 	"strings"
 	"testing"
-
-	goyaml "github.com/goccy/go-yaml"
 )
 
 const levelEnabled = "enabled"
@@ -72,7 +70,7 @@ func settingsUIKeyOrder() []string {
 // the schema structs, so a struct reorder would silently change the output
 // without this pin.
 func TestRepositoryMarshalsKeysInSettingsUIOrder(t *testing.T) {
-	out, err := goyaml.Marshal(fullRepository())
+	out, err := Marshal(fullRepository())
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}

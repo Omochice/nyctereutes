@@ -187,7 +187,7 @@ func exportYAML(t *testing.T, projectJSON string) string {
 		t.Fatalf("FetchRepository: %v", err)
 	}
 
-	out, err := goyaml.Marshal(ToManifest(state))
+	out, err := manifest.Marshal(ToManifest(state))
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}

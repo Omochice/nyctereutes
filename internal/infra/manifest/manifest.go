@@ -2,6 +2,22 @@
 // commands read and emit.
 package manifest
 
+import (
+	"fmt"
+
+	goyaml "github.com/goccy/go-yaml"
+)
+
+// Encodes a manifest document to YAML. Every emitter goes through this
+// function so the document encoding style has a single owner.
+func Marshal(doc *Repository) ([]byte, error) {
+	out, err := goyaml.Marshal(doc)
+	if err != nil {
+		return nil, fmt.Errorf("marshal manifest: %w", err)
+	}
+	return out, nil
+}
+
 const (
 	// The schema version stamped on every manifest document. It is
 	// nyctereutes-specific, not gh-infra's: the platform is GitLab and the fields

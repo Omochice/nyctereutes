@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	goyaml "github.com/goccy/go-yaml"
-
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 	"github.com/Omochice/nyctereutes/internal/infra/repository"
 )
 
@@ -69,7 +68,7 @@ func (c *infraImportCommand) Execute(args []string) error {
 			fail("project %s not found on GitLab\n", target)
 			continue
 		}
-		data, err := goyaml.Marshal(repository.ToManifest(state))
+		data, err := manifest.Marshal(repository.ToManifest(state))
 		if err != nil {
 			fail("marshal %s: %v\n", target, err)
 			continue
