@@ -92,14 +92,16 @@ func TestFetchRepositoryNotFoundIsNew(t *testing.T) {
 
 func TestToManifest(t *testing.T) {
 	state := &CurrentState{
-		Owner:             ownerGroup,
-		Name:              nameProj,
-		Description:       sampleDescription,
-		Archived:          new(true),
-		Visibility:        visibilityPrivate,
-		Topics:            []string{"go"},
-		IssuesAccessLevel: levelEnabled,
-		WikiAccessLevel:   levelDisabled,
+		Owner: ownerGroup,
+		Name:  nameProj,
+		rawProject: rawProject{
+			Description:       sampleDescription,
+			Archived:          new(true),
+			Visibility:        visibilityPrivate,
+			Topics:            []string{"go"},
+			IssuesAccessLevel: levelEnabled,
+			WikiAccessLevel:   levelDisabled,
+		},
 	}
 
 	doc := ToManifest(state)
@@ -129,7 +131,11 @@ func TestToManifest(t *testing.T) {
 }
 
 func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
-	doc := ToManifest(&CurrentState{Owner: ownerGroup, Name: nameProj, Visibility: visibilityPrivate})
+	doc := ToManifest(&CurrentState{
+		Owner:      ownerGroup,
+		Name:       nameProj,
+		rawProject: rawProject{Visibility: visibilityPrivate},
+	})
 	if doc.Spec.Features != nil {
 		t.Errorf("spec.features = %v, want nil when no access level was reported", doc.Spec.Features)
 	}
@@ -222,10 +228,12 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 // three-value set the others use.
 func TestToManifestPreservesPublicAccessLevel(t *testing.T) {
 	doc := ToManifest(&CurrentState{
-		Owner:                      ownerGroup,
-		Name:                       nameProj,
-		PagesAccessLevel:           "public",
-		PackageRegistryAccessLevel: "public",
+		Owner: ownerGroup,
+		Name:  nameProj,
+		rawProject: rawProject{
+			PagesAccessLevel:           "public",
+			PackageRegistryAccessLevel: "public",
+		},
 	})
 	if doc.Spec.Features == nil {
 		t.Fatal("spec.features = nil, want populated")
