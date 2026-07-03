@@ -143,12 +143,12 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 		},
 		Spec: manifest.RepositorySpec{
 			Description:                new(string(state.Description)),
-			Visibility:                 new(state.Visibility),
+			Visibility:                 new(manifest.Visibility(state.Visibility)),
 			RequestAccessEnabled:       state.RequestAccessEnabled,
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
 			Archived:                   state.Archived,
 			Topics:                     state.Topics,
-			DefaultBranch:              optional(state.DefaultBranch),
+			DefaultBranch:              optional[string](state.DefaultBranch),
 			MergeCommitTemplate:        (*string)(state.MergeCommitTemplate),
 			SquashCommitTemplate:       (*string)(state.SquashCommitTemplate),
 			MergeRequestsTemplate:      (*string)(state.MergeRequestsTemplate),
@@ -161,26 +161,26 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 // whole block is omitted rather than emitted empty.
 func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	features := manifest.RepositoryFeatures{
-		Issues:                optional(state.IssuesAccessLevel),
-		Repository:            optional(state.RepositoryAccessLevel),
-		MergeRequests:         optional(state.MergeRequestsAccessLevel),
-		Forking:               optional(state.ForkingAccessLevel),
-		CICD:                  optional(state.BuildsAccessLevel),
-		ContainerRegistry:     optional(state.ContainerRegistryAccessLevel),
-		Analytics:             optional(state.AnalyticsAccessLevel),
-		Requirements:          optional(state.RequirementsAccessLevel),
-		SecurityAndCompliance: optional(state.SecurityAndComplianceAccessLevel),
-		Wiki:                  optional(state.WikiAccessLevel),
-		Snippets:              optional(state.SnippetsAccessLevel),
-		PackageRegistry:       optional(state.PackageRegistryAccessLevel),
-		ModelExperiments:      optional(state.ModelExperimentsAccessLevel),
-		ModelRegistry:         optional(state.ModelRegistryAccessLevel),
-		Pages:                 optional(state.PagesAccessLevel),
-		Monitor:               optional(state.MonitorAccessLevel),
-		Environments:          optional(state.EnvironmentsAccessLevel),
-		FeatureFlags:          optional(state.FeatureFlagsAccessLevel),
-		Infrastructure:        optional(state.InfrastructureAccessLevel),
-		Releases:              optional(state.ReleasesAccessLevel),
+		Issues:                optional[manifest.AccessLevel](state.IssuesAccessLevel),
+		Repository:            optional[manifest.AccessLevel](state.RepositoryAccessLevel),
+		MergeRequests:         optional[manifest.AccessLevel](state.MergeRequestsAccessLevel),
+		Forking:               optional[manifest.AccessLevel](state.ForkingAccessLevel),
+		CICD:                  optional[manifest.AccessLevel](state.BuildsAccessLevel),
+		ContainerRegistry:     optional[manifest.AccessLevel](state.ContainerRegistryAccessLevel),
+		Analytics:             optional[manifest.AccessLevel](state.AnalyticsAccessLevel),
+		Requirements:          optional[manifest.AccessLevel](state.RequirementsAccessLevel),
+		SecurityAndCompliance: optional[manifest.AccessLevel](state.SecurityAndComplianceAccessLevel),
+		Wiki:                  optional[manifest.AccessLevel](state.WikiAccessLevel),
+		Snippets:              optional[manifest.AccessLevel](state.SnippetsAccessLevel),
+		PackageRegistry:       optional[manifest.PublicAccessLevel](state.PackageRegistryAccessLevel),
+		ModelExperiments:      optional[manifest.AccessLevel](state.ModelExperimentsAccessLevel),
+		ModelRegistry:         optional[manifest.AccessLevel](state.ModelRegistryAccessLevel),
+		Pages:                 optional[manifest.PublicAccessLevel](state.PagesAccessLevel),
+		Monitor:               optional[manifest.AccessLevel](state.MonitorAccessLevel),
+		Environments:          optional[manifest.AccessLevel](state.EnvironmentsAccessLevel),
+		FeatureFlags:          optional[manifest.AccessLevel](state.FeatureFlagsAccessLevel),
+		Infrastructure:        optional[manifest.AccessLevel](state.InfrastructureAccessLevel),
+		Releases:              optional[manifest.AccessLevel](state.ReleasesAccessLevel),
 	}
 	if features == (manifest.RepositoryFeatures{}) {
 		return nil
@@ -188,10 +188,11 @@ func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	return &features
 }
 
-// nil for a value GitLab did not report, so omitempty drops the field.
-func optional(value reported) *string {
+// nil for a value GitLab did not report, so omitempty drops the field. The
+// type parameter picks the manifest value type the target field carries.
+func optional[Value ~string](value reported) *Value {
 	if value == "" {
 		return nil
 	}
-	return new(string(value))
+	return new(Value(value))
 }

@@ -29,14 +29,14 @@ const sampleProjectJSON = `{"description":"a tool","visibility":"private","topic
 var errGlab404 = errors.New("glab api projects/x: exit status 1\n404 Project Not Found")
 
 // wantPtr fails the test unless got points to want.
-func wantPtr(t *testing.T, name string, got *string, want string) {
+func wantPtr[Value ~string](t *testing.T, name string, got *Value, want string) {
 	t.Helper()
 	if got == nil {
 		t.Errorf("%s = nil, want %q", name, want)
 		return
 	}
-	if *got != want {
-		t.Errorf("%s = %q, want %q", name, *got, want)
+	if string(*got) != want {
+		t.Errorf("%s = %q, want %q", name, string(*got), want)
 	}
 }
 

@@ -84,11 +84,23 @@ type RepositoryMetadata struct {
 	Owner string `yaml:"owner"`
 }
 
+// Who can see a GitLab project: "private", "internal" or "public".
+type Visibility string
+
+// How far a project feature is opened up: "disabled", "private" or "enabled".
+type AccessLevel string
+
+// An access level for the two toggles (pages, package_registry) that
+// additionally accept "public", exposing the feature to everyone even on a
+// private project. A separate type keeps "public" rejectable on the other
+// feature fields.
+type PublicAccessLevel string
+
 // The GitLab project basic settings. Pointer fields distinguish "unset" (omitted
 // from YAML) from a zero value that is an intentional setting.
 type RepositorySpec struct {
-	Description *string `yaml:"description,omitempty"`
-	Visibility  *string `yaml:"visibility,omitempty"`
+	Description *string     `yaml:"description,omitempty"`
+	Visibility  *Visibility `yaml:"visibility,omitempty"`
 	// Placed after visibility to match their spot in the settings UI.
 	RequestAccessEnabled       *bool `yaml:"request_access_enabled,omitempty"`
 	EnforceAuthChecksOnUploads *bool `yaml:"enforce_auth_checks_on_uploads,omitempty"`
@@ -105,31 +117,29 @@ type RepositorySpec struct {
 	Features              *RepositoryFeatures `yaml:"features,omitempty"`
 }
 
-// The per-feature access levels of a GitLab project. Each value is one of
-// "disabled", "private" or "enabled" ("pages" and "package_registry"
-// additionally allow "public"); an unset feature is omitted. Fields follow the
-// settings-UI display order rather than the API's, so the emitted YAML reads
-// like the settings page.
+// The per-feature access levels of a GitLab project; an unset feature is
+// omitted. Fields follow the settings-UI display order rather than the API's,
+// so the emitted YAML reads like the settings page.
 type RepositoryFeatures struct {
-	Issues        *string `yaml:"issues,omitempty"`
-	Repository    *string `yaml:"repository,omitempty"`
-	MergeRequests *string `yaml:"merge_requests,omitempty"`
-	Forking       *string `yaml:"forking,omitempty"`
+	Issues        *AccessLevel `yaml:"issues,omitempty"`
+	Repository    *AccessLevel `yaml:"repository,omitempty"`
+	MergeRequests *AccessLevel `yaml:"merge_requests,omitempty"`
+	Forking       *AccessLevel `yaml:"forking,omitempty"`
 	// GitLab's builds_access_level, exposed under the friendlier "ci" key.
-	CICD                  *string `yaml:"ci,omitempty"`
-	ContainerRegistry     *string `yaml:"container_registry,omitempty"`
-	Analytics             *string `yaml:"analytics,omitempty"`
-	Requirements          *string `yaml:"requirements,omitempty"`
-	SecurityAndCompliance *string `yaml:"security_and_compliance,omitempty"`
-	Wiki                  *string `yaml:"wiki,omitempty"`
-	Snippets              *string `yaml:"snippets,omitempty"`
-	PackageRegistry       *string `yaml:"package_registry,omitempty"`
-	ModelExperiments      *string `yaml:"model_experiments,omitempty"`
-	ModelRegistry         *string `yaml:"model_registry,omitempty"`
-	Pages                 *string `yaml:"pages,omitempty"`
-	Monitor               *string `yaml:"monitor,omitempty"`
-	Environments          *string `yaml:"environments,omitempty"`
-	FeatureFlags          *string `yaml:"feature_flags,omitempty"`
-	Infrastructure        *string `yaml:"infrastructure,omitempty"`
-	Releases              *string `yaml:"releases,omitempty"`
+	CICD                  *AccessLevel       `yaml:"ci,omitempty"`
+	ContainerRegistry     *AccessLevel       `yaml:"container_registry,omitempty"`
+	Analytics             *AccessLevel       `yaml:"analytics,omitempty"`
+	Requirements          *AccessLevel       `yaml:"requirements,omitempty"`
+	SecurityAndCompliance *AccessLevel       `yaml:"security_and_compliance,omitempty"`
+	Wiki                  *AccessLevel       `yaml:"wiki,omitempty"`
+	Snippets              *AccessLevel       `yaml:"snippets,omitempty"`
+	PackageRegistry       *PublicAccessLevel `yaml:"package_registry,omitempty"`
+	ModelExperiments      *AccessLevel       `yaml:"model_experiments,omitempty"`
+	ModelRegistry         *AccessLevel       `yaml:"model_registry,omitempty"`
+	Pages                 *PublicAccessLevel `yaml:"pages,omitempty"`
+	Monitor               *AccessLevel       `yaml:"monitor,omitempty"`
+	Environments          *AccessLevel       `yaml:"environments,omitempty"`
+	FeatureFlags          *AccessLevel       `yaml:"feature_flags,omitempty"`
+	Infrastructure        *AccessLevel       `yaml:"infrastructure,omitempty"`
+	Releases              *AccessLevel       `yaml:"releases,omitempty"`
 }
