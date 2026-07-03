@@ -57,7 +57,7 @@ func fullRepository() *Repository {
 func settingsUIKeyOrder() []string {
 	return []string{
 		"description", "visibility", "request_access_enabled",
-		"enforce_auth_checks_on_uploads", "archived", "topics",
+		"enforce_auth_checks_on_uploads", "archived", "topics", "default_branch",
 		"merge_commit_template", "squash_commit_template", "merge_requests_template",
 		"features",
 		"issues", "repository", "merge_requests", "forking", "ci",

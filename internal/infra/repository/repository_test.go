@@ -361,6 +361,20 @@ func TestFetchRepositoryNormalizesCRLFToLF(t *testing.T) {
 	}
 }
 
+// An empty repository has no default branch, so GitLab reports null and the
+// key must be omitted rather than emitted empty.
+func TestFetchRepositoryMapsDefaultBranch(t *testing.T) {
+	out, spec := exportSpec(t, `{"visibility":"private","default_branch":"trunk"}`)
+	if got := spec["default_branch"]; got != "trunk" {
+		t.Errorf("spec.default_branch = %v, want %q\n%s", got, "trunk", out)
+	}
+
+	out, spec = exportSpec(t, `{"visibility":"private","default_branch":null}`)
+	if got, ok := spec["default_branch"]; ok {
+		t.Errorf("spec.default_branch = %v, want the key omitted for an empty repository\n%s", got, out)
+	}
+}
+
 // A boolean attribute the API did not return must be omitted, not emitted as
 // false. archived is included so all spec booleans share one absence rule.
 func TestFetchRepositoryOmitsBooleansWhenAbsent(t *testing.T) {
