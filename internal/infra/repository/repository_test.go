@@ -65,10 +65,10 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 		{"description", string(state.Description), sampleDescription},
 		{"visibility", state.Visibility, visibilityPrivate},
 		{"topics", strings.Join(state.Topics, ","), "go,cli"},
-		{"issues", state.IssuesAccessLevel, levelEnabled},
-		{"wiki", state.WikiAccessLevel, levelDisabled},
-		{"builds", state.BuildsAccessLevel, levelEnabled},
-		{"container_registry", state.ContainerRegistryAccessLevel, visibilityPrivate},
+		{"issues", string(state.IssuesAccessLevel), levelEnabled},
+		{"wiki", string(state.WikiAccessLevel), levelDisabled},
+		{"builds", string(state.BuildsAccessLevel), levelEnabled},
+		{"container_registry", string(state.ContainerRegistryAccessLevel), visibilityPrivate},
 	} {
 		if check.got != check.want {
 			t.Errorf("%s = %q, want %q", check.name, check.got, check.want)
@@ -358,6 +358,20 @@ func TestFetchRepositoryNormalizesCRLFToLF(t *testing.T) {
 				t.Errorf("spec.%s = %q, want %q\n%s", field, got, "a\nb\nc", out)
 			}
 		})
+	}
+}
+
+// An empty repository has no default branch, so GitLab reports null and the
+// key must be omitted rather than emitted empty.
+func TestFetchRepositoryMapsDefaultBranch(t *testing.T) {
+	out, spec := exportSpec(t, `{"visibility":"private","default_branch":"trunk"}`)
+	if got := spec["default_branch"]; got != "trunk" {
+		t.Errorf("spec.default_branch = %v, want %q\n%s", got, "trunk", out)
+	}
+
+	out, spec = exportSpec(t, `{"visibility":"private","default_branch":null}`)
+	if got, ok := spec["default_branch"]; ok {
+		t.Errorf("spec.default_branch = %v, want the key omitted for an empty repository\n%s", got, out)
 	}
 }
 

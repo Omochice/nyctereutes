@@ -70,11 +70,19 @@ func (text *freeText) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Text where the empty string never occurs as a real value, so "" doubles as
+// "not reported by GitLab". The distinct type makes ToManifest's conversion
+// choice a compile-time concern: such fields only fit optional, which drops
+// the key, while new(state.X) would produce an incompatible pointer.
+type reported string
+
 // The subset of the `glab api projects/:id` JSON response the import reads.
 type rawProject struct {
 	Description freeText `json:"description"`
 	Visibility  string   `json:"visibility"`
 	Topics      []string `json:"topics"`
+	// Empty when the repository has no commits yet: GitLab reports null.
+	DefaultBranch reported `json:"default_branch"`
 	// Pointer booleans and templates keep "not reported" (JSON absence or
 	// null) apart from an intentional false or empty string.
 	Archived                   *bool     `json:"archived"`
@@ -83,28 +91,27 @@ type rawProject struct {
 	MergeCommitTemplate        *freeText `json:"merge_commit_template"`
 	SquashCommitTemplate       *freeText `json:"squash_commit_template"`
 	MergeRequestsTemplate      *freeText `json:"merge_requests_template"`
-	// Per-feature access levels, in GitLab settings-UI display order; empty
-	// when GitLab did not report the field.
-	IssuesAccessLevel                string `json:"issues_access_level"`
-	RepositoryAccessLevel            string `json:"repository_access_level"`
-	MergeRequestsAccessLevel         string `json:"merge_requests_access_level"`
-	ForkingAccessLevel               string `json:"forking_access_level"`
-	BuildsAccessLevel                string `json:"builds_access_level"`
-	ContainerRegistryAccessLevel     string `json:"container_registry_access_level"`
-	AnalyticsAccessLevel             string `json:"analytics_access_level"`
-	RequirementsAccessLevel          string `json:"requirements_access_level"`
-	SecurityAndComplianceAccessLevel string `json:"security_and_compliance_access_level"`
-	WikiAccessLevel                  string `json:"wiki_access_level"`
-	SnippetsAccessLevel              string `json:"snippets_access_level"`
-	PackageRegistryAccessLevel       string `json:"package_registry_access_level"`
-	ModelExperimentsAccessLevel      string `json:"model_experiments_access_level"`
-	ModelRegistryAccessLevel         string `json:"model_registry_access_level"`
-	PagesAccessLevel                 string `json:"pages_access_level"`
-	MonitorAccessLevel               string `json:"monitor_access_level"`
-	EnvironmentsAccessLevel          string `json:"environments_access_level"`
-	FeatureFlagsAccessLevel          string `json:"feature_flags_access_level"`
-	InfrastructureAccessLevel        string `json:"infrastructure_access_level"`
-	ReleasesAccessLevel              string `json:"releases_access_level"`
+	// Per-feature access levels, in GitLab settings-UI display order.
+	IssuesAccessLevel                reported `json:"issues_access_level"`
+	RepositoryAccessLevel            reported `json:"repository_access_level"`
+	MergeRequestsAccessLevel         reported `json:"merge_requests_access_level"`
+	ForkingAccessLevel               reported `json:"forking_access_level"`
+	BuildsAccessLevel                reported `json:"builds_access_level"`
+	ContainerRegistryAccessLevel     reported `json:"container_registry_access_level"`
+	AnalyticsAccessLevel             reported `json:"analytics_access_level"`
+	RequirementsAccessLevel          reported `json:"requirements_access_level"`
+	SecurityAndComplianceAccessLevel reported `json:"security_and_compliance_access_level"`
+	WikiAccessLevel                  reported `json:"wiki_access_level"`
+	SnippetsAccessLevel              reported `json:"snippets_access_level"`
+	PackageRegistryAccessLevel       reported `json:"package_registry_access_level"`
+	ModelExperimentsAccessLevel      reported `json:"model_experiments_access_level"`
+	ModelRegistryAccessLevel         reported `json:"model_registry_access_level"`
+	PagesAccessLevel                 reported `json:"pages_access_level"`
+	MonitorAccessLevel               reported `json:"monitor_access_level"`
+	EnvironmentsAccessLevel          reported `json:"environments_access_level"`
+	FeatureFlagsAccessLevel          reported `json:"feature_flags_access_level"`
+	InfrastructureAccessLevel        reported `json:"infrastructure_access_level"`
+	ReleasesAccessLevel              reported `json:"releases_access_level"`
 }
 
 // Unmarshals a `glab api projects/:id` response into a CurrentState. Owner and
@@ -141,6 +148,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
 			Archived:                   state.Archived,
 			Topics:                     state.Topics,
+			DefaultBranch:              optional(state.DefaultBranch),
 			MergeCommitTemplate:        (*string)(state.MergeCommitTemplate),
 			SquashCommitTemplate:       (*string)(state.SquashCommitTemplate),
 			MergeRequestsTemplate:      (*string)(state.MergeRequestsTemplate),
@@ -153,26 +161,26 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 // whole block is omitted rather than emitted empty.
 func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	features := manifest.RepositoryFeatures{
-		Issues:                accessLevel(state.IssuesAccessLevel),
-		Repository:            accessLevel(state.RepositoryAccessLevel),
-		MergeRequests:         accessLevel(state.MergeRequestsAccessLevel),
-		Forking:               accessLevel(state.ForkingAccessLevel),
-		CICD:                  accessLevel(state.BuildsAccessLevel),
-		ContainerRegistry:     accessLevel(state.ContainerRegistryAccessLevel),
-		Analytics:             accessLevel(state.AnalyticsAccessLevel),
-		Requirements:          accessLevel(state.RequirementsAccessLevel),
-		SecurityAndCompliance: accessLevel(state.SecurityAndComplianceAccessLevel),
-		Wiki:                  accessLevel(state.WikiAccessLevel),
-		Snippets:              accessLevel(state.SnippetsAccessLevel),
-		PackageRegistry:       accessLevel(state.PackageRegistryAccessLevel),
-		ModelExperiments:      accessLevel(state.ModelExperimentsAccessLevel),
-		ModelRegistry:         accessLevel(state.ModelRegistryAccessLevel),
-		Pages:                 accessLevel(state.PagesAccessLevel),
-		Monitor:               accessLevel(state.MonitorAccessLevel),
-		Environments:          accessLevel(state.EnvironmentsAccessLevel),
-		FeatureFlags:          accessLevel(state.FeatureFlagsAccessLevel),
-		Infrastructure:        accessLevel(state.InfrastructureAccessLevel),
-		Releases:              accessLevel(state.ReleasesAccessLevel),
+		Issues:                optional(state.IssuesAccessLevel),
+		Repository:            optional(state.RepositoryAccessLevel),
+		MergeRequests:         optional(state.MergeRequestsAccessLevel),
+		Forking:               optional(state.ForkingAccessLevel),
+		CICD:                  optional(state.BuildsAccessLevel),
+		ContainerRegistry:     optional(state.ContainerRegistryAccessLevel),
+		Analytics:             optional(state.AnalyticsAccessLevel),
+		Requirements:          optional(state.RequirementsAccessLevel),
+		SecurityAndCompliance: optional(state.SecurityAndComplianceAccessLevel),
+		Wiki:                  optional(state.WikiAccessLevel),
+		Snippets:              optional(state.SnippetsAccessLevel),
+		PackageRegistry:       optional(state.PackageRegistryAccessLevel),
+		ModelExperiments:      optional(state.ModelExperimentsAccessLevel),
+		ModelRegistry:         optional(state.ModelRegistryAccessLevel),
+		Pages:                 optional(state.PagesAccessLevel),
+		Monitor:               optional(state.MonitorAccessLevel),
+		Environments:          optional(state.EnvironmentsAccessLevel),
+		FeatureFlags:          optional(state.FeatureFlagsAccessLevel),
+		Infrastructure:        optional(state.InfrastructureAccessLevel),
+		Releases:              optional(state.ReleasesAccessLevel),
 	}
 	if features == (manifest.RepositoryFeatures{}) {
 		return nil
@@ -180,10 +188,10 @@ func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 	return &features
 }
 
-// nil for an unreported level, so omitempty drops the field.
-func accessLevel(level string) *string {
-	if level == "" {
+// nil for a value GitLab did not report, so omitempty drops the field.
+func optional(value reported) *string {
+	if value == "" {
 		return nil
 	}
-	return new(level)
+	return new(string(value))
 }
