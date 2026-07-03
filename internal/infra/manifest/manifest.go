@@ -25,6 +25,15 @@ var errNotRoundTrippable = errors.New("manifest does not survive a yaml round tr
 // back as empty. The attempts run from prettiest to safest; JSON escaping
 // represents every string.
 func Marshal(doc *Repository) ([]byte, error) {
+	// topics carries no omitempty, so nil and empty emit identically as [] and
+	// the document cannot express the difference; canonicalizing nil up front
+	// keeps the round-trip comparison free of field-specific carve-outs.
+	if doc.Spec.Topics == nil {
+		canonical := *doc
+		canonical.Spec.Topics = []string{}
+		doc = &canonical
+	}
+
 	attempts := [][]goyaml.EncodeOption{
 		{goyaml.UseLiteralStyleIfMultiline(true)},
 		{},
@@ -42,15 +51,11 @@ func Marshal(doc *Repository) ([]byte, error) {
 	return nil, errNotRoundTrippable
 }
 
-// Reports whether out decodes back into a document equal to doc. An empty
-// topics list decodes as non-nil, so a nil and an empty list compare equal.
+// Reports whether out decodes back into a document equal to doc.
 func roundTrips(out []byte, doc *Repository) bool {
 	var back Repository
 	if err := goyaml.Unmarshal(out, &back); err != nil {
 		return false
-	}
-	if len(back.Spec.Topics) == 0 && len(doc.Spec.Topics) == 0 {
-		back.Spec.Topics = doc.Spec.Topics
 	}
 	return reflect.DeepEqual(&back, doc)
 }
