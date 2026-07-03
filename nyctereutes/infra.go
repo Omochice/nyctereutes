@@ -139,7 +139,7 @@ func (c *infraValidateCommand) Execute(args []string) error {
 	}
 
 	if failures > 0 {
-		return fmt.Errorf("%w: %d problems", errInvalidManifests, failures)
+		return fmt.Errorf("%w: %d problem(s)", errInvalidManifests, failures)
 	}
 	_, _ = fmt.Fprintf(c.inout.Stdout, "Valid: %d repositories\n", len(repos))
 	for _, repo := range repos {
