@@ -62,7 +62,7 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 	}
 
 	for _, check := range []struct{ name, got, want string }{
-		{"description", state.Description, sampleDescription},
+		{"description", string(state.Description), sampleDescription},
 		{"visibility", state.Visibility, visibilityPrivate},
 		{"topics", strings.Join(state.Topics, ","), "go,cli"},
 		{"issues", state.IssuesAccessLevel, levelEnabled},

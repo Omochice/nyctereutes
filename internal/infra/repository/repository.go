@@ -53,19 +53,36 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 	return state, nil
 }
 
+// Free text that GitLab stores verbatim (length-validated only). The web UI
+// saves CRLF and a YAML literal block cannot carry a bare CR, so line endings
+// are normalized to LF while decoding; a field gets this by declaring the
+// type.
+type freeText string
+
+// Normalizes line endings to LF while decoding.
+func (text *freeText) UnmarshalJSON(data []byte) error {
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return fmt.Errorf("unmarshal free text: %w", err)
+	}
+	value = strings.ReplaceAll(value, "\r\n", "\n")
+	*text = freeText(strings.ReplaceAll(value, "\r", "\n"))
+	return nil
+}
+
 // The subset of the `glab api projects/:id` JSON response the import reads.
 type rawProject struct {
-	Description string   `json:"description"`
+	Description freeText `json:"description"`
 	Visibility  string   `json:"visibility"`
 	Topics      []string `json:"topics"`
 	// Pointer booleans and templates keep "not reported" (JSON absence or
 	// null) apart from an intentional false or empty string.
-	Archived                   *bool   `json:"archived"`
-	RequestAccessEnabled       *bool   `json:"request_access_enabled"`
-	EnforceAuthChecksOnUploads *bool   `json:"enforce_auth_checks_on_uploads"`
-	MergeCommitTemplate        *string `json:"merge_commit_template"`
-	SquashCommitTemplate       *string `json:"squash_commit_template"`
-	MergeRequestsTemplate      *string `json:"merge_requests_template"`
+	Archived                   *bool     `json:"archived"`
+	RequestAccessEnabled       *bool     `json:"request_access_enabled"`
+	EnforceAuthChecksOnUploads *bool     `json:"enforce_auth_checks_on_uploads"`
+	MergeCommitTemplate        *freeText `json:"merge_commit_template"`
+	SquashCommitTemplate       *freeText `json:"squash_commit_template"`
+	MergeRequestsTemplate      *freeText `json:"merge_requests_template"`
 	// Per-feature access levels, in GitLab settings-UI display order; empty
 	// when GitLab did not report the field.
 	IssuesAccessLevel                string `json:"issues_access_level"`
@@ -98,25 +115,7 @@ func parseProject(out []byte) (*CurrentState, error) {
 		return nil, fmt.Errorf("unmarshal project json: %w", err)
 	}
 
-	raw.normalizeNewlines()
 	return &CurrentState{rawProject: raw}, nil
-}
-
-// The web UI stores CRLF in free-text fields, and goyaml would carry the CR
-// into the emitted document as mixed line endings, so line breaks are
-// normalized to LF at the wire boundary. A bare CR also counts as a line
-// break for goyaml's literal-style detection, hence the second pass.
-func (raw *rawProject) normalizeNewlines() {
-	raw.Description = toLF(raw.Description)
-	for _, template := range []*string{raw.MergeCommitTemplate, raw.SquashCommitTemplate, raw.MergeRequestsTemplate} {
-		if template != nil {
-			*template = toLF(*template)
-		}
-	}
-}
-
-func toLF(text string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
 }
 
 // Reports whether err is a GitLab 404. It matches the status in the glab error
@@ -136,15 +135,15 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Owner: state.Owner,
 		},
 		Spec: manifest.RepositorySpec{
-			Description:                new(state.Description),
+			Description:                new(string(state.Description)),
 			Visibility:                 new(state.Visibility),
 			RequestAccessEnabled:       state.RequestAccessEnabled,
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
 			Archived:                   state.Archived,
 			Topics:                     state.Topics,
-			MergeCommitTemplate:        state.MergeCommitTemplate,
-			SquashCommitTemplate:       state.SquashCommitTemplate,
-			MergeRequestsTemplate:      state.MergeRequestsTemplate,
+			MergeCommitTemplate:        (*string)(state.MergeCommitTemplate),
+			SquashCommitTemplate:       (*string)(state.SquashCommitTemplate),
+			MergeRequestsTemplate:      (*string)(state.MergeRequestsTemplate),
 			Features:                   toFeatures(state),
 		},
 	}
