@@ -66,6 +66,22 @@ func settingsUIKeyOrder() []string {
 	}
 }
 
+// A multiline value must be emitted as a literal block (|-), not as a quoted
+// string with escape sequences, so templates in the manifest read the way
+// they are written in the settings UI.
+func TestMarshalEmitsMultilineValuesAsLiteralBlocks(t *testing.T) {
+	doc := fullRepository()
+	doc.Spec.MergeCommitTemplate = new("%{title}\n\n%{description}")
+
+	out, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(out), "merge_commit_template: |-\n") {
+		t.Errorf("multiline template not emitted as a literal block\n%s", out)
+	}
+}
+
 // The emitted key order is carried solely by the field declaration order of
 // the schema structs, so a struct reorder would silently change the output
 // without this pin.
