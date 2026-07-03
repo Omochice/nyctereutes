@@ -2,6 +2,64 @@
 // commands read and emit.
 package manifest
 
+import (
+	"errors"
+	"fmt"
+	"reflect"
+
+	goyaml "github.com/goccy/go-yaml"
+)
+
+// Signals that no supported YAML encoding decodes back to the document.
+var errNotRoundTrippable = errors.New("manifest does not survive a yaml round trip")
+
+// Encodes a manifest document to YAML. Every emitter goes through this
+// function so the document encoding style has a single owner. Multiline
+// values become literal blocks, which requires the LF-normalized values the
+// import produces: a literal block cannot carry a bare CR.
+//
+// Each encoding is verified by decoding it back, because goyaml can emit
+// unparseable or lossy documents for representable values: literal blocks
+// carry no indentation indicator, so a multiline value whose first line
+// starts with whitespace does not parse, and a newline-only value decodes
+// back as empty. The attempts run from prettiest to safest; JSON escaping
+// represents every string.
+func Marshal(doc *Repository) ([]byte, error) {
+	// topics carries no omitempty, so nil and empty emit identically as [] and
+	// the document cannot express the difference; canonicalizing nil up front
+	// keeps the round-trip comparison free of field-specific carve-outs.
+	if doc.Spec.Topics == nil {
+		canonical := *doc
+		canonical.Spec.Topics = []string{}
+		doc = &canonical
+	}
+
+	attempts := [][]goyaml.EncodeOption{
+		{goyaml.UseLiteralStyleIfMultiline(true)},
+		{},
+		{goyaml.JSON()},
+	}
+	for _, opts := range attempts {
+		out, err := goyaml.MarshalWithOptions(doc, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("marshal manifest: %w", err)
+		}
+		if roundTrips(out, doc) {
+			return out, nil
+		}
+	}
+	return nil, errNotRoundTrippable
+}
+
+// Reports whether out decodes back into a document equal to doc.
+func roundTrips(out []byte, doc *Repository) bool {
+	var back Repository
+	if err := goyaml.Unmarshal(out, &back); err != nil {
+		return false
+	}
+	return reflect.DeepEqual(&back, doc)
+}
+
 const (
 	// The schema version stamped on every manifest document. It is
 	// nyctereutes-specific, not gh-infra's: the platform is GitLab and the fields

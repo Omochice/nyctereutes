@@ -68,11 +68,59 @@ func settingsUIKeyOrder() []string {
 	}
 }
 
+// goyaml's literal emitter writes no indentation indicator, so a multiline
+// value whose first line starts with whitespace produces unparseable YAML,
+// and a newline-only value decodes back as empty. GitLab stores templates
+// verbatim (length-validated only), so such values do reach Marshal, which
+// must emit a decodable document that reproduces them.
+func TestMarshalSurvivesValuesLiteralStyleCannotRepresent(t *testing.T) {
+	cases := []struct{ name, value string }{
+		{"leading_space_first_line", "  a\nb"},
+		{"leading_tab_first_line", "\ta\nb"},
+		{"blank_first_line", " \nb"},
+		{"newline_only", "\n"},
+	}
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			doc := fullRepository()
+			doc.Spec.MergeCommitTemplate = new(attr.value)
+
+			out, err := Marshal(doc)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			var back Repository
+			if err := goyaml.Unmarshal(out, &back); err != nil {
+				t.Fatalf("emitted yaml does not parse: %v\n%s", err, out)
+			}
+			if got := back.Spec.MergeCommitTemplate; got == nil || *got != attr.value {
+				t.Errorf("template did not survive the round trip: got %v, want %q\n%s", got, attr.value, out)
+			}
+		})
+	}
+}
+
+// A multiline value must be emitted as a literal block (|-), not as a quoted
+// string with escape sequences, so templates in the manifest read the way
+// they are written in the settings UI.
+func TestMarshalEmitsMultilineValuesAsLiteralBlocks(t *testing.T) {
+	doc := fullRepository()
+	doc.Spec.MergeCommitTemplate = new("%{title}\n\n%{description}")
+
+	out, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(out), "merge_commit_template: |-\n") {
+		t.Errorf("multiline template not emitted as a literal block\n%s", out)
+	}
+}
+
 // The emitted key order is carried solely by the field declaration order of
 // the schema structs, so a struct reorder would silently change the output
 // without this pin.
 func TestRepositoryMarshalsKeysInSettingsUIOrder(t *testing.T) {
-	out, err := goyaml.Marshal(fullRepository())
+	out, err := Marshal(fullRepository())
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
