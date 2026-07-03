@@ -6,12 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
+	"strings"
 
 	goyaml "github.com/goccy/go-yaml"
 )
 
 // Signals that no supported YAML encoding decodes back to the document.
 var errNotRoundTrippable = errors.New("manifest does not survive a yaml round trip")
+
+// Signals a manifest enum value outside its allowed set.
+var errInvalidValue = errors.New("invalid value")
 
 // Encodes a manifest document to YAML. Every emitter goes through this
 // function so the document encoding style has a single owner. Multiline
@@ -84,17 +89,71 @@ type RepositoryMetadata struct {
 	Owner string `yaml:"owner"`
 }
 
+const (
+	valueDisabled = "disabled"
+	valueEnabled  = "enabled"
+	valueInternal = "internal"
+	valuePrivate  = "private"
+	valuePublic   = "public"
+)
+
 // Who can see a GitLab project: "private", "internal" or "public".
 type Visibility string
 
+// Rejects values outside the visibility set at decode time.
+func (visibility *Visibility) UnmarshalYAML(data []byte) error {
+	value, err := enumValue(data, "visibility", valuePrivate, valueInternal, valuePublic)
+	if err != nil {
+		return err
+	}
+	*visibility = Visibility(value)
+	return nil
+}
+
 // How far a project feature is opened up: "disabled", "private" or "enabled".
 type AccessLevel string
+
+// Rejects values outside the access-level set at decode time; notably
+// "public", which only the public-capable toggles accept.
+func (level *AccessLevel) UnmarshalYAML(data []byte) error {
+	value, err := enumValue(data, "access level", valueDisabled, valuePrivate, valueEnabled)
+	if err != nil {
+		return err
+	}
+	*level = AccessLevel(value)
+	return nil
+}
 
 // An access level for the two toggles (pages, package_registry) that
 // additionally accept "public", exposing the feature to everyone even on a
 // private project. A separate type keeps "public" rejectable on the other
 // feature fields.
 type PublicAccessLevel string
+
+// Rejects values outside the public-capable access-level set at decode time.
+func (level *PublicAccessLevel) UnmarshalYAML(data []byte) error {
+	value, err := enumValue(data, "access level", valueDisabled, valuePrivate, valueEnabled, valuePublic)
+	if err != nil {
+		return err
+	}
+	*level = PublicAccessLevel(value)
+	return nil
+}
+
+// Decodes a scalar enum value, rejecting anything outside allowed with an
+// error that lists the allowed values, so a typo in a hand-edited manifest
+// is self-explanatory.
+func enumValue(data []byte, kind string, allowed ...string) (string, error) {
+	var value string
+	if err := goyaml.Unmarshal(data, &value); err != nil {
+		return "", fmt.Errorf("decode %s: %w", kind, err)
+	}
+	if !slices.Contains(allowed, value) {
+		return "", fmt.Errorf("%w: %s %q must be one of: %s",
+			errInvalidValue, kind, value, strings.Join(allowed, ", "))
+	}
+	return value, nil
+}
 
 // The GitLab project basic settings. Pointer fields distinguish "unset" (omitted
 // from YAML) from a zero value that is an intentional setting.
