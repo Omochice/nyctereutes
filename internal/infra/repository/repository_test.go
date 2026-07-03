@@ -330,14 +330,19 @@ func TestFetchRepositoryPreservesMultilineTemplate(t *testing.T) {
 }
 
 // Free-text fields edited in the GitLab web UI are stored with CRLF line
-// endings; the manifest is an LF document, so CRLF must arrive as LF. One
-// field per case so a field skipped by the normalization cannot pass.
+// endings, and goyaml writes such values out with CR in the YAML byte stream
+// itself, so the emitted document gets mixed line endings. The raw output is
+// asserted because reparsing normalizes line breaks and would hide the CR.
+// One field per case so a field skipped by the normalization cannot pass.
 func TestFetchRepositoryNormalizesCRLFToLF(t *testing.T) {
 	fields := []string{"description", "merge_commit_template", "squash_commit_template", "merge_requests_template"}
 	for _, field := range fields {
 		t.Run(field, func(t *testing.T) {
 			out := exportYAML(t, fmt.Sprintf(`{"visibility":"private","%s":"a\r\nb"}`, field))
 
+			if strings.Contains(out, "\r") || strings.Contains(out, `\r`) {
+				t.Errorf("yaml carries CR for %s\n%q", field, out)
+			}
 			var doc struct {
 				Spec map[string]any `yaml:"spec"`
 			}
