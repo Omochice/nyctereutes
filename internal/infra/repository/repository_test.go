@@ -331,14 +331,16 @@ func TestFetchRepositoryPreservesMultilineTemplate(t *testing.T) {
 
 // Free-text fields edited in the GitLab web UI are stored with CRLF line
 // endings, and goyaml writes such values out with CR in the YAML byte stream
-// itself, so the emitted document gets mixed line endings. The raw output is
-// asserted because reparsing normalizes line breaks and would hide the CR.
-// One field per case so a field skipped by the normalization cannot pass.
+// itself, so the emitted document gets mixed line endings. A bare CR counts
+// too: goyaml treats it as multiline content and would emit it into a literal
+// block. The raw output is asserted because reparsing normalizes line breaks
+// and would hide the CR. One field per case so a field skipped by the
+// normalization cannot pass.
 func TestFetchRepositoryNormalizesCRLFToLF(t *testing.T) {
 	fields := []string{"description", "merge_commit_template", "squash_commit_template", "merge_requests_template"}
 	for _, field := range fields {
 		t.Run(field, func(t *testing.T) {
-			out := exportYAML(t, fmt.Sprintf(`{"visibility":"private","%s":"a\r\nb"}`, field))
+			out := exportYAML(t, fmt.Sprintf(`{"visibility":"private","%s":"a\r\nb\rc"}`, field))
 
 			if strings.Contains(out, "\r") || strings.Contains(out, `\r`) {
 				t.Errorf("yaml carries CR for %s\n%q", field, out)
@@ -349,8 +351,8 @@ func TestFetchRepositoryNormalizesCRLFToLF(t *testing.T) {
 			if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
 				t.Fatalf("unmarshal: %v\n%s", err, out)
 			}
-			if got := doc.Spec[field]; got != "a\nb" {
-				t.Errorf("spec.%s = %q, want %q\n%s", field, got, "a\nb", out)
+			if got := doc.Spec[field]; got != "a\nb\nc" {
+				t.Errorf("spec.%s = %q, want %q\n%s", field, got, "a\nb\nc", out)
 			}
 		})
 	}
