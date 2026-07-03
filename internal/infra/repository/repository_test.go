@@ -282,7 +282,8 @@ func TestFetchRepositoryMapsMergeTemplates(t *testing.T) {
 	templates := []string{"merge_commit_template", "squash_commit_template", "merge_requests_template"}
 	for _, field := range templates {
 		t.Run(field, func(t *testing.T) {
-			attrs := []string{`"visibility":"private"`}
+			attrs := make([]string, 0, 1+len(templates))
+			attrs = append(attrs, `"visibility":"private"`)
 			for _, key := range templates {
 				value := "null"
 				if key == field {
