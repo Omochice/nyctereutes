@@ -266,6 +266,62 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 	}
 }
 
+// Each commit/description template must round-trip to its own spec key: one
+// template per case, so a swapped mapping between the three cannot pass.
+func TestFetchRepositoryMapsMergeTemplates(t *testing.T) {
+	templates := []string{"merge_commit_template", "squash_commit_template", "merge_requests_template"}
+	for _, field := range templates {
+		t.Run(field, func(t *testing.T) {
+			out := exportYAML(t, fmt.Sprintf(`{"visibility":"private","%s":"%%{title}"}`, field))
+
+			var doc struct {
+				Spec map[string]any `yaml:"spec"`
+			}
+			if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
+				t.Fatalf("unmarshal: %v\n%s", err, out)
+			}
+			if got := doc.Spec[field]; got != "%{title}" {
+				t.Errorf("spec.%s = %v, want %q\n%s", field, got, "%{title}", out)
+			}
+			for _, other := range templates {
+				if _, ok := doc.Spec[other]; other != field && ok {
+					t.Errorf("spec.%s present, want only %s set\n%s", other, field, out)
+				}
+			}
+		})
+	}
+}
+
+// Templates hold multiline text, which must survive the YAML round trip
+// byte for byte.
+func TestFetchRepositoryPreservesMultilineTemplate(t *testing.T) {
+	out := exportYAML(t, `{"visibility":"private","merge_commit_template":"%{title}\n\n%{description}"}`)
+
+	var doc struct {
+		Spec struct {
+			MergeCommitTemplate string `yaml:"merge_commit_template"`
+		} `yaml:"spec"`
+	}
+	if err := goyaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, out)
+	}
+	if want := "%{title}\n\n%{description}"; doc.Spec.MergeCommitTemplate != want {
+		t.Errorf("spec.merge_commit_template = %q, want %q\n%s", doc.Spec.MergeCommitTemplate, want, out)
+	}
+}
+
+// GitLab reports null for an unset template, which must be omitted like an
+// absent field rather than emitted as an empty string.
+func TestFetchRepositoryOmitsNullTemplates(t *testing.T) {
+	out := exportYAML(t, `{"visibility":"private","merge_commit_template":null,`+
+		`"squash_commit_template":null,"merge_requests_template":null}`)
+	for _, key := range []string{"merge_commit_template", "squash_commit_template", "merge_requests_template"} {
+		if strings.Contains(out, key) {
+			t.Errorf("yaml contains %q, want it omitted when the template is null\n%s", key, out)
+		}
+	}
+}
+
 // A boolean attribute the API did not return must be omitted, not emitted as
 // false. archived is included so all spec booleans share one absence rule.
 func TestFetchRepositoryOmitsBooleansWhenAbsent(t *testing.T) {
