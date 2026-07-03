@@ -40,7 +40,7 @@ func Parse(data []byte) ([]*Repository, []error) {
 // a literal block is always indented and never matches the separator.
 func splitDocuments(data []byte) [][]byte {
 	var docs [][]byte
-	for _, doc := range bytes.Split(data, []byte("\n---")) {
+	for doc := range bytes.SplitSeq(data, []byte("\n---")) {
 		if len(bytes.TrimSpace(doc)) == 0 {
 			continue
 		}
