@@ -75,6 +75,8 @@ type rawProject struct {
 	Description freeText `json:"description"`
 	Visibility  string   `json:"visibility"`
 	Topics      []string `json:"topics"`
+	// Empty when the repository has no commits yet: GitLab reports null.
+	DefaultBranch string `json:"default_branch"`
 	// Pointer booleans and templates keep "not reported" (JSON absence or
 	// null) apart from an intentional false or empty string.
 	Archived                   *bool     `json:"archived"`
@@ -141,6 +143,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
 			Archived:                   state.Archived,
 			Topics:                     state.Topics,
+			DefaultBranch:              optional(state.DefaultBranch),
 			MergeCommitTemplate:        (*string)(state.MergeCommitTemplate),
 			SquashCommitTemplate:       (*string)(state.SquashCommitTemplate),
 			MergeRequestsTemplate:      (*string)(state.MergeRequestsTemplate),
