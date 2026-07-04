@@ -22,6 +22,7 @@ var (
 	errNoManifestsFound  = errors.New("no .yaml/.yml files in directory")
 	errPlanNeedsPath     = errors.New("plan requires at least one <path>")
 	errPlanDrift         = errors.New("changes detected")
+	errPlanFailed        = errors.New("plan failed")
 )
 
 type infraCommand struct {
@@ -220,6 +221,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
 	changed := 0
+	failures := 0
 	for _, path := range args {
 		files, err := manifestFiles(path)
 		if err != nil {
@@ -234,7 +236,11 @@ func (c *infraPlanCommand) Execute(args []string) error {
 			for _, repo := range repos {
 				state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
 				if err != nil {
-					return err
+					// One project's fetch failure must not hide the drift of
+					// the others, so report it and move on.
+					_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+					failures++
+					continue
 				}
 				changes := repository.Diff(repo, state)
 				if len(changes) == 0 {
@@ -249,8 +255,11 @@ func (c *infraPlanCommand) Execute(args []string) error {
 		}
 	}
 
-	if changed == 0 {
+	if changed == 0 && failures == 0 {
 		_, _ = fmt.Fprintln(c.inout.Stdout, "No changes.")
+	}
+	if failures > 0 {
+		return fmt.Errorf("%w: %d problem(s)", errPlanFailed, failures)
 	}
 	// Drift is reported, not an error, so a human run always succeeds; --ci
 	// turns detected drift into a non-zero exit for pipeline gating.
