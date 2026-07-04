@@ -62,9 +62,10 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	appendChanged(&changes, name, fieldDescription, desired.Spec.Description, string(current.Description))
 	appendChanged(&changes, name, fieldVisibility, desired.Spec.Visibility, manifest.Visibility(current.Visibility))
 	appendChanged(&changes, name, fieldArchived, desired.Spec.Archived, current.Archived != nil && *current.Archived)
-	// Topics are a set, and an absent list means "leave as-is" the way a nil
-	// pointer does for the scalar fields; order carries no meaning.
-	if len(desired.Spec.Topics) > 0 && !sameStringSet(desired.Spec.Topics, current.Topics) {
+	// A nil topics list is omitted and left as-is the way a nil pointer is for
+	// the scalar fields; an explicit empty list clears the topics. Order
+	// carries no meaning.
+	if desired.Spec.Topics != nil && !sameStringSet(desired.Spec.Topics, current.Topics) {
 		changes = append(changes, Change{
 			Type: ChangeUpdate, Name: name, Field: fieldTopics,
 			OldValue: current.Topics, NewValue: desired.Spec.Topics,
