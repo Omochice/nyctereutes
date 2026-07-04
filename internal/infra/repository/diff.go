@@ -33,6 +33,7 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	}
 
 	var changes []Change
+	appendChanged(&changes, name, "description", desired.Spec.Description, string(current.Description))
 	appendChanged(&changes, name, "visibility", desired.Spec.Visibility, manifest.Visibility(current.Visibility))
 	return changes
 }
