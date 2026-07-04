@@ -216,6 +216,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
+	changed := 0
 	for _, path := range args {
 		files, err := manifestFiles(path)
 		if err != nil {
@@ -236,12 +237,17 @@ func (c *infraPlanCommand) Execute(args []string) error {
 				if len(changes) == 0 {
 					continue
 				}
+				changed++
 				_, _ = fmt.Fprintf(c.inout.Stdout, "%s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
 				for _, change := range changes {
 					_, _ = fmt.Fprintf(c.inout.Stdout, "  %s\n", change)
 				}
 			}
 		}
+	}
+
+	if changed == 0 {
+		_, _ = fmt.Fprintln(c.inout.Stdout, "No changes.")
 	}
 	return nil
 }
