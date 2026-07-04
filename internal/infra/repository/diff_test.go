@@ -101,6 +101,31 @@ func TestDiffLeavesUndeclaredFieldsUnchanged(t *testing.T) {
 	}
 }
 
+func TestDiffReportsNoChangeWhenDeclaredMatchesLive(t *testing.T) {
+	desc := "same"
+	vis := manifest.Visibility("private")
+	arch := false
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec: manifest.RepositorySpec{
+			Description: &desc,
+			Visibility:  &vis,
+			Archived:    &arch,
+			Topics:      []string{"go", "cli"},
+		},
+	}
+	current := &CurrentState{rawProject: rawProject{
+		Description: "same",
+		Visibility:  "private",
+		Archived:    &arch,
+		Topics:      []string{"cli", "go"},
+	}}
+
+	if changes := Diff(desired, current); len(changes) != 0 {
+		t.Errorf("changes = %+v, want none when declared matches live", changes)
+	}
+}
+
 func TestDiffComparesTopicsAsSet(t *testing.T) {
 	t.Run("same set in another order is no change", func(t *testing.T) {
 		desired := &manifest.Repository{
