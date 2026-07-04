@@ -125,6 +125,23 @@ func TestInfraValidateReportsMissingPath(t *testing.T) {
 	}
 }
 
+// A directory with nothing to validate must fail, not report success: a
+// mistyped manifests directory would otherwise pass CI having checked
+// nothing.
+func TestInfraValidateRejectsDirectoryWithoutManifests(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, "readme.txt", "not a manifest")
+
+	exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", dir)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 for a directory without manifest files", exit)
+	}
+	if !strings.Contains(stderr, dir) {
+		t.Errorf("stderr missing the empty directory path\n%s", stderr)
+	}
+}
+
 func TestInfraValidateAcceptsEmptyFile(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "empty.yaml", "")
 

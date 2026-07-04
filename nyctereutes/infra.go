@@ -19,6 +19,7 @@ var (
 	errSomeImportsFailed = errors.New("some projects could not be imported")
 	errValidateNeedsPath = errors.New("validate requires at least one <path>")
 	errInvalidManifests  = errors.New("validation failed")
+	errNoManifestsFound  = errors.New("no .yaml/.yml files in directory")
 )
 
 type infraCommand struct {
@@ -188,6 +189,11 @@ func manifestFiles(path string) ([]string, error) {
 			continue
 		}
 		files = append(files, filepath.Join(path, entry.Name()))
+	}
+	// Nothing to validate is a failure, not an empty success: a mistyped
+	// directory would otherwise pass CI having checked nothing.
+	if len(files) == 0 {
+		return nil, fmt.Errorf("%w: %s", errNoManifestsFound, path)
 	}
 	return files, nil
 }
