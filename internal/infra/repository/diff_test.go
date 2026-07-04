@@ -81,3 +81,22 @@ func TestDiffReportsArchivedChange(t *testing.T) {
 		t.Errorf("values = %v → %v, want false → true", changes[0].OldValue, changes[0].NewValue)
 	}
 }
+
+// A manifest that declares no spec fields manages nothing, so a live project
+// that differs in those fields must still yield no drift.
+func TestDiffLeavesUndeclaredFieldsUnchanged(t *testing.T) {
+	desired := &manifest.Repository{Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"}}
+	live := false
+	current := &CurrentState{rawProject: rawProject{
+		Description: "live text",
+		Visibility:  "public",
+		Archived:    &live,
+		Topics:      []string{"go"},
+	}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 0 {
+		t.Errorf("changes = %+v, want none for a silent manifest", changes)
+	}
+}
