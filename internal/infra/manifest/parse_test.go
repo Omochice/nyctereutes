@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -227,6 +228,19 @@ func TestParseSplitsOnSeparatorWithComment(t *testing.T) {
 	}
 	if len(repos) != 2 {
 		t.Errorf("parsed %d documents, want 2", len(repos))
+	}
+}
+
+// A "--- content" marker carries an in-line document that this parser does
+// not accept: the dashes are not a bare separator, so splitStream keeps the
+// line, and goyaml then splits the fragment into two documents.
+func TestParseRejectsInlineDocumentMarker(t *testing.T) {
+	_, errs := Parse([]byte(validDoc + "--- inline\n"))
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want exactly one inline-document error", errs)
+	}
+	if !errors.Is(errs[0], errInlineDocument) {
+		t.Errorf("error %q is not errInlineDocument", errs[0])
 	}
 }
 
