@@ -38,3 +38,30 @@ func TestInfraPlanShowsChanges(t *testing.T) {
 		}
 	}
 }
+
+// A manifest whose declared fields all match the live project drifts in
+// nothing, so the plan says so explicitly instead of printing an empty diff.
+const matchingManifest = `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: proj
+  owner: group
+spec:
+  visibility: private
+  topics: [go]
+  archived: false
+`
+
+func TestInfraPlanReportsNoChanges(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", matchingManifest)
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, stdout, _ := runDep(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	if !strings.Contains(stdout, "No changes.") {
+		t.Errorf("stdout missing 'No changes.'\n%s", stdout)
+	}
+}
