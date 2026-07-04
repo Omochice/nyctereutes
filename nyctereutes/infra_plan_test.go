@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -184,6 +185,26 @@ func TestInfraPlanWalksDirectory(t *testing.T) {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout missing %q\n%s", want, stdout)
 		}
+	}
+}
+
+// A path that does not resolve is reported and skipped so the remaining paths
+// are still planned, matching the validate command's aggregation.
+func TestInfraPlanContinuesPastMissingPath(t *testing.T) {
+	dir := t.TempDir()
+	good := writeManifest(t, dir, "a.yaml", planManifest)
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, stdout, stderr := runDep(runner, "infra", "plan", filepath.Join(dir, "nope.yaml"), good)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a path does not exist", exit)
+	}
+	if !strings.Contains(stderr, "nope.yaml") {
+		t.Errorf("stderr missing the unresolved path\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "group/proj") {
+		t.Errorf("stdout missing the good path's drift, later paths must still be planned\n%s", stdout)
 	}
 }
 
