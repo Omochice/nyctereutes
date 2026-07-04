@@ -79,7 +79,7 @@ type reported string
 // The subset of the `glab api projects/:id` JSON response the import reads.
 type rawProject struct {
 	Description freeText `json:"description"`
-	Visibility  string   `json:"visibility"`
+	Visibility  reported `json:"visibility"`
 	Topics      []string `json:"topics"`
 	// Empty when the repository has no commits yet: GitLab reports null.
 	DefaultBranch reported `json:"default_branch"`
@@ -143,7 +143,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 		},
 		Spec: manifest.RepositorySpec{
 			Description:                new(string(state.Description)),
-			Visibility:                 new(manifest.Visibility(state.Visibility)),
+			Visibility:                 optional[manifest.Visibility](state.Visibility),
 			RequestAccessEnabled:       state.RequestAccessEnabled,
 			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
 			Archived:                   state.Archived,
