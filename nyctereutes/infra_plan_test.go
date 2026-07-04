@@ -65,3 +65,24 @@ func TestInfraPlanReportsNoChanges(t *testing.T) {
 		t.Errorf("stdout missing 'No changes.'\n%s", stdout)
 	}
 }
+
+func TestInfraPlanCIExitCode(t *testing.T) {
+	dir := t.TempDir()
+	drift := writeManifest(t, dir, "drift.yaml", planManifest)
+	match := writeManifest(t, dir, "match.yaml", matchingManifest)
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	t.Run("drift exits non-zero", func(t *testing.T) {
+		exit, _, _ := runDep(runner, "infra", "plan", "--ci", drift)
+		if exit != 1 {
+			t.Errorf("exit = %d, want 1 with --ci and drift", exit)
+		}
+	})
+
+	t.Run("no drift exits zero", func(t *testing.T) {
+		exit, _, _ := runDep(runner, "infra", "plan", "--ci", match)
+		if exit != 0 {
+			t.Errorf("exit = %d, want 0 with --ci and no drift", exit)
+		}
+	})
+}
