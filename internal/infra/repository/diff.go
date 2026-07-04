@@ -32,5 +32,16 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 		return []Change{{Type: ChangeCreate, Name: name, Field: "repository", NewValue: name}}
 	}
 
-	return nil
+	var changes []Change
+	appendChanged(&changes, name, "visibility", desired.Spec.Visibility, manifest.Visibility(current.Visibility))
+	return changes
+}
+
+// appendChanged records an update when the manifest declares the field
+// (desired is non-nil) and its value differs from the live one. A nil desired
+// means the manifest is silent about the field, so the live value is left as-is.
+func appendChanged[Value comparable](changes *[]Change, name, field string, desired *Value, current Value) {
+	if desired != nil && *desired != current {
+		*changes = append(*changes, Change{Type: ChangeUpdate, Name: name, Field: field, OldValue: current, NewValue: *desired})
+	}
 }
