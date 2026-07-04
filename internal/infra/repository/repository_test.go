@@ -29,14 +29,14 @@ const sampleProjectJSON = `{"description":"a tool","visibility":"private","topic
 var errGlab404 = errors.New("glab api projects/x: exit status 1\n404 Project Not Found")
 
 // wantPtr fails the test unless got points to want.
-func wantPtr(t *testing.T, name string, got *string, want string) {
+func wantPtr[Value ~string](t *testing.T, name string, got *Value, want string) {
 	t.Helper()
 	if got == nil {
 		t.Errorf("%s = nil, want %q", name, want)
 		return
 	}
-	if *got != want {
-		t.Errorf("%s = %q, want %q", name, *got, want)
+	if string(*got) != want {
+		t.Errorf("%s = %q, want %q", name, string(*got), want)
 	}
 }
 
@@ -63,7 +63,7 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 
 	for _, check := range []struct{ name, got, want string }{
 		{"description", string(state.Description), sampleDescription},
-		{"visibility", state.Visibility, visibilityPrivate},
+		{"visibility", string(state.Visibility), visibilityPrivate},
 		{"topics", strings.Join(state.Topics, ","), "go,cli"},
 		{"issues", string(state.IssuesAccessLevel), levelEnabled},
 		{"wiki", string(state.WikiAccessLevel), levelDisabled},
@@ -372,6 +372,17 @@ func TestFetchRepositoryMapsDefaultBranch(t *testing.T) {
 	out, spec = exportSpec(t, `{"visibility":"private","default_branch":null}`)
 	if got, ok := spec["default_branch"]; ok {
 		t.Errorf("spec.default_branch = %v, want the key omitted for an empty repository\n%s", got, out)
+	}
+}
+
+// A project response without a visibility must omit the key rather than emit
+// `visibility: ""`: the empty string is not a member of the Visibility enum,
+// so emitting it would fail Marshal's round-trip verification and break the
+// import of that project.
+func TestFetchRepositoryOmitsVisibilityWhenAbsent(t *testing.T) {
+	out := exportYAML(t, `{"description":"d"}`)
+	if strings.Contains(out, "visibility") {
+		t.Errorf("yaml contains visibility, want it omitted when the API did not report it\n%s", out)
 	}
 }
 

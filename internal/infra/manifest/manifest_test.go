@@ -7,7 +7,7 @@ import (
 	goyaml "github.com/goccy/go-yaml"
 )
 
-const levelEnabled = "enabled"
+const levelEnabled AccessLevel = "enabled"
 
 // A document with every optional field set, so marshalling exercises the full
 // key sequence.
@@ -18,7 +18,7 @@ func fullRepository() *Repository {
 		Metadata:   RepositoryMetadata{Name: "proj", Owner: "group"},
 		Spec: RepositorySpec{
 			Description:                new("a tool"),
-			Visibility:                 new("private"),
+			Visibility:                 new(Visibility("private")),
 			RequestAccessEnabled:       new(true),
 			EnforceAuthChecksOnUploads: new(true),
 			Archived:                   new(true),
@@ -39,10 +39,10 @@ func fullRepository() *Repository {
 				SecurityAndCompliance: new(levelEnabled),
 				Wiki:                  new(levelEnabled),
 				Snippets:              new(levelEnabled),
-				PackageRegistry:       new(levelEnabled),
+				PackageRegistry:       new(PublicAccessLevel(levelEnabled)),
 				ModelExperiments:      new(levelEnabled),
 				ModelRegistry:         new(levelEnabled),
-				Pages:                 new(levelEnabled),
+				Pages:                 new(PublicAccessLevel(levelEnabled)),
 				Monitor:               new(levelEnabled),
 				Environments:          new(levelEnabled),
 				FeatureFlags:          new(levelEnabled),

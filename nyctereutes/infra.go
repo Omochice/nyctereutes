@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
@@ -15,20 +17,25 @@ import (
 var (
 	errImportNeedsTarget = errors.New("import requires at least one <owner/project>")
 	errSomeImportsFailed = errors.New("some projects could not be imported")
+	errValidateNeedsPath = errors.New("validate requires at least one <path>")
+	errInvalidManifests  = errors.New("validation failed")
+	errNoManifestsFound  = errors.New("no .yaml/.yml files in directory")
 )
 
 type infraCommand struct {
 	inout  *cli.ProcInout
 	runner glab.Runner
 
-	Import *infraImportCommand `command:"import" description:"export GitLab project settings as YAML"`
+	Import   *infraImportCommand   `command:"import" description:"export GitLab project settings as YAML"`
+	Validate *infraValidateCommand `command:"validate" description:"validate manifest YAML files against the schema"`
 }
 
 func newInfraCommand(inout *cli.ProcInout, runner glab.Runner) *infraCommand {
 	return &infraCommand{
-		inout:  inout,
-		runner: runner,
-		Import: &infraImportCommand{inout: inout, runner: runner},
+		inout:    inout,
+		runner:   runner,
+		Import:   &infraImportCommand{inout: inout, runner: runner},
+		Validate: &infraValidateCommand{inout: inout},
 	}
 }
 
@@ -101,4 +108,93 @@ func splitTarget(target string) (owner, name string, ok bool) {
 		return "", "", false
 	}
 	return owner, name, true
+}
+
+type infraValidateCommand struct {
+	inout *cli.ProcInout
+}
+
+// Validates manifest YAML files against the schema. Every problem is reported
+// on stderr with its file and document position before the run fails, so one
+// broken document does not hide the rest; a fully valid run summarizes the
+// documents on stdout.
+func (c *infraValidateCommand) Execute(args []string) error {
+	if len(args) == 0 {
+		return errValidateNeedsPath
+	}
+
+	var repos []*manifest.Repository
+	failures := 0
+	for _, path := range args {
+		files, err := manifestFiles(path)
+		if err != nil {
+			_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+			failures++
+			continue
+		}
+		for _, file := range files {
+			parsed, failed := c.validateFile(file)
+			repos = append(repos, parsed...)
+			failures += failed
+		}
+	}
+
+	if failures > 0 {
+		return fmt.Errorf("%w: %d problem(s)", errInvalidManifests, failures)
+	}
+	_, _ = fmt.Fprintf(c.inout.Stdout, "Valid: %d repositories\n", len(repos))
+	for _, repo := range repos {
+		_, _ = fmt.Fprintf(c.inout.Stdout, "  - %s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
+	}
+	return nil
+}
+
+// Reports every schema violation in one file to stderr and returns the
+// documents that validated along with the number of problems found.
+func (c *infraValidateCommand) validateFile(path string) ([]*manifest.Repository, int) {
+	data, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+		return nil, 1
+	}
+	repos, errs := manifest.Parse(data)
+	for _, parseErr := range errs {
+		_, _ = fmt.Fprintf(c.inout.Stderr, "%s: %v\n", path, parseErr)
+	}
+	return repos, len(errs)
+}
+
+// Expands one path argument into the manifest files it names: a file is
+// itself, a directory contributes its .yaml/.yml entries one level deep.
+// Recursion is deliberately absent so an unrelated tree cannot leak in.
+func manifestFiles(path string) ([]string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve path: %w", err)
+	}
+	if !info.IsDir() {
+		return []string{path}, nil
+	}
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("read dir: %w", err)
+	}
+	var files []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		// Lower-cased so an "A.YAML" entry cannot silently escape validation.
+		if ext := strings.ToLower(filepath.Ext(entry.Name())); ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+		files = append(files, filepath.Join(path, entry.Name()))
+	}
+	// Nothing to validate is a failure, not an empty success: a mistyped
+	// directory would otherwise pass CI having checked nothing.
+	if len(files) == 0 {
+		return nil, fmt.Errorf("%w: %s", errNoManifestsFound, path)
+	}
+	return files, nil
 }
