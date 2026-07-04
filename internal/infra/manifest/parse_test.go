@@ -165,6 +165,19 @@ func TestParseContinuesPastSyntaxError(t *testing.T) {
 	}
 }
 
+// A UTF-8 BOM (written by some Windows editors, permitted at stream start by
+// the YAML spec) must not glue itself onto the first key and surface as a
+// baffling unsupported-apiVersion error.
+func TestParseStripsLeadingBOM(t *testing.T) {
+	repos, errs := Parse([]byte("\ufeff" + validDoc))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want a BOM-prefixed manifest to validate", errs)
+	}
+	if len(repos) != 1 {
+		t.Errorf("parsed %d documents, want 1", len(repos))
+	}
+}
+
 // A file holding only a document start marker is semantically empty, the
 // same as an empty file; it must not be reported as an unknown kind.
 func TestParseAcceptsMarkerOnlyStream(t *testing.T) {

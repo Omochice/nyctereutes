@@ -31,6 +31,11 @@ var (
 // lose sight of a document. Each fragment is then parsed on its own, so a
 // syntax error is also confined to its document.
 func Parse(data []byte) ([]*Repository, []error) {
+	// A leading UTF-8 BOM (written by some Windows editors, permitted at
+	// stream start by the YAML spec) would otherwise glue itself onto the
+	// first key and surface as a baffling unsupported-apiVersion error.
+	data = bytes.TrimPrefix(data, []byte("\ufeff"))
+
 	var repos []*Repository
 	var errs []error
 	for _, frag := range splitStream(data) {
