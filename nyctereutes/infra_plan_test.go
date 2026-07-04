@@ -164,6 +164,29 @@ func TestInfraPlanContinuesPastParseError(t *testing.T) {
 	}
 }
 
+// A directory argument plans every .yaml/.yml manifest it holds, sharing the
+// non-recursive expansion the validate command uses.
+func TestInfraPlanWalksDirectory(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, "a.yaml", planManifest)
+	writeManifest(t, dir, "b.yml", strings.ReplaceAll(planManifest, "name: proj", "name: other"))
+	runner := &fakeInfraGlab{projects: map[string]string{
+		"group/proj":  projJSON,
+		"group/other": projJSON,
+	}}
+
+	exit, stdout, _ := runDep(runner, "infra", "plan", dir)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	for _, want := range []string{"group/proj", "group/other"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+}
+
 func TestInfraPlanCIExitCode(t *testing.T) {
 	dir := t.TempDir()
 	drift := writeManifest(t, dir, "drift.yaml", planManifest)
