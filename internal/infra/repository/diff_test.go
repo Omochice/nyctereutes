@@ -100,3 +100,31 @@ func TestDiffLeavesUndeclaredFieldsUnchanged(t *testing.T) {
 		t.Errorf("changes = %+v, want none for a silent manifest", changes)
 	}
 }
+
+func TestDiffComparesTopicsAsSet(t *testing.T) {
+	t.Run("same set in another order is no change", func(t *testing.T) {
+		desired := &manifest.Repository{
+			Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+			Spec:     manifest.RepositorySpec{Topics: []string{"go", "cli"}},
+		}
+		current := &CurrentState{rawProject: rawProject{Topics: []string{"cli", "go"}}}
+
+		if changes := Diff(desired, current); len(changes) != 0 {
+			t.Errorf("changes = %+v, want none for the same topic set", changes)
+		}
+	})
+
+	t.Run("different set is an update", func(t *testing.T) {
+		desired := &manifest.Repository{
+			Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+			Spec:     manifest.RepositorySpec{Topics: []string{"go", "rust"}},
+		}
+		current := &CurrentState{rawProject: rawProject{Topics: []string{"go"}}}
+
+		changes := Diff(desired, current)
+
+		if len(changes) != 1 || changes[0].Field != "topics" {
+			t.Fatalf("changes = %+v, want one topics update", changes)
+		}
+	})
+}
