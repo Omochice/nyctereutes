@@ -66,6 +66,32 @@ func TestInfraPlanReportsNoChanges(t *testing.T) {
 	}
 }
 
+// A manifest for a project GitLab does not have plans as a whole-project
+// create, driven by the 404 that FetchRepository turns into IsNew.
+func TestInfraPlanShowsCreate(t *testing.T) {
+	create := `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: fresh
+  owner: group
+spec:
+  visibility: private
+`
+	path := writeManifest(t, t.TempDir(), "a.yaml", create)
+	runner := &fakeInfraGlab{projects: map[string]string{}}
+
+	exit, stdout, _ := runDep(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	for _, want := range []string{"group/fresh", "new repository"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+}
+
 func TestInfraPlanCIExitCode(t *testing.T) {
 	dir := t.TempDir()
 	drift := writeManifest(t, dir, "drift.yaml", planManifest)
