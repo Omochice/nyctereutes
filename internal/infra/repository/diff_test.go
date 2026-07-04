@@ -152,4 +152,20 @@ func TestDiffComparesTopicsAsSet(t *testing.T) {
 			t.Fatalf("changes = %+v, want one topics update", changes)
 		}
 	})
+
+	// An explicit empty list means "clear the topics", distinct from an
+	// omitted (nil) list that leaves them as-is.
+	t.Run("clearing topics is an update", func(t *testing.T) {
+		desired := &manifest.Repository{
+			Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+			Spec:     manifest.RepositorySpec{Topics: []string{}},
+		}
+		current := &CurrentState{rawProject: rawProject{Topics: []string{"go"}}}
+
+		changes := Diff(desired, current)
+
+		if len(changes) != 1 || changes[0].Field != "topics" {
+			t.Fatalf("changes = %+v, want one topics update", changes)
+		}
+	})
 }
