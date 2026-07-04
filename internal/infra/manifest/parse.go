@@ -18,6 +18,9 @@ var (
 	errRequiredField = errors.New("required field is missing")
 	// Signals an in-line "--- content" marker, which this parser does not accept.
 	errInlineDocument = errors.New("unsupported inline document after ---")
+	// Reports a document holding nothing but comments or whitespace; the
+	// caller skips it the way it skips a blank one.
+	errBlankDocument = errors.New("blank document")
 )
 
 // Parses a YAML stream of "---"-separated manifest documents against the
@@ -40,13 +43,14 @@ func Parse(data []byte) ([]*Repository, []error) {
 	var errs []error
 	for _, frag := range splitStream(data) {
 		repo, err := parseDocument(frag)
+		if errors.Is(err, errBlankDocument) {
+			continue
+		}
 		if err != nil {
 			errs = append(errs, fmt.Errorf("document %d: %w", frag.number, err))
 			continue
 		}
-		if repo != nil {
-			repos = append(repos, repo)
-		}
+		repos = append(repos, repo)
 	}
 	return repos, errs
 }
@@ -76,7 +80,7 @@ func splitStream(data []byte) []documentFragment {
 	flush := func(nextStart int) {
 		body := bytes.Join(current, []byte("\n"))
 		blank := len(bytes.TrimSpace(body)) == 0
-		if !(leading && blank) {
+		if !leading || !blank {
 			number++
 			if !blank {
 				fragments = append(fragments, documentFragment{body: body, number: number, startLine: currentStart})
@@ -89,7 +93,8 @@ func splitStream(data []byte) []documentFragment {
 
 	for index, line := range bytes.Split(data, []byte("\n")) {
 		if isSeparator(line) {
-			flush(index + 2)
+			separatorLine := index + 1
+			flush(separatorLine + 1)
 			continue
 		}
 		current = append(current, line)
@@ -122,8 +127,7 @@ func parseDocument(frag documentFragment) (*Repository, error) {
 		return nil, errInlineDocument
 	}
 	if len(file.Docs) == 0 || file.Docs[0].Body == nil {
-		// Nothing but comments; treated like a blank document.
-		return nil, nil
+		return nil, errBlankDocument
 	}
 	body := file.Docs[0].Body
 
