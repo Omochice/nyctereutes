@@ -111,6 +111,22 @@ func TestInfraValidateWalksDirectoryNonRecursively(t *testing.T) {
 	}
 }
 
+// Extension matching must not depend on letter case: silently skipping an
+// "A.YAML" entry would let an unchecked manifest pass as success.
+func TestInfraValidateMatchesExtensionsCaseInsensitively(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, "A.YAML", brokenManifest())
+
+	exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", dir)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1: A.YAML must be validated despite its case", exit)
+	}
+	if !strings.Contains(stderr, "A.YAML") {
+		t.Errorf("stderr missing the upper-case manifest\n%s", stderr)
+	}
+}
+
 func TestInfraValidateReportsMissingPath(t *testing.T) {
 	dir := t.TempDir()
 	good := writeManifest(t, dir, "a.yaml", validManifest)

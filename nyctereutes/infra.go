@@ -185,7 +185,8 @@ func manifestFiles(path string) ([]string, error) {
 		if entry.IsDir() {
 			continue
 		}
-		if ext := filepath.Ext(entry.Name()); ext != ".yaml" && ext != ".yml" {
+		// Lower-cased so an "A.YAML" entry cannot silently escape validation.
+		if ext := strings.ToLower(filepath.Ext(entry.Name())); ext != ".yaml" && ext != ".yml" {
 			continue
 		}
 		files = append(files, filepath.Join(path, entry.Name()))
