@@ -16,6 +16,13 @@ spec:
   visibility: internal
 `
 
+func TestInfraPlanRequiresPath(t *testing.T) {
+	exit, _, _ := runDep(&fakeInfraGlab{}, "infra", "plan")
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when no path is given", exit)
+	}
+}
+
 func TestInfraPlanShowsChanges(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest)
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
