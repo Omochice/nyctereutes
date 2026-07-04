@@ -225,12 +225,16 @@ func (c *infraPlanCommand) Execute(args []string) error {
 	for _, path := range args {
 		files, err := manifestFiles(path)
 		if err != nil {
-			return err
+			_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+			failures++
+			continue
 		}
 		for _, file := range files {
 			data, err := os.ReadFile(filepath.Clean(file))
 			if err != nil {
-				return err
+				_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+				failures++
+				continue
 			}
 			repos, errs := manifest.Parse(data)
 			for _, parseErr := range errs {
