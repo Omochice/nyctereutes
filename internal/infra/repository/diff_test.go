@@ -62,3 +62,22 @@ func TestDiffReportsDescriptionChange(t *testing.T) {
 		t.Errorf("values = %v → %v, want old text → new text", changes[0].OldValue, changes[0].NewValue)
 	}
 }
+
+func TestDiffReportsArchivedChange(t *testing.T) {
+	archived := true
+	liveFalse := false
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{Archived: &archived},
+	}
+	current := &CurrentState{rawProject: rawProject{Archived: &liveFalse}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "archived" {
+		t.Fatalf("changes = %+v, want one archived update", changes)
+	}
+	if changes[0].OldValue != false || changes[0].NewValue != true {
+		t.Errorf("values = %v → %v, want false → true", changes[0].OldValue, changes[0].NewValue)
+	}
+}
