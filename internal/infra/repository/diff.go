@@ -1,6 +1,10 @@
 package repository
 
-import "github.com/Omochice/nyctereutes/internal/infra/manifest"
+import (
+	"fmt"
+
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
+)
 
 // ChangeType names the kind of drift a [Change] records.
 type ChangeType string
@@ -20,6 +24,19 @@ type Change struct {
 	Field    string
 	OldValue any
 	NewValue any
+}
+
+// String renders one plan line: a create names the whole project, an update
+// shows the field's live value giving way to the declared one.
+func (c Change) String() string {
+	switch c.Type {
+	case ChangeCreate:
+		return fmt.Sprintf("+ %s (new repository)", c.Name)
+	case ChangeUpdate:
+		return fmt.Sprintf("~ %s: %v → %v", c.Field, c.OldValue, c.NewValue)
+	default:
+		return ""
+	}
 }
 
 // Diff reports how the live project differs from the declared manifest. A

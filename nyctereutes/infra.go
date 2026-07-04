@@ -28,6 +28,7 @@ type infraCommand struct {
 
 	Import   *infraImportCommand   `command:"import" description:"export GitLab project settings as YAML"`
 	Validate *infraValidateCommand `command:"validate" description:"validate manifest YAML files against the schema"`
+	Plan     *infraPlanCommand     `command:"plan" description:"show drift between manifests and live GitLab state"`
 }
 
 func newInfraCommand(inout *cli.ProcInout, runner glab.Runner) *infraCommand {
@@ -36,6 +37,7 @@ func newInfraCommand(inout *cli.ProcInout, runner glab.Runner) *infraCommand {
 		runner:   runner,
 		Import:   &infraImportCommand{inout: inout, runner: runner},
 		Validate: &infraValidateCommand{inout: inout},
+		Plan:     &infraPlanCommand{inout: inout, runner: runner},
 	}
 }
 
@@ -197,4 +199,44 @@ func manifestFiles(path string) ([]string, error) {
 		return nil, fmt.Errorf("%w: %s", errNoManifestsFound, path)
 	}
 	return files, nil
+}
+
+type infraPlanCommand struct {
+	inout  *cli.ProcInout
+	runner glab.Runner
+}
+
+// Shows how each declared manifest differs from its live GitLab project. Every
+// project's drift is printed under an "owner/name" header on stdout.
+func (c *infraPlanCommand) Execute(args []string) error {
+	ctx := context.Background()
+	client := repository.NewClient(c.runner)
+	for _, path := range args {
+		files, err := manifestFiles(path)
+		if err != nil {
+			return err
+		}
+		for _, file := range files {
+			data, err := os.ReadFile(filepath.Clean(file))
+			if err != nil {
+				return err
+			}
+			repos, _ := manifest.Parse(data)
+			for _, repo := range repos {
+				state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+				if err != nil {
+					return err
+				}
+				changes := repository.Diff(repo, state)
+				if len(changes) == 0 {
+					continue
+				}
+				_, _ = fmt.Fprintf(c.inout.Stdout, "%s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
+				for _, change := range changes {
+					_, _ = fmt.Fprintf(c.inout.Stdout, "  %s\n", change)
+				}
+			}
+		}
+	}
+	return nil
 }
