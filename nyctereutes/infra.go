@@ -230,36 +230,9 @@ func (c *infraPlanCommand) Execute(args []string) error {
 			continue
 		}
 		for _, file := range files {
-			data, err := os.ReadFile(filepath.Clean(file))
-			if err != nil {
-				_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
-				failures++
-				continue
-			}
-			repos, errs := manifest.Parse(data)
-			for _, parseErr := range errs {
-				_, _ = fmt.Fprintf(c.inout.Stderr, "%s: %v\n", file, parseErr)
-				failures++
-			}
-			for _, repo := range repos {
-				state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
-				if err != nil {
-					// One project's fetch failure must not hide the drift of
-					// the others, so report it and move on.
-					_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
-					failures++
-					continue
-				}
-				changes := repository.Diff(repo, state)
-				if len(changes) == 0 {
-					continue
-				}
-				changed++
-				_, _ = fmt.Fprintf(c.inout.Stdout, "%s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
-				for _, change := range changes {
-					_, _ = fmt.Fprintf(c.inout.Stdout, "  %s\n", change)
-				}
-			}
+			fileChanged, fileFailures := c.planFile(ctx, client, file)
+			changed += fileChanged
+			failures += fileFailures
 		}
 	}
 
@@ -275,4 +248,39 @@ func (c *infraPlanCommand) Execute(args []string) error {
 		return errPlanDrift
 	}
 	return nil
+}
+
+// Plans every manifest document in one file against its live project, printing
+// each drifting project's changes. It returns how many projects drifted and
+// how many problems (unreadable file, parse errors, fetch failures) it hit, so
+// one bad document or project never hides the rest.
+func (c *infraPlanCommand) planFile(ctx context.Context, client *repository.Client, file string) (changed, failures int) {
+	data, err := os.ReadFile(filepath.Clean(file))
+	if err != nil {
+		_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+		return 0, 1
+	}
+	repos, errs := manifest.Parse(data)
+	for _, parseErr := range errs {
+		_, _ = fmt.Fprintf(c.inout.Stderr, "%s: %v\n", file, parseErr)
+		failures++
+	}
+	for _, repo := range repos {
+		state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+		if err != nil {
+			_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+			failures++
+			continue
+		}
+		changes := repository.Diff(repo, state)
+		if len(changes) == 0 {
+			continue
+		}
+		changed++
+		_, _ = fmt.Fprintf(c.inout.Stdout, "%s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
+		for _, change := range changes {
+			_, _ = fmt.Fprintf(c.inout.Stdout, "  %s\n", change)
+		}
+	}
+	return changed, failures
 }
