@@ -15,6 +15,9 @@ import (
 // Signals that no supported YAML encoding decodes back to the document.
 var errNotRoundTrippable = errors.New("manifest does not survive a yaml round trip")
 
+// Signals an encoding that parses but decodes into a different document.
+var errLossyEncoding = errors.New("decoded document differs from the source")
+
 // Signals a manifest enum value outside its allowed set.
 var errInvalidValue = errors.New("invalid value")
 
@@ -44,25 +47,35 @@ func Marshal(doc *Repository) ([]byte, error) {
 		{},
 		{goyaml.JSON()},
 	}
+	var lastErr error
 	for _, opts := range attempts {
 		out, err := goyaml.MarshalWithOptions(doc, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("marshal manifest: %w", err)
 		}
-		if roundTrips(out, doc) {
-			return out, nil
+		if err := roundTrips(out, doc); err != nil {
+			lastErr = err
+			continue
 		}
+		return out, nil
 	}
-	return nil, errNotRoundTrippable
+	return nil, fmt.Errorf("%w: %w", errNotRoundTrippable, lastErr)
 }
 
-// Reports whether out decodes back into a document equal to doc.
-func roundTrips(out []byte, doc *Repository) bool {
+// Reports why out does not decode back into a document equal to doc, or nil
+// when it does. The decode error must be preserved, not reduced to a bool: it
+// is the only message that names the field and value that cannot round-trip
+// (an enum value outside the schema, for example), so swallowing it would
+// leave an import failure with no actionable cause.
+func roundTrips(out []byte, doc *Repository) error {
 	var back Repository
 	if err := goyaml.Unmarshal(out, &back); err != nil {
-		return false
+		return fmt.Errorf("decode emitted yaml: %w", err)
 	}
-	return reflect.DeepEqual(&back, doc)
+	if !reflect.DeepEqual(&back, doc) {
+		return errLossyEncoding
+	}
+	return nil
 }
 
 const (

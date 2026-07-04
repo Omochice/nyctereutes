@@ -56,12 +56,17 @@ func TestEnumValuesRejectUnknownValues(t *testing.T) {
 
 // Marshal re-decodes its output to verify the round trip, so an enum value
 // outside the schema fails the import loudly instead of emitting a document
-// that validate would then reject.
+// that validate would then reject. The failure must name the offending value:
+// a bare "does not survive a yaml round trip" gives the user nothing to fix.
 func TestMarshalRejectsUnknownAccessLevel(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.Features.Issues = new(AccessLevel("beta"))
 
-	if _, err := Marshal(doc); err == nil {
-		t.Error("marshal succeeded for an unknown access level, want a round-trip failure")
+	_, err := Marshal(doc)
+	if err == nil {
+		t.Fatal("marshal succeeded for an unknown access level, want a round-trip failure")
+	}
+	if !strings.Contains(err.Error(), `"beta"`) {
+		t.Errorf("error %q does not name the offending value", err)
 	}
 }
