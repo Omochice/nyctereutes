@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -149,5 +150,76 @@ func TestParseContinuesPastInvalidDocument(t *testing.T) {
 	}
 	if !strings.Contains(errs[0].Error(), "document 2") {
 		t.Errorf("error %q does not carry the document position", errs[0])
+	}
+}
+
+// A document that is not even parseable YAML must not take the rest of the
+// stream down with it either.
+func TestParseContinuesPastSyntaxError(t *testing.T) {
+	repos, errs := Parse(joinDocs(validDoc, ": : :\n", validDoc))
+	if len(repos) != 2 {
+		t.Errorf("parsed %d documents, want the 2 valid ones", len(repos))
+	}
+	if len(errs) != 1 {
+		t.Errorf("errs = %v, want exactly one error for the malformed document", errs)
+	}
+}
+
+// A file holding only a document start marker is semantically empty, the
+// same as an empty file; it must not be reported as an unknown kind.
+func TestParseAcceptsMarkerOnlyStream(t *testing.T) {
+	repos, errs := Parse([]byte("---\n"))
+	if len(repos) != 0 || len(errs) != 0 {
+		t.Errorf("marker-only stream parsed to %d documents and %v, want none", len(repos), errs)
+	}
+}
+
+// Error positions count every document in the stream, including empty ones,
+// so "document N" matches what the user sees when counting separators.
+func TestParseNumbersDocumentsByStreamPosition(t *testing.T) {
+	bad := strings.ReplaceAll(validDoc, "kind: Repository", "kind: Nonsense")
+	_, errs := Parse(joinDocs(validDoc, "", bad))
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want exactly one error", errs)
+	}
+	if !strings.Contains(errs[0].Error(), "document 3") {
+		t.Errorf("error %q should name document 3: the empty document keeps its position", errs[0])
+	}
+}
+
+// Only a bare "---" line separates documents. A line that merely starts with
+// dashes ("----", "--- inline") belongs to its document and must surface as
+// that document's parse error, not shift every following document.
+func TestParseTreatsDashLinesAsContent(t *testing.T) {
+	repos, errs := Parse(joinDocs(validDoc, "kind: Broken\ndescription: x\n----\n", validDoc))
+	if len(repos) != 2 {
+		t.Errorf("parsed %d documents, want the 2 valid ones", len(repos))
+	}
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want exactly one error for the dash-line document", errs)
+	}
+	if !strings.Contains(errs[0].Error(), "document 2") {
+		t.Errorf("error %q should blame document 2, not a phantom split at the dash line", errs[0])
+	}
+}
+
+// goyaml error positions must point at the file the user is editing, not at
+// a document-relative fragment, so the reported line is found by searching
+// the assembled stream for the offending key.
+func TestParseReportsFileLineNumbers(t *testing.T) {
+	stream := string(joinDocs(validDoc, validDoc+"  bogus_key: x\n"))
+	wantLine := 0
+	for index, line := range strings.Split(stream, "\n") {
+		if strings.Contains(line, "bogus_key") {
+			wantLine = index + 1
+		}
+	}
+
+	_, errs := Parse([]byte(stream))
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want exactly one unknown-key error", errs)
+	}
+	if want := fmt.Sprintf("[%d:", wantLine); !strings.Contains(errs[0].Error(), want) {
+		t.Errorf("error %q does not point at file line %d", errs[0], wantLine)
 	}
 }
