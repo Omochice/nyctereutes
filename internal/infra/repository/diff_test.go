@@ -44,3 +44,21 @@ func TestDiffReportsVisibilityChange(t *testing.T) {
 		t.Errorf("values = %v → %v, want internal → private", c.OldValue, c.NewValue)
 	}
 }
+
+func TestDiffReportsDescriptionChange(t *testing.T) {
+	want := "new text"
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{Description: &want},
+	}
+	current := &CurrentState{rawProject: rawProject{Description: "old text"}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "description" {
+		t.Fatalf("changes = %+v, want one description update", changes)
+	}
+	if changes[0].OldValue != "old text" || changes[0].NewValue != "new text" {
+		t.Errorf("values = %v → %v, want old text → new text", changes[0].OldValue, changes[0].NewValue)
+	}
+}
