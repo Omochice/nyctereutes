@@ -254,7 +254,9 @@ func (c *infraPlanCommand) Execute(args []string) error {
 // each drifting project's changes. It returns how many projects drifted and
 // how many problems (unreadable file, parse errors, fetch failures) it hit, so
 // one bad document or project never hides the rest.
-func (c *infraPlanCommand) planFile(ctx context.Context, client *repository.Client, file string) (changed, failures int) {
+func (c *infraPlanCommand) planFile(
+	ctx context.Context, client *repository.Client, file string,
+) (changed, failures int) {
 	data, err := os.ReadFile(filepath.Clean(file))
 	if err != nil {
 		_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)

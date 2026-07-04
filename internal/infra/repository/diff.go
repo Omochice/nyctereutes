@@ -16,6 +16,15 @@ const (
 	ChangeUpdate ChangeType = "update"
 )
 
+// The manifest field names a [Change] reports drift for, named once so the
+// scattered literals (including struct tags) do not drift apart.
+const (
+	fieldDescription = "description"
+	fieldVisibility  = "visibility"
+	fieldArchived    = "archived"
+	fieldTopics      = "topics"
+)
+
 // Change is one planned difference between a declared manifest and the live
 // project: a whole project to create, or one field to update.
 type Change struct {
@@ -50,28 +59,32 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	}
 
 	var changes []Change
-	appendChanged(&changes, name, "description", desired.Spec.Description, string(current.Description))
-	appendChanged(&changes, name, "visibility", desired.Spec.Visibility, manifest.Visibility(current.Visibility))
-	appendChanged(&changes, name, "archived", desired.Spec.Archived, current.Archived != nil && *current.Archived)
+	appendChanged(&changes, name, fieldDescription, desired.Spec.Description, string(current.Description))
+	appendChanged(&changes, name, fieldVisibility, desired.Spec.Visibility, manifest.Visibility(current.Visibility))
+	appendChanged(&changes, name, fieldArchived, desired.Spec.Archived, current.Archived != nil && *current.Archived)
 	// Topics are a set, and an absent list means "leave as-is" the way a nil
 	// pointer does for the scalar fields; order carries no meaning.
 	if len(desired.Spec.Topics) > 0 && !sameStringSet(desired.Spec.Topics, current.Topics) {
-		changes = append(changes, Change{Type: ChangeUpdate, Name: name, Field: "topics", OldValue: current.Topics, NewValue: desired.Spec.Topics})
+		changes = append(changes, Change{
+			Type: ChangeUpdate, Name: name, Field: fieldTopics,
+			OldValue: current.Topics, NewValue: desired.Spec.Topics,
+		})
 	}
 	return changes
 }
 
-// sameStringSet reports whether a and b hold the same elements regardless of
-// order, treating repeats as distinct so a genuine multiplicity change shows.
-func sameStringSet(a, b []string) bool {
-	if len(a) != len(b) {
+// sameStringSet reports whether left and right hold the same elements
+// regardless of order, treating repeats as distinct so a genuine multiplicity
+// change shows.
+func sameStringSet(left, right []string) bool {
+	if len(left) != len(right) {
 		return false
 	}
-	counts := make(map[string]int, len(a))
-	for _, s := range a {
+	counts := make(map[string]int, len(left))
+	for _, s := range left {
 		counts[s]++
 	}
-	for _, s := range b {
+	for _, s := range right {
 		counts[s]--
 		if counts[s] < 0 {
 			return false
@@ -84,7 +97,11 @@ func sameStringSet(a, b []string) bool {
 // (desired is non-nil) and its value differs from the live one. A nil desired
 // means the manifest is silent about the field, so the live value is left as-is.
 func appendChanged[Value comparable](changes *[]Change, name, field string, desired *Value, current Value) {
-	if desired != nil && *desired != current {
-		*changes = append(*changes, Change{Type: ChangeUpdate, Name: name, Field: field, OldValue: current, NewValue: *desired})
+	if desired == nil || *desired == current {
+		return
 	}
+	*changes = append(*changes, Change{
+		Type: ChangeUpdate, Name: name, Field: field,
+		OldValue: current, NewValue: *desired,
+	})
 }
