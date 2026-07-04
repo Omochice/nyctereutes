@@ -63,10 +63,9 @@ type documentFragment struct {
 	startLine int
 }
 
-// Splits a stream on bare "---" separator lines. Only a line that is exactly
-// the marker separates documents; a line that merely starts with dashes
-// ("----", "--- inline") belongs to its document and is judged by the YAML
-// parser. The chunk before the first separator is special: when blank, the
+// Splits a stream on "---" separator lines (see isSeparator). A line that
+// merely starts with dashes ("----", "--- inline") belongs to its document
+// and is judged by the YAML parser. The chunk before the first separator is special: when blank, the
 // marker is the first document's own opening and no document exists there,
 // while a later blank chunk is a real (empty) document that keeps its
 // position in the numbering.
@@ -103,9 +102,24 @@ func splitStream(data []byte) []documentFragment {
 	return fragments
 }
 
-// Reports whether line is a bare document separator.
+// Reports whether line is a document separator: the "---" marker alone or
+// followed only by a comment. YAML permits a comment on the marker line, and
+// treating it as content would leave two documents in one fragment and
+// surface a misleading inline-document error.
 func isSeparator(line []byte) bool {
-	return bytes.Equal(bytes.TrimRight(line, " \t\r"), []byte("---"))
+	rest, found := bytes.CutPrefix(bytes.TrimRight(line, " \t\r"), []byte("---"))
+	if !found {
+		return false
+	}
+	if len(rest) == 0 {
+		return true
+	}
+	// A comment needs whitespace after the marker; "----" or "---#x" is a
+	// plain scalar and stays with its document.
+	if rest[0] != ' ' && rest[0] != '\t' {
+		return false
+	}
+	return bytes.HasPrefix(bytes.TrimLeft(rest, " \t"), []byte("#"))
 }
 
 // Validates one document. The fragment is padded with newlines up to its

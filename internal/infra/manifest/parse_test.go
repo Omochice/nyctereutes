@@ -216,6 +216,20 @@ func TestParseTreatsDashLinesAsContent(t *testing.T) {
 	}
 }
 
+// YAML permits a comment after the document start marker ("--- # note"), so
+// such a line must separate documents instead of leaving both documents in
+// one fragment and surfacing a misleading inline-document error.
+func TestParseSplitsOnSeparatorWithComment(t *testing.T) {
+	second := strings.ReplaceAll(validDoc, "name: proj", "name: other")
+	repos, errs := Parse([]byte(validDoc + "--- # environments\n" + second))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want none", errs)
+	}
+	if len(repos) != 2 {
+		t.Errorf("parsed %d documents, want 2", len(repos))
+	}
+}
+
 // goyaml error positions must point at the file the user is editing, not at
 // a document-relative fragment, so the reported line is found by searching
 // the assembled stream for the offending key.
