@@ -232,7 +232,11 @@ func (c *infraPlanCommand) Execute(args []string) error {
 			if err != nil {
 				return err
 			}
-			repos, _ := manifest.Parse(data)
+			repos, errs := manifest.Parse(data)
+			for _, parseErr := range errs {
+				_, _ = fmt.Fprintf(c.inout.Stderr, "%s: %v\n", file, parseErr)
+				failures++
+			}
 			for _, repo := range repos {
 				state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
 				if err != nil {
