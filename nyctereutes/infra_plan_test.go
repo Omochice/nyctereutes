@@ -141,6 +141,29 @@ spec:
 	}
 }
 
+// An unparseable document is reported with its file and position and the run
+// fails, but the valid documents around it are still planned.
+func TestInfraPlanContinuesPastParseError(t *testing.T) {
+	badDoc := strings.ReplaceAll(planManifest, "kind: Repository", "kind: Nonsense")
+	stream := badDoc + "---\n" + planManifest
+	path := writeManifest(t, t.TempDir(), "a.yaml", stream)
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, stdout, stderr := runDep(runner, "infra", "plan", path)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a document is invalid", exit)
+	}
+	for _, want := range []string{"a.yaml", "document 1"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr missing %q\n%s", want, stderr)
+		}
+	}
+	if !strings.Contains(stdout, "group/proj") {
+		t.Errorf("stdout missing the valid document's drift\n%s", stdout)
+	}
+}
+
 func TestInfraPlanCIExitCode(t *testing.T) {
 	dir := t.TempDir()
 	drift := writeManifest(t, dir, "drift.yaml", planManifest)
