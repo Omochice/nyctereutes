@@ -21,6 +21,7 @@ var (
 	errInvalidManifests  = errors.New("validation failed")
 	errNoManifestsFound  = errors.New("no .yaml/.yml files in directory")
 	errPlanNeedsPath     = errors.New("plan requires at least one <path>")
+	errPlanDrift         = errors.New("changes detected")
 )
 
 type infraCommand struct {
@@ -205,6 +206,8 @@ func manifestFiles(path string) ([]string, error) {
 type infraPlanCommand struct {
 	inout  *cli.ProcInout
 	runner glab.Runner
+
+	CI bool `long:"ci" description:"exit non-zero when any drift is detected"`
 }
 
 // Shows how each declared manifest differs from its live GitLab project. Every
@@ -248,6 +251,11 @@ func (c *infraPlanCommand) Execute(args []string) error {
 
 	if changed == 0 {
 		_, _ = fmt.Fprintln(c.inout.Stdout, "No changes.")
+	}
+	// Drift is reported, not an error, so a human run always succeeds; --ci
+	// turns detected drift into a non-zero exit for pipeline gating.
+	if c.CI && changed > 0 {
+		return errPlanDrift
 	}
 	return nil
 }
