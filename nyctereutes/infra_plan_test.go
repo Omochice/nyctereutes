@@ -1,9 +1,30 @@
 package nyctereutes
 
 import (
+	"context"
+	"errors"
+	"net/url"
 	"strings"
 	"testing"
 )
+
+// planFetchErrGlab answers only for okPath; every other project fails with a
+// non-404 error, standing in for a network or auth failure.
+type planFetchErrGlab struct {
+	okPath string
+	okBody string
+}
+
+func (f *planFetchErrGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	path, err := url.PathUnescape(strings.TrimPrefix(args[1], "projects/"))
+	if err != nil {
+		return nil, err
+	}
+	if path == f.okPath {
+		return []byte(f.okBody), nil
+	}
+	return nil, errors.New("500 Internal Server Error")
+}
 
 // planManifest declares a project whose visibility differs from projJSON's
 // (private), so a plan against that live state must report the drift.
@@ -89,6 +110,34 @@ spec:
 		if !strings.Contains(stdout, want) {
 			t.Errorf("stdout missing %q\n%s", want, stdout)
 		}
+	}
+}
+
+// A fetch failure for one project is reported and skipped without hiding the
+// drift of the projects around it, and the run fails overall.
+func TestInfraPlanContinuesPastFetchError(t *testing.T) {
+	brokenDoc := `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: broken
+  owner: group
+spec:
+  visibility: private
+`
+	stream := brokenDoc + "---\n" + planManifest
+	path := writeManifest(t, t.TempDir(), "a.yaml", stream)
+	runner := &planFetchErrGlab{okPath: targetGroupProj, okBody: projJSON}
+
+	exit, stdout, stderr := runDep(runner, "infra", "plan", path)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a fetch fails", exit)
+	}
+	if !strings.Contains(stderr, "group/broken") {
+		t.Errorf("stderr missing the failing project\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "group/proj") {
+		t.Errorf("stdout missing the healthy project's drift, later repos must still be planned\n%s", stdout)
 	}
 }
 
