@@ -36,7 +36,31 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	appendChanged(&changes, name, "description", desired.Spec.Description, string(current.Description))
 	appendChanged(&changes, name, "visibility", desired.Spec.Visibility, manifest.Visibility(current.Visibility))
 	appendChanged(&changes, name, "archived", desired.Spec.Archived, current.Archived != nil && *current.Archived)
+	// Topics are a set, and an absent list means "leave as-is" the way a nil
+	// pointer does for the scalar fields; order carries no meaning.
+	if len(desired.Spec.Topics) > 0 && !sameStringSet(desired.Spec.Topics, current.Topics) {
+		changes = append(changes, Change{Type: ChangeUpdate, Name: name, Field: "topics", OldValue: current.Topics, NewValue: desired.Spec.Topics})
+	}
 	return changes
+}
+
+// sameStringSet reports whether a and b hold the same elements regardless of
+// order, treating repeats as distinct so a genuine multiplicity change shows.
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[string]int, len(a))
+	for _, s := range a {
+		counts[s]++
+	}
+	for _, s := range b {
+		counts[s]--
+		if counts[s] < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // appendChanged records an update when the manifest declares the field
