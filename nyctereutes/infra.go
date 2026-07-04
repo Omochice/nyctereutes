@@ -20,6 +20,7 @@ var (
 	errValidateNeedsPath = errors.New("validate requires at least one <path>")
 	errInvalidManifests  = errors.New("validation failed")
 	errNoManifestsFound  = errors.New("no .yaml/.yml files in directory")
+	errPlanNeedsPath     = errors.New("plan requires at least one <path>")
 )
 
 type infraCommand struct {
@@ -209,6 +210,10 @@ type infraPlanCommand struct {
 // Shows how each declared manifest differs from its live GitLab project. Every
 // project's drift is printed under an "owner/name" header on stdout.
 func (c *infraPlanCommand) Execute(args []string) error {
+	if len(args) == 0 {
+		return errPlanNeedsPath
+	}
+
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
 	for _, path := range args {
