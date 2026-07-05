@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
@@ -262,5 +263,150 @@ func TestDiffReportsTemplateChanges(t *testing.T) {
 				t.Errorf("values = %v → %v, want old → new", changes[0].OldValue, changes[0].NewValue)
 			}
 		})
+	}
+}
+
+// A manifest that omits the features block manages no feature, so live access
+// levels must not surface as drift.
+func TestDiffIgnoresAbsentFeaturesBlock(t *testing.T) {
+	desired := &manifest.Repository{Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"}}
+	current := &CurrentState{rawProject: rawProject{
+		IssuesAccessLevel: "disabled",
+		WikiAccessLevel:   "enabled",
+	}}
+
+	if changes := Diff(desired, current); len(changes) != 0 {
+		t.Errorf("changes = %+v, want none when the features block is absent", changes)
+	}
+}
+
+// Every feature key must diff against its own live access level. Each live
+// level carries a sentinel equal to its manifest key, so a change reporting the
+// wrong old value means the wrong live field was read, and a missing or extra
+// key means the wiring is off.
+func TestDiffMapsEveryFeature(t *testing.T) {
+	level := manifest.AccessLevel("enabled")
+	public := manifest.PublicAccessLevel("enabled")
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec: manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{
+			Issues:                &level,
+			Repository:            &level,
+			MergeRequests:         &level,
+			Forking:               &level,
+			CICD:                  &level,
+			ContainerRegistry:     &level,
+			Analytics:             &level,
+			Requirements:          &level,
+			SecurityAndCompliance: &level,
+			Wiki:                  &level,
+			Snippets:              &level,
+			PackageRegistry:       &public,
+			ModelExperiments:      &level,
+			ModelRegistry:         &level,
+			Pages:                 &public,
+			Monitor:               &level,
+			Environments:          &level,
+			FeatureFlags:          &level,
+			Infrastructure:        &level,
+			Releases:              &level,
+		}},
+	}
+	current := &CurrentState{rawProject: rawProject{
+		IssuesAccessLevel:                "issues",
+		RepositoryAccessLevel:            "repository",
+		MergeRequestsAccessLevel:         "merge_requests",
+		ForkingAccessLevel:               "forking",
+		BuildsAccessLevel:                "ci",
+		ContainerRegistryAccessLevel:     "container_registry",
+		AnalyticsAccessLevel:             "analytics",
+		RequirementsAccessLevel:          "requirements",
+		SecurityAndComplianceAccessLevel: "security_and_compliance",
+		WikiAccessLevel:                  "wiki",
+		SnippetsAccessLevel:              "snippets",
+		PackageRegistryAccessLevel:       "package_registry",
+		ModelExperimentsAccessLevel:      "model_experiments",
+		ModelRegistryAccessLevel:         "model_registry",
+		PagesAccessLevel:                 "pages",
+		MonitorAccessLevel:               "monitor",
+		EnvironmentsAccessLevel:          "environments",
+		FeatureFlagsAccessLevel:          "feature_flags",
+		InfrastructureAccessLevel:        "infrastructure",
+		ReleasesAccessLevel:              "releases",
+	}}
+	want := map[string]string{
+		"features.issues":                  "issues",
+		"features.repository":              "repository",
+		"features.merge_requests":          "merge_requests",
+		"features.forking":                 "forking",
+		"features.ci":                      "ci",
+		"features.container_registry":      "container_registry",
+		"features.analytics":               "analytics",
+		"features.requirements":            "requirements",
+		"features.security_and_compliance": "security_and_compliance",
+		"features.wiki":                    "wiki",
+		"features.snippets":                "snippets",
+		"features.package_registry":        "package_registry",
+		"features.model_experiments":       "model_experiments",
+		"features.model_registry":          "model_registry",
+		"features.pages":                   "pages",
+		"features.monitor":                 "monitor",
+		"features.environments":            "environments",
+		"features.feature_flags":           "feature_flags",
+		"features.infrastructure":          "infrastructure",
+		"features.releases":                "releases",
+	}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != len(want) {
+		t.Fatalf("got %d changes, want %d features", len(changes), len(want))
+	}
+	for _, change := range changes {
+		wantOld, ok := want[change.Field]
+		if !ok {
+			t.Errorf("unexpected change field %q", change.Field)
+			continue
+		}
+		if got := fmt.Sprint(change.OldValue); got != wantOld {
+			t.Errorf("%s old = %q, want %q (wrong live field mapped?)", change.Field, got, wantOld)
+		}
+		if got := fmt.Sprint(change.NewValue); got != "enabled" {
+			t.Errorf("%s new = %q, want enabled", change.Field, got)
+		}
+	}
+}
+
+func TestDiffLeavesUndeclaredFeaturesUnchanged(t *testing.T) {
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{Issues: new(manifest.AccessLevel("enabled"))}},
+	}
+	current := &CurrentState{rawProject: rawProject{
+		IssuesAccessLevel: "disabled",
+		WikiAccessLevel:   "disabled",
+	}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "features.issues" {
+		t.Fatalf("changes = %+v, want only the declared feature to drift", changes)
+	}
+}
+
+func TestDiffAcceptsPublicAccessLevelFeatures(t *testing.T) {
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{Pages: new(manifest.PublicAccessLevel("public"))}},
+	}
+	current := &CurrentState{rawProject: rawProject{PagesAccessLevel: "disabled"}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "features.pages" {
+		t.Fatalf("changes = %+v, want one features.pages update", changes)
+	}
+	if got := fmt.Sprint(changes[0].NewValue); got != "public" {
+		t.Errorf("new value = %q, want public", got)
 	}
 }
