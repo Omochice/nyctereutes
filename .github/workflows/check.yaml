@@ -48,7 +48,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      actions: read
+      actions: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -59,10 +59,16 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: coverage
+      - name: Expose Nix-provided octocov on PATH
+        run: |
+          nix develop --command bash <<'EOF' >> "$GITHUB_PATH"
+          dirname "$(command -v octocov)"
+          EOF
       - name: Report coverage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: nix develop --command octocov --config octocov.yaml
+        uses: k1LoW/octocov-action@b3b6ee60482a667950f87553abf1df63217235d9 # v1.5.1
+        with:
+          config: octocov.yaml
+          check-existence: true
   status-check:
     timeout-minutes: 5
     runs-on: ubuntu-latest
