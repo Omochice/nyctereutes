@@ -48,9 +48,17 @@ func (a *Applier) Apply(ctx context.Context, changes []Change) []ApplyResult {
 // Signals a Change whose NewValue does not hold the type its field requires.
 var errUnexpectedValueType = errors.New("change value has unexpected type")
 
-// Translates one change into its glab call. Archived is toggled through its own
-// endpoint; every other field is a scalar PUT.
+// Signals a project the manifest declares but GitLab lacks; this slice applies
+// only updates, so a create is reported rather than performed.
+var errCreateUnsupported = errors.New("creating a project is not supported yet")
+
+// Translates one change into its glab call. A create is reported unsupported;
+// archived is toggled through its own endpoint; every other field is a scalar
+// PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
+	if change.Type == ChangeCreate {
+		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
+	}
 	switch change.Field {
 	case fieldArchived:
 		archived, ok := change.NewValue.(bool)
