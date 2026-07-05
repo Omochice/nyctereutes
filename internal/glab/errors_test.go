@@ -12,18 +12,17 @@ func TestClassify(t *testing.T) {
 		stderr string
 		want   error
 	}{
-		// The stderr strings mirror glab's real output, which always ends in an
-		// "HTTP <code>" token; a 400 carries no message on stderr.
+		// The stderr strings mirror glab's real output, ending in an "HTTP <code>"
+		// token; a 400 carries no message on stderr.
 		{"not found", "glab: 404 Project Not Found (HTTP 404)", ErrNotFound},
 		{"forbidden", "glab: 403 Forbidden (HTTP 403)", ErrForbidden},
 		{"validation 400 bare", "glab: HTTP 400", ErrValidation},
 		{"validation 422", "glab: 422 Unprocessable Entity (HTTP 422)", ErrValidation},
 		{"unclassified 500", "glab: 500 Internal Server Error (HTTP 500)", nil},
-		// A digit run that is not the HTTP status token must not classify: an
-		// unrelated failure whose text merely mentions 404 stays unclassified.
+		// Digits outside the HTTP token must not classify, and must not shadow a
+		// real status: the 404 in a retry count stays nil, the 404 in a project
+		// name still classifies as its HTTP 400.
 		{"unrelated 404 digits", "glab: request failed after 404 retries", nil},
-		// A validation error naming a project that contains 404 must classify by
-		// its HTTP 400 token, not be shadowed into ErrNotFound by the digits.
 		{"validation naming a 404 project", "glab: 400 name project-404 is taken (HTTP 400)", ErrValidation},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
