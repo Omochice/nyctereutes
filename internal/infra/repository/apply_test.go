@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -19,6 +20,9 @@ type writerCall struct {
 	args  []string
 	stdin []byte // nil for a plain Run, the body for a RunWithStdin
 }
+
+// A stand-in glab failure so a test can force one call to fail.
+var errBoom = errors.New("boom")
 
 func (w *recordingWriter) Run(_ context.Context, args ...string) ([]byte, error) {
 	err := w.errAt[len(w.calls)]
@@ -46,6 +50,36 @@ func TestApplyPutsScalarField(t *testing.T) {
 	want := "api projects/group%2Fproj --method PUT -f description=a tool"
 	if got := strings.Join(writer.calls[0].args, " "); got != want {
 		t.Errorf("glab args = %q, want %q", got, want)
+	}
+}
+
+func TestApplyRunsEveryChangeAndReportsEachOutcome(t *testing.T) {
+	writer := &recordingWriter{errAt: map[int]error{1: errBoom}}
+	changes := []Change{
+		{Type: ChangeUpdate, Name: "group/sub/proj", Field: fieldDescription, NewValue: "x"},
+		{Type: ChangeUpdate, Name: "group/sub/proj", Field: fieldVisibility, NewValue: manifest.Visibility("private")},
+		{Type: ChangeUpdate, Name: "group/sub/proj", Field: fieldDefaultBranch, NewValue: "main"},
+	}
+
+	results := NewApplier(writer).Apply(context.Background(), changes)
+
+	if len(results) != 3 {
+		t.Fatalf("results = %d, want 3", len(results))
+	}
+	if results[0].Err != nil || results[2].Err != nil {
+		t.Errorf("edge results = %v/%v, want both nil", results[0].Err, results[2].Err)
+	}
+	if results[1].Err == nil {
+		t.Errorf("middle result Err = nil, want the failure")
+	}
+	if len(writer.calls) != 3 {
+		t.Errorf("calls = %d, want 3 (every change runs despite the failure)", len(writer.calls))
+	}
+	if got := writer.calls[0].args[1]; got != "projects/group%2Fsub%2Fproj" {
+		t.Errorf("nested path = %q, want projects/group%%2Fsub%%2Fproj", got)
+	}
+	if results[0].Change.Field != fieldDescription || results[2].Change.Field != fieldDefaultBranch {
+		t.Errorf("result order not preserved: %q, %q", results[0].Change.Field, results[2].Change.Field)
 	}
 }
 
