@@ -6,18 +6,18 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// ChangeType names the kind of drift a [Change] records.
+// The kind of drift a [Change] records.
 type ChangeType string
 
 const (
-	// ChangeCreate marks a project the manifest declares but GitLab does not have.
+	// Marks a project the manifest declares but GitLab does not have.
 	ChangeCreate ChangeType = "create"
-	// ChangeUpdate marks a field whose live value differs from the declared one.
+	// Marks a field whose live value differs from the declared one.
 	ChangeUpdate ChangeType = "update"
 )
 
-// The manifest field names a [Change] reports drift for, named once so the
-// scattered literals (including struct tags) do not drift apart.
+// Field names shared with the manifest struct tags, kept as constants so the
+// scattered copies cannot drift apart.
 const (
 	fieldDescription = "description"
 	fieldVisibility  = "visibility"
@@ -25,8 +25,8 @@ const (
 	fieldTopics      = "topics"
 )
 
-// Change is one planned difference between a declared manifest and the live
-// project: a whole project to create, or one field to update.
+// One planned difference between a declared manifest and the live project: a
+// whole project to create, or one field to update.
 type Change struct {
 	Type     ChangeType
 	Name     string
@@ -35,10 +35,8 @@ type Change struct {
 	NewValue any
 }
 
-// String renders one plan line under the project's own header: a create marks
-// the whole project, an update shows the field's live value giving way to the
-// declared one. The header already carries the project name, so neither
-// repeats it.
+// Renders one plan line. The project header already carries the name, so
+// neither a create nor an update line repeats it.
 func (c Change) String() string {
 	switch c.Type {
 	case ChangeCreate:
@@ -50,9 +48,9 @@ func (c Change) String() string {
 	}
 }
 
-// Diff reports how the live project differs from the declared manifest. A
-// project GitLab does not have yields a single create; otherwise each declared
-// field that differs from the live value yields an update.
+// Reports how the live project differs from the declared manifest: a create
+// when GitLab lacks the project, otherwise one update per differing declared
+// field.
 func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	name := desired.Metadata.Owner + "/" + desired.Metadata.Name
 
@@ -76,9 +74,8 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	return changes
 }
 
-// sameStringSet reports whether left and right hold the same elements
-// regardless of order, treating repeats as distinct so a genuine multiplicity
-// change shows.
+// Reports whether left and right hold the same elements ignoring order;
+// repeats are significant.
 func sameStringSet(left, right []string) bool {
 	if len(left) != len(right) {
 		return false
@@ -96,9 +93,8 @@ func sameStringSet(left, right []string) bool {
 	return true
 }
 
-// appendChanged records an update when the manifest declares the field
-// (desired is non-nil) and its value differs from the live one. A nil desired
-// means the manifest is silent about the field, so the live value is left as-is.
+// Appends an update unless the manifest is silent about the field (desired is
+// nil), in which case the live value is left as-is.
 func appendChanged[Value comparable](changes *[]Change, name, field string, desired *Value, current Value) {
 	if desired == nil || *desired == current {
 		return

@@ -214,8 +214,7 @@ type infraPlanCommand struct {
 	CI bool `long:"ci" description:"exit non-zero when any drift is detected"`
 }
 
-// Shows how each declared manifest differs from its live GitLab project. Every
-// project's drift is printed under an "owner/name" header on stdout.
+// Shows how each declared manifest differs from its live GitLab project.
 func (c *infraPlanCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errPlanNeedsPath
@@ -253,10 +252,9 @@ func (c *infraPlanCommand) Execute(args []string) error {
 	return nil
 }
 
-// Plans every manifest document in one file against its live project, printing
-// each drifting project's changes. It returns how many projects drifted and
-// how many problems (unreadable file, parse errors, fetch failures) it hit, so
-// one bad document or project never hides the rest.
+// Plans each document in one file against its live project. Problems are
+// reported and counted rather than fatal, so one bad document or project never
+// hides the rest.
 func (c *infraPlanCommand) planFile(
 	ctx context.Context, client *repository.Client, file string,
 ) (changed, failures int) {
