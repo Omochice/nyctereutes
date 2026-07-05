@@ -215,8 +215,10 @@
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
+            pkgs.go
             pkgs.godoclint
             pkgs.golangci-lint
+            pkgs.octocov
             treefmt.config.build.wrapper
           ];
           inherit (gitHooks) shellHook;
