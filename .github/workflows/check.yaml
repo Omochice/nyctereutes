@@ -62,7 +62,9 @@ jobs:
       - name: Expose Nix-provided octocov on PATH
         run: |
           nix develop --command bash <<'EOF' >> "$GITHUB_PATH"
-          dirname "$(command -v octocov)"
+          set -euo pipefail
+          octocov_path="$(command -v octocov)"
+          dirname "$octocov_path"
           EOF
       - name: Report coverage
         uses: k1LoW/octocov-action@b3b6ee60482a667950f87553abf1df63217235d9 # v1.5.1
