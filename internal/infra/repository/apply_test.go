@@ -83,6 +83,25 @@ func TestApplyRunsEveryChangeAndReportsEachOutcome(t *testing.T) {
 	}
 }
 
+func TestApplyFeatureFailureNamesPlanField(t *testing.T) {
+	writer := &recordingWriter{errAt: map[int]error{0: errBoom}}
+	changes := []Change{
+		{Type: ChangeUpdate, Name: "group/proj", Field: "features.issues", NewValue: manifest.AccessLevel("enabled")},
+	}
+
+	results := NewApplier(writer).Apply(context.Background(), changes)
+
+	if len(results) != 1 || results[0].Err == nil {
+		t.Fatalf("results = %+v, want one failed result", results)
+	}
+	if got := results[0].Err.Error(); !strings.Contains(got, "features.issues") {
+		t.Errorf("error = %q, want it to name the plan field features.issues", got)
+	}
+	if got := results[0].Err.Error(); strings.Contains(got, "issues_access_level") {
+		t.Errorf("error = %q, should not leak the API param name", got)
+	}
+}
+
 func TestApplyReportsCreateAsUnsupported(t *testing.T) {
 	writer := &recordingWriter{}
 	changes := []Change{{Type: ChangeCreate, Name: "group/newproj", Field: fieldRepository, NewValue: "group/newproj"}}
