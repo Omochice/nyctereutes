@@ -5,6 +5,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -125,10 +126,11 @@ func parseProject(out []byte) (*CurrentState, error) {
 	return &CurrentState{rawProject: raw}, nil
 }
 
-// Reports whether err is a GitLab 404. It matches the status in the glab error
-// text, mirroring how the dep client detects an already-approved 401.
+// Reports whether err is a GitLab 404. It relies on the sentinel the glab
+// runner wraps around a classified not-found response, so an unrelated failure
+// whose text merely mentions 404 is not mistaken for a missing project.
 func isNotFound(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "404")
+	return errors.Is(err, glab.ErrNotFound)
 }
 
 // Converts current state into a Repository manifest document, emitting only the
