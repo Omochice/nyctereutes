@@ -26,7 +26,9 @@ const sampleProjectJSON = `{"description":"a tool","visibility":"private","topic
 	`"issues_access_level":"enabled","merge_requests_access_level":"private","wiki_access_level":"disabled",` +
 	`"builds_access_level":"enabled","snippets_access_level":"enabled","container_registry_access_level":"private"}`
 
-var errGlab404 = errors.New("glab api projects/x: exit status 1\n404 Project Not Found")
+// The glab runner wraps a classified 404 with glab.ErrNotFound; the fake
+// mirrors that so the consumer is exercised through errors.Is, not the text.
+var errGlab404 = fmt.Errorf("%w: glab api projects/x: exit status 1\n404 Project Not Found", glab.ErrNotFound)
 
 // wantPtr fails the test unless got points to want.
 func wantPtr[Value ~string](t *testing.T, name string, got *Value, want string) {
@@ -87,6 +89,25 @@ func TestFetchRepositoryNotFoundIsNew(t *testing.T) {
 	}
 	if !state.IsNew {
 		t.Errorf("IsNew = false, want true for a missing project")
+	}
+}
+
+// A fetch failure that is not the classified not-found sentinel must surface
+// as an error, even when its text happens to contain "404": only errors.Is
+// against glab.ErrNotFound, not a substring match, may stand in for a missing
+// project.
+func TestFetchRepositoryUnclassifiedErrorSurfaces(t *testing.T) {
+	unrelated := errors.New("glab api projects/x: exit status 1\nfailed after 404 retries")
+	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+		return nil, unrelated
+	})
+
+	_, err := NewClient(runner).FetchRepository(context.Background(), "group", "proj")
+	if err == nil {
+		t.Fatal("FetchRepository should surface an unclassified error, got nil")
+	}
+	if !errors.Is(err, unrelated) {
+		t.Errorf("FetchRepository error = %v, want it to wrap the unclassified cause", err)
 	}
 }
 
