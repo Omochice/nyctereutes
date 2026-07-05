@@ -15,14 +15,10 @@ var (
 	ErrValidation = errors.New("glab: validation failed (400/422)")
 )
 
-// Detection keys on the "HTTP <code>" token glab always appends to a failed
-// run's stderr (for example "glab: 404 Project Not Found (HTTP 404)", or a bare
-// "glab: HTTP 400" when the body carries no message). Matching that token
-// rather than a bare status number avoids classifying an unrelated error whose
-// text merely contains the digits (a "project-404" name, a retry count), and
-// the descriptive phrase is unreliable: a 400 emits none on stderr. An
-// unmatched status loses no information, since the raw stderr stays in the
-// wrapping error.
+// Keys on the "HTTP <code>" token glab appends to a failed run's stderr, not a
+// bare status number: an unrelated error that merely mentions the digits (a
+// "project-404" name, a retry count) must not classify, and a 400 emits no
+// phrase to match on instead.
 func classify(stderr string) error {
 	switch {
 	case strings.Contains(stderr, "HTTP 404"):
