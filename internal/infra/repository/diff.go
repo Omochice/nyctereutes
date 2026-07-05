@@ -19,11 +19,17 @@ const (
 // Field names shared with the manifest struct tags, kept as constants so the
 // scattered copies cannot drift apart.
 const (
-	fieldDescription = "description"
-	fieldVisibility  = "visibility"
-	fieldArchived    = "archived"
-	fieldTopics      = "topics"
-	fieldRepository  = "repository"
+	fieldDescription                = "description"
+	fieldVisibility                 = "visibility"
+	fieldArchived                   = "archived"
+	fieldTopics                     = "topics"
+	fieldRepository                 = "repository"
+	fieldRequestAccessEnabled       = "request_access_enabled"
+	fieldEnforceAuthChecksOnUploads = "enforce_auth_checks_on_uploads"
+	fieldDefaultBranch              = "default_branch"
+	fieldMergeCommitTemplate        = "merge_commit_template"
+	fieldSquashCommitTemplate       = "squash_commit_template"
+	fieldMergeRequestsTemplate      = "merge_requests_template"
 )
 
 // One planned difference between a declared manifest and the live project: a
@@ -64,16 +70,16 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	appendChanged(&changes, name, fieldDescription, spec.Description, string(current.Description))
 	appendChanged(&changes, name, fieldVisibility, spec.Visibility, manifest.Visibility(current.Visibility))
 	appendChanged(&changes, name, fieldArchived, spec.Archived, boolValue(current.Archived))
-	appendChanged(&changes, name, "request_access_enabled",
+	appendChanged(&changes, name, fieldRequestAccessEnabled,
 		spec.RequestAccessEnabled, boolValue(current.RequestAccessEnabled))
-	appendChanged(&changes, name, "enforce_auth_checks_on_uploads",
+	appendChanged(&changes, name, fieldEnforceAuthChecksOnUploads,
 		spec.EnforceAuthChecksOnUploads, boolValue(current.EnforceAuthChecksOnUploads))
-	appendChanged(&changes, name, "default_branch", spec.DefaultBranch, string(current.DefaultBranch))
-	appendChanged(&changes, name, "merge_commit_template",
+	appendChanged(&changes, name, fieldDefaultBranch, spec.DefaultBranch, string(current.DefaultBranch))
+	appendChanged(&changes, name, fieldMergeCommitTemplate,
 		spec.MergeCommitTemplate, textValue(current.MergeCommitTemplate))
-	appendChanged(&changes, name, "squash_commit_template",
+	appendChanged(&changes, name, fieldSquashCommitTemplate,
 		spec.SquashCommitTemplate, textValue(current.SquashCommitTemplate))
-	appendChanged(&changes, name, "merge_requests_template",
+	appendChanged(&changes, name, fieldMergeRequestsTemplate,
 		spec.MergeRequestsTemplate, textValue(current.MergeRequestsTemplate))
 	// A nil topics list is omitted and left as-is the way a nil pointer is for
 	// the scalar fields; an explicit empty list clears the topics. Order
