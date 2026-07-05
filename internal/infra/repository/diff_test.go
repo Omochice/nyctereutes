@@ -267,6 +267,28 @@ func TestDiffReportsTemplateChanges(t *testing.T) {
 	}
 }
 
+// An unreported bool or template (nil live pointer) counts as the zero value,
+// so a manifest declaring that zero is not seen as drift.
+func TestDiffTreatsUnreportedAsZero(t *testing.T) {
+	off := false
+	empty := ""
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec: manifest.RepositorySpec{
+			RequestAccessEnabled: &off,
+			MergeCommitTemplate:  &empty,
+		},
+	}
+	current := &CurrentState{rawProject: rawProject{
+		RequestAccessEnabled: nil,
+		MergeCommitTemplate:  nil,
+	}}
+
+	if changes := Diff(desired, current); len(changes) != 0 {
+		t.Errorf("changes = %+v, want none when declared zero matches unreported live", changes)
+	}
+}
+
 // A manifest that omits the features block manages no feature, so live access
 // levels must not surface as drift.
 func TestDiffIgnoresAbsentFeaturesBlock(t *testing.T) {
