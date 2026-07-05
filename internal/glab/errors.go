@@ -15,17 +15,21 @@ var (
 	ErrValidation = errors.New("glab: validation failed (400/422)")
 )
 
-// Detection is by substring because glab surfaces the HTTP status and phrase
-// verbatim; the raw stderr stays in the wrapping error, so an unmatched status
-// loses no information.
+// Detection keys on the "HTTP <code>" token glab always appends to a failed
+// run's stderr (for example "glab: 404 Project Not Found (HTTP 404)", or a bare
+// "glab: HTTP 400" when the body carries no message). Matching that token
+// rather than a bare status number avoids classifying an unrelated error whose
+// text merely contains the digits (a "project-404" name, a retry count), and
+// the descriptive phrase is unreliable: a 400 emits none on stderr. An
+// unmatched status loses no information, since the raw stderr stays in the
+// wrapping error.
 func classify(stderr string) error {
 	switch {
-	case strings.Contains(stderr, "404") || strings.Contains(stderr, "Not Found"):
+	case strings.Contains(stderr, "HTTP 404"):
 		return ErrNotFound
-	case strings.Contains(stderr, "403") || strings.Contains(stderr, "Forbidden"):
+	case strings.Contains(stderr, "HTTP 403"):
 		return ErrForbidden
-	case strings.Contains(stderr, "400") || strings.Contains(stderr, "422") ||
-		strings.Contains(stderr, "Unprocessable") || strings.Contains(stderr, "validation"):
+	case strings.Contains(stderr, "HTTP 400") || strings.Contains(stderr, "HTTP 422"):
 		return ErrValidation
 	}
 	return nil
