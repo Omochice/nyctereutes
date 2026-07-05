@@ -58,6 +58,21 @@
               "wsl_v5" # successor of wsl, same opinionated whitespace rules
               # keep-sorted end
             ];
+            exclusions.rules = [
+              {
+                # Test fixtures state their data as literals on purpose; forcing
+                # them into shared constants, wrapping simulated errors, or
+                # naming static sentinels hurts test readability.
+                path = "_test\\.go";
+                linters = [
+                  # keep-sorted start
+                  "err113"
+                  "goconst"
+                  "wrapcheck"
+                  # keep-sorted end
+                ];
+              }
+            ];
           };
         };
         treefmt = treefmt-nix.lib.evalModule pkgs (

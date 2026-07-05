@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,9 @@ var (
 	errValidateNeedsPath = errors.New("validate requires at least one <path>")
 	errInvalidManifests  = errors.New("validation failed")
 	errNoManifestsFound  = errors.New("no .yaml/.yml files in directory")
+	errPlanNeedsPath     = errors.New("plan requires at least one <path>")
+	errPlanDrift         = errors.New("changes detected")
+	errPlanFailed        = errors.New("plan failed")
 )
 
 type infraCommand struct {
@@ -28,6 +32,7 @@ type infraCommand struct {
 
 	Import   *infraImportCommand   `command:"import" description:"export GitLab project settings as YAML"`
 	Validate *infraValidateCommand `command:"validate" description:"validate manifest YAML files against the schema"`
+	Plan     *infraPlanCommand     `command:"plan" description:"show drift between manifests and live GitLab state"`
 }
 
 func newInfraCommand(inout *cli.ProcInout, runner glab.Runner) *infraCommand {
@@ -36,6 +41,7 @@ func newInfraCommand(inout *cli.ProcInout, runner glab.Runner) *infraCommand {
 		runner:   runner,
 		Import:   &infraImportCommand{inout: inout, runner: runner},
 		Validate: &infraValidateCommand{inout: inout},
+		Plan:     &infraPlanCommand{inout: inout, runner: runner},
 	}
 }
 
@@ -133,7 +139,7 @@ func (c *infraValidateCommand) Execute(args []string) error {
 			continue
 		}
 		for _, file := range files {
-			parsed, failed := c.validateFile(file)
+			parsed, failed := readManifestFile(c.inout.Stderr, file)
 			repos = append(repos, parsed...)
 			failures += failed
 		}
@@ -149,17 +155,19 @@ func (c *infraValidateCommand) Execute(args []string) error {
 	return nil
 }
 
-// Reports every schema violation in one file to stderr and returns the
-// documents that validated along with the number of problems found.
-func (c *infraValidateCommand) validateFile(path string) ([]*manifest.Repository, int) {
+// Reads and parses one manifest file, reporting an unreadable file or any
+// parse error to stderr and returning the documents that parsed with the
+// number of problems found. Validate and plan share it so the two commands
+// read manifests identically.
+func readManifestFile(stderr io.Writer, path string) ([]*manifest.Repository, int) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
-		_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
 		return nil, 1
 	}
 	repos, errs := manifest.Parse(data)
 	for _, parseErr := range errs {
-		_, _ = fmt.Fprintf(c.inout.Stderr, "%s: %v\n", path, parseErr)
+		_, _ = fmt.Fprintf(stderr, "%s: %v\n", path, parseErr)
 	}
 	return repos, len(errs)
 }
@@ -197,4 +205,76 @@ func manifestFiles(path string) ([]string, error) {
 		return nil, fmt.Errorf("%w: %s", errNoManifestsFound, path)
 	}
 	return files, nil
+}
+
+type infraPlanCommand struct {
+	inout  *cli.ProcInout
+	runner glab.Runner
+
+	CI bool `long:"ci" description:"exit non-zero when any drift is detected"`
+}
+
+// Shows how each declared manifest differs from its live GitLab project.
+func (c *infraPlanCommand) Execute(args []string) error {
+	if len(args) == 0 {
+		return errPlanNeedsPath
+	}
+
+	ctx := context.Background()
+	client := repository.NewClient(c.runner)
+	changed := 0
+	failures := 0
+	for _, path := range args {
+		files, err := manifestFiles(path)
+		if err != nil {
+			_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+			failures++
+			continue
+		}
+		for _, file := range files {
+			fileChanged, fileFailures := c.planFile(ctx, client, file)
+			changed += fileChanged
+			failures += fileFailures
+		}
+	}
+
+	if changed == 0 && failures == 0 {
+		_, _ = fmt.Fprintln(c.inout.Stdout, "No changes.")
+	}
+	if failures > 0 {
+		return fmt.Errorf("%w: %d problem(s)", errPlanFailed, failures)
+	}
+	// Drift is reported, not an error, so a human run always succeeds; --ci
+	// turns detected drift into a non-zero exit for pipeline gating.
+	if c.CI && changed > 0 {
+		return errPlanDrift
+	}
+	return nil
+}
+
+// Plans each document in one file against its live project. Problems are
+// reported and counted rather than fatal, so one bad document or project never
+// hides the rest.
+func (c *infraPlanCommand) planFile(
+	ctx context.Context, client *repository.Client, file string,
+) (changed, failures int) {
+	repos, failures := readManifestFile(c.inout.Stderr, file)
+	for _, repo := range repos {
+		state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+		if err != nil {
+			_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+			failures++
+			continue
+		}
+		changes := repository.Diff(repo, state)
+		if len(changes) == 0 {
+			continue
+		}
+		changed++
+		_, _ = fmt.Fprintf(c.inout.Stdout, "%s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
+		for _, change := range changes {
+			_, _ = fmt.Fprintf(c.inout.Stdout, "  %s\n", change)
+		}
+	}
+	return changed, failures
 }
