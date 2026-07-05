@@ -39,7 +39,10 @@ func NewClient(runner glab.Runner) *Client {
 func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*CurrentState, error) {
 	out, err := c.runner.Run(ctx, "api", "projects/"+glab.EncodePath(owner+"/"+name))
 	if err != nil {
-		if isNotFound(err) {
+		// A classified 404 means the project is absent, not a real failure; the
+		// sentinel, not the error text, keeps an unrelated failure that merely
+		// mentions 404 from being mistaken for a missing project.
+		if errors.Is(err, glab.ErrNotFound) {
 			return &CurrentState{Owner: owner, Name: name, IsNew: true}, nil
 		}
 		return nil, fmt.Errorf("fetch project %s/%s: %w", owner, name, err)
@@ -124,13 +127,6 @@ func parseProject(out []byte) (*CurrentState, error) {
 	}
 
 	return &CurrentState{rawProject: raw}, nil
-}
-
-// Matches on the sentinel the glab runner wraps around a classified not-found
-// response, so an unrelated failure whose text merely mentions 404 is not
-// mistaken for a missing project.
-func isNotFound(err error) bool {
-	return errors.Is(err, glab.ErrNotFound)
 }
 
 // Converts current state into a Repository manifest document, emitting only the
