@@ -73,7 +73,7 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 		}
 		return a.applyTopics(ctx, change.Name, topics)
 	default:
-		return a.putField(ctx, change.Name, apiParam(change.Field), fmt.Sprintf("%v", change.NewValue))
+		return a.putField(ctx, change.Name, change.Field, fmt.Sprintf("%v", change.NewValue))
 	}
 }
 
@@ -113,15 +113,17 @@ func apiParam(field string) string {
 	return key + "_access_level"
 }
 
-// Updates one scalar project setting with a PUT to the projects endpoint.
-func (a *Applier) putField(ctx context.Context, project, field, value string) error {
+// Updates one scalar project setting with a PUT to the projects endpoint. The
+// plan field names the change to GitLab's API parameter for the request but to
+// the manifest field in any error, so a failure lines up with the printed plan.
+func (a *Applier) putField(ctx context.Context, project, planField, value string) error {
 	_, err := a.writer.Run(
 		ctx,
 		"api", "projects/"+glab.EncodePath(project),
 		"--method", "PUT",
-		"-f", field+"="+value,
+		"-f", apiParam(planField)+"="+value,
 	)
-	return wrapWrite(err, project, field)
+	return wrapWrite(err, project, planField)
 }
 
 // Replaces a project's whole topic list. GitLab's projects PUT performs a full
