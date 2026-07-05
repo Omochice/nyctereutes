@@ -90,12 +90,33 @@ func (a *Applier) setArchived(ctx context.Context, project string, archived bool
 
 // Adds the project and field to a failed write so an aggregated report names
 // what could not be applied; a nil error passes through so callers need no
-// guard of their own.
+// guard of their own. A classified API failure also gains a hint describing how
+// to act on that class, prepended to the chain so [errors.Is] still finds the
+// sentinel.
 func wrapWrite(err error, project, field string) error {
 	if err == nil {
 		return nil
 	}
+	if hint := writeHint(err); hint != "" {
+		err = fmt.Errorf("%s: %w", hint, err)
+	}
 	return fmt.Errorf("apply %s on %s: %w", field, project, err)
+}
+
+// Returns an actionable hint for a classified glab failure, or "" when the
+// error is not one the glab runner classified. The hints name the likely cause
+// so a caller reading the aggregated report knows whether to fix a token, a
+// path, or a value.
+func writeHint(err error) string {
+	switch {
+	case errors.Is(err, glab.ErrForbidden):
+		return "permission denied; check the token has the Maintainer or Owner role"
+	case errors.Is(err, glab.ErrNotFound):
+		return "project not found; it may have been removed or renamed"
+	case errors.Is(err, glab.ErrValidation):
+		return "GitLab rejected the value"
+	}
+	return ""
 }
 
 // Maps a plan field name to the GitLab API parameter that carries it. A
