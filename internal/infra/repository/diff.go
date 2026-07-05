@@ -59,19 +59,44 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	}
 
 	var changes []Change
-	appendChanged(&changes, name, fieldDescription, desired.Spec.Description, string(current.Description))
-	appendChanged(&changes, name, fieldVisibility, desired.Spec.Visibility, manifest.Visibility(current.Visibility))
-	appendChanged(&changes, name, fieldArchived, desired.Spec.Archived, current.Archived != nil && *current.Archived)
+	spec := desired.Spec
+	appendChanged(&changes, name, fieldDescription, spec.Description, string(current.Description))
+	appendChanged(&changes, name, fieldVisibility, spec.Visibility, manifest.Visibility(current.Visibility))
+	appendChanged(&changes, name, fieldArchived, spec.Archived, boolValue(current.Archived))
+	appendChanged(&changes, name, "request_access_enabled",
+		spec.RequestAccessEnabled, boolValue(current.RequestAccessEnabled))
+	appendChanged(&changes, name, "enforce_auth_checks_on_uploads",
+		spec.EnforceAuthChecksOnUploads, boolValue(current.EnforceAuthChecksOnUploads))
+	appendChanged(&changes, name, "default_branch", spec.DefaultBranch, string(current.DefaultBranch))
+	appendChanged(&changes, name, "merge_commit_template",
+		spec.MergeCommitTemplate, textValue(current.MergeCommitTemplate))
+	appendChanged(&changes, name, "squash_commit_template",
+		spec.SquashCommitTemplate, textValue(current.SquashCommitTemplate))
+	appendChanged(&changes, name, "merge_requests_template",
+		spec.MergeRequestsTemplate, textValue(current.MergeRequestsTemplate))
 	// A nil topics list is omitted and left as-is the way a nil pointer is for
 	// the scalar fields; an explicit empty list clears the topics. Order
 	// carries no meaning.
-	if desired.Spec.Topics != nil && !sameStringSet(desired.Spec.Topics, current.Topics) {
+	if spec.Topics != nil && !sameStringSet(spec.Topics, current.Topics) {
 		changes = append(changes, Change{
 			Type: ChangeUpdate, Name: name, Field: fieldTopics,
-			OldValue: current.Topics, NewValue: desired.Spec.Topics,
+			OldValue: current.Topics, NewValue: spec.Topics,
 		})
 	}
 	return changes
+}
+
+// A nil pointer is the live value GitLab did not report; it counts as the zero
+// value so a manifest declaring that zero is not seen as drift.
+func boolValue(b *bool) bool {
+	return b != nil && *b
+}
+
+func textValue(t *freeText) string {
+	if t == nil {
+		return ""
+	}
+	return string(*t)
 }
 
 // Reports whether left and right hold the same elements ignoring order;

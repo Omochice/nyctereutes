@@ -171,15 +171,23 @@ func TestDiffComparesTopicsAsSet(t *testing.T) {
 }
 
 func TestDiffReportsBooleanChanges(t *testing.T) {
-	yes := true
-	no := false
+	enabled := true
+	disabled := false
 	cases := []struct {
 		name  string
 		spec  manifest.RepositorySpec
 		state rawProject
 	}{
-		{"request_access_enabled", manifest.RepositorySpec{RequestAccessEnabled: &yes}, rawProject{RequestAccessEnabled: &no}},
-		{"enforce_auth_checks_on_uploads", manifest.RepositorySpec{EnforceAuthChecksOnUploads: &yes}, rawProject{EnforceAuthChecksOnUploads: &no}},
+		{
+			name:  "request_access_enabled",
+			spec:  manifest.RepositorySpec{RequestAccessEnabled: &enabled},
+			state: rawProject{RequestAccessEnabled: &disabled},
+		},
+		{
+			name:  "enforce_auth_checks_on_uploads",
+			spec:  manifest.RepositorySpec{EnforceAuthChecksOnUploads: &enabled},
+			state: rawProject{EnforceAuthChecksOnUploads: &disabled},
+		},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {
@@ -224,9 +232,21 @@ func TestDiffReportsTemplateChanges(t *testing.T) {
 		spec  manifest.RepositorySpec
 		state rawProject
 	}{
-		{"merge_commit_template", manifest.RepositorySpec{MergeCommitTemplate: &want}, rawProject{MergeCommitTemplate: &live}},
-		{"squash_commit_template", manifest.RepositorySpec{SquashCommitTemplate: &want}, rawProject{SquashCommitTemplate: &live}},
-		{"merge_requests_template", manifest.RepositorySpec{MergeRequestsTemplate: &want}, rawProject{MergeRequestsTemplate: &live}},
+		{
+			name:  "merge_commit_template",
+			spec:  manifest.RepositorySpec{MergeCommitTemplate: &want},
+			state: rawProject{MergeCommitTemplate: &live},
+		},
+		{
+			name:  "squash_commit_template",
+			spec:  manifest.RepositorySpec{SquashCommitTemplate: &want},
+			state: rawProject{SquashCommitTemplate: &live},
+		},
+		{
+			name:  "merge_requests_template",
+			spec:  manifest.RepositorySpec{MergeRequestsTemplate: &want},
+			state: rawProject{MergeRequestsTemplate: &live},
+		},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {
