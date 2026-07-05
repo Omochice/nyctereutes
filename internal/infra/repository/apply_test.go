@@ -49,6 +49,35 @@ func TestApplyPutsScalarField(t *testing.T) {
 	}
 }
 
+func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		field   string
+		wantArg string
+	}{
+		{"issues", "features.issues", "-f issues_access_level=enabled"},
+		{"container_registry", "features.container_registry", "-f container_registry_access_level=enabled"},
+		{"ci maps to builds", "features.ci", "-f builds_access_level=enabled"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &recordingWriter{}
+			changes := []Change{
+				{Type: ChangeUpdate, Name: "group/proj", Field: tc.field, NewValue: manifest.AccessLevel("enabled")},
+			}
+
+			results := NewApplier(writer).Apply(context.Background(), changes)
+
+			if len(results) != 1 || results[0].Err != nil {
+				t.Fatalf("results = %+v, want one successful result", results)
+			}
+			want := "api projects/group%2Fproj --method PUT " + tc.wantArg
+			if got := strings.Join(writer.calls[0].args, " "); got != want {
+				t.Errorf("glab args = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
