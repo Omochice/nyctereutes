@@ -33,15 +33,21 @@ type infraCommand struct {
 	Import   *infraImportCommand   `command:"import" description:"export GitLab project settings as YAML"`
 	Validate *infraValidateCommand `command:"validate" description:"validate manifest YAML files against the schema"`
 	Plan     *infraPlanCommand     `command:"plan" description:"show drift between manifests and live GitLab state"`
+	Apply    *infraApplyCommand    `command:"apply" description:"apply manifests to live GitLab state"`
 }
 
 func newInfraCommand(inout *cli.ProcInout, runner glab.Runner) *infraCommand {
+	// apply needs to stream a request body for topics, which only the
+	// stdin-capable runner provides; a runner without it leaves writer nil and
+	// apply reports that it cannot write.
+	writer, _ := runner.(repository.ProjectWriter)
 	return &infraCommand{
 		inout:    inout,
 		runner:   runner,
 		Import:   &infraImportCommand{inout: inout, runner: runner},
 		Validate: &infraValidateCommand{inout: inout},
 		Plan:     &infraPlanCommand{inout: inout, runner: runner},
+		Apply:    &infraApplyCommand{inout: inout, writer: writer},
 	}
 }
 

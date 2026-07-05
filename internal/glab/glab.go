@@ -31,9 +31,25 @@ type ExecRunner struct{}
 // Executes "glab <args...>". On failure the error includes glab's stderr so the
 // underlying cause (for example a missing login) is surfaced verbatim.
 func (ExecRunner) Run(ctx context.Context, args ...string) ([]byte, error) {
+	return runGlab(ctx, nil, args)
+}
+
+// Executes "glab <args...>" with body written to its stdin, for commands that
+// read a request payload through "--input -" (the topics PUT). Errors carry
+// glab's stderr exactly as Run does.
+func (ExecRunner) RunWithStdin(ctx context.Context, body []byte, args ...string) ([]byte, error) {
+	return runGlab(ctx, body, args)
+}
+
+// Runs glab with the given args, optionally feeding stdin from body (nil for
+// none), and returns its stdout. A non-nil error carries glab's stderr verbatim.
+func runGlab(ctx context.Context, body []byte, args []string) ([]byte, error) {
 	// glab is a fixed trusted binary; passing dynamic args to it is this
 	// package's entire purpose.
 	cmd := exec.CommandContext(ctx, "glab", args...) //nolint:gosec // G204: args are intended dynamic glab arguments
+	if body != nil {
+		cmd.Stdin = bytes.NewReader(body)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
