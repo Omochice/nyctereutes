@@ -83,6 +83,20 @@ func TestApplyRunsEveryChangeAndReportsEachOutcome(t *testing.T) {
 	}
 }
 
+func TestApplyReportsCreateAsUnsupported(t *testing.T) {
+	writer := &recordingWriter{}
+	changes := []Change{{Type: ChangeCreate, Name: "group/newproj", Field: fieldRepository, NewValue: "group/newproj"}}
+
+	results := NewApplier(writer).Apply(context.Background(), changes)
+
+	if len(results) != 1 || results[0].Err == nil {
+		t.Fatalf("results = %+v, want one failed result", results)
+	}
+	if len(writer.calls) != 0 {
+		t.Errorf("calls = %d, want 0 (create must not write)", len(writer.calls))
+	}
+}
+
 func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
