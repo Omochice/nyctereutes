@@ -78,6 +78,35 @@ func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
 	}
 }
 
+func TestApplyReplacesTopicsViaJSONStdin(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		topics   []string
+		wantBody string
+	}{
+		{"replace", []string{"go", "cli"}, `{"topics":["go","cli"]}`},
+		{"clear", []string{}, `{"topics":[]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &recordingWriter{}
+			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldTopics, NewValue: tc.topics}}
+
+			results := NewApplier(writer).Apply(context.Background(), changes)
+
+			if len(results) != 1 || results[0].Err != nil {
+				t.Fatalf("results = %+v, want one successful result", results)
+			}
+			wantArgs := "api projects/group%2Fproj --method PUT --header Content-Type: application/json --input -"
+			if got := strings.Join(writer.calls[0].args, " "); got != wantArgs {
+				t.Errorf("glab args = %q, want %q", got, wantArgs)
+			}
+			if got := string(writer.calls[0].stdin); got != tc.wantBody {
+				t.Errorf("stdin = %q, want %q", got, tc.wantBody)
+			}
+		})
+	}
+}
+
 func TestApplyArchivesThroughDedicatedEndpoint(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
