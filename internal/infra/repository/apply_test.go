@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
@@ -99,6 +101,63 @@ func TestApplyFeatureFailureNamesPlanField(t *testing.T) {
 	}
 	if got := results[0].Err.Error(); strings.Contains(got, "issues_access_level") {
 		t.Errorf("error = %q, should not leak the API param name", got)
+	}
+}
+
+// A classified write failure keeps the sentinel in the chain, so errors.Is
+// still identifies the cause, and prepends a human hint that says how to act
+// on that class of failure. One case per sentinel so a swapped hint cannot
+// pass.
+func TestApplyClassifiesWriteFailures(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		cause    error
+		wantHint string
+	}{
+		{"forbidden", fmt.Errorf("%w: 403 Forbidden", glab.ErrForbidden), "permission"},
+		{"not found", fmt.Errorf("%w: 404 Not Found", glab.ErrNotFound), "not found"},
+		{"validation", fmt.Errorf("%w: 400 Bad Request", glab.ErrValidation), "reject"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			writer := &recordingWriter{errAt: map[int]error{0: testCase.cause}}
+			changes := []Change{
+				{Type: ChangeUpdate, Name: "group/proj", Field: fieldDescription, NewValue: "x"},
+			}
+
+			results := NewApplier(writer).Apply(context.Background(), changes)
+
+			if len(results) != 1 || results[0].Err == nil {
+				t.Fatalf("results = %+v, want one failed result", results)
+			}
+			if !errors.Is(results[0].Err, testCase.cause) {
+				t.Errorf("error = %v, want it to keep the sentinel cause in the chain", results[0].Err)
+			}
+			if got := results[0].Err.Error(); !strings.Contains(got, testCase.wantHint) {
+				t.Errorf("error = %q, want a hint containing %q", got, testCase.wantHint)
+			}
+			if got := results[0].Err.Error(); !strings.Contains(got, "description") ||
+				!strings.Contains(got, "group/proj") {
+				t.Errorf("error = %q, want it to still name the field and project", got)
+			}
+		})
+	}
+}
+
+// An unclassified write failure carries no hint, only the field, project, and
+// the underlying error, so the generic form is unchanged for non-API errors.
+func TestApplyUnclassifiedFailureStaysGeneric(t *testing.T) {
+	writer := &recordingWriter{errAt: map[int]error{0: errBoom}}
+	changes := []Change{
+		{Type: ChangeUpdate, Name: "group/proj", Field: fieldDescription, NewValue: "x"},
+	}
+
+	results := NewApplier(writer).Apply(context.Background(), changes)
+
+	if len(results) != 1 || results[0].Err == nil {
+		t.Fatalf("results = %+v, want one failed result", results)
+	}
+	if want := "apply description on group/proj: boom"; results[0].Err.Error() != want {
+		t.Errorf("error = %q, want %q", results[0].Err.Error(), want)
 	}
 }
 

@@ -5,6 +5,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -38,7 +39,10 @@ func NewClient(runner glab.Runner) *Client {
 func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*CurrentState, error) {
 	out, err := c.runner.Run(ctx, "api", "projects/"+glab.EncodePath(owner+"/"+name))
 	if err != nil {
-		if isNotFound(err) {
+		// A classified 404 means the project is absent, not a real failure; the
+		// sentinel, not the error text, keeps an unrelated failure that merely
+		// mentions 404 from being mistaken for a missing project.
+		if errors.Is(err, glab.ErrNotFound) {
 			return &CurrentState{Owner: owner, Name: name, IsNew: true}, nil
 		}
 		return nil, fmt.Errorf("fetch project %s/%s: %w", owner, name, err)
@@ -123,12 +127,6 @@ func parseProject(out []byte) (*CurrentState, error) {
 	}
 
 	return &CurrentState{rawProject: raw}, nil
-}
-
-// Reports whether err is a GitLab 404. It matches the status in the glab error
-// text, mirroring how the dep client detects an already-approved 401.
-func isNotFound(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "404")
 }
 
 // Converts current state into a Repository manifest document, emitting only the

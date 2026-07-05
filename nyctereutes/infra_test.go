@@ -7,10 +7,15 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
 var (
-	errInfra404       = errors.New("glab api: exit status 1\n404 Project Not Found")
+	// The glab runner wraps a classified not-found response with
+	// glab.ErrNotFound; the fake mirrors that so FetchRepository detects the
+	// 404 through errors.Is rather than the error text.
+	errInfra404       = fmt.Errorf("%w: glab api: exit status 1\n404 Project Not Found", glab.ErrNotFound)
 	errUnexpectedGlab = errors.New("unexpected glab call")
 )
 

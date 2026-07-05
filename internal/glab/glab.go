@@ -6,9 +6,7 @@ package glab
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
-	"strings"
 )
 
 // Executes the glab CLI with the given arguments and returns its stdout.
@@ -54,7 +52,7 @@ func runGlab(ctx context.Context, body []byte, args []string) ([]byte, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("glab %s: %w\n%s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+		return nil, glabError(args, err, stderr.String())
 	}
 	return stdout.Bytes(), nil
 }
