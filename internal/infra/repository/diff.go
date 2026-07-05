@@ -35,12 +35,14 @@ type Change struct {
 	NewValue any
 }
 
-// String renders one plan line: a create names the whole project, an update
-// shows the field's live value giving way to the declared one.
+// String renders one plan line under the project's own header: a create marks
+// the whole project, an update shows the field's live value giving way to the
+// declared one. The header already carries the project name, so neither
+// repeats it.
 func (c Change) String() string {
 	switch c.Type {
 	case ChangeCreate:
-		return fmt.Sprintf("+ %s (new repository)", c.Name)
+		return "+ new repository"
 	case ChangeUpdate:
 		return fmt.Sprintf("~ %s: %v → %v", c.Field, c.OldValue, c.NewValue)
 	default:
