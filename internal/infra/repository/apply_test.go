@@ -78,6 +78,32 @@ func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
 	}
 }
 
+func TestApplyArchivesThroughDedicatedEndpoint(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		archived bool
+		wantPath string
+	}{
+		{"archive", true, "projects/group%2Fproj/archive"},
+		{"unarchive", false, "projects/group%2Fproj/unarchive"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &recordingWriter{}
+			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldArchived, NewValue: tc.archived}}
+
+			results := NewApplier(writer).Apply(context.Background(), changes)
+
+			if len(results) != 1 || results[0].Err != nil {
+				t.Fatalf("results = %+v, want one successful result", results)
+			}
+			want := "api " + tc.wantPath + " --method POST"
+			if got := strings.Join(writer.calls[0].args, " "); got != want {
+				t.Errorf("glab args = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
