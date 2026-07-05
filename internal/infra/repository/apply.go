@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
@@ -44,7 +45,22 @@ func (a *Applier) Apply(ctx context.Context, changes []Change) []ApplyResult {
 
 // Translates one change into its glab call.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
-	return a.putField(ctx, change.Name, change.Field, fmt.Sprintf("%v", change.NewValue))
+	return a.putField(ctx, change.Name, apiParam(change.Field), fmt.Sprintf("%v", change.NewValue))
+}
+
+// Maps a plan field name to the GitLab API parameter that carries it. A
+// features.<key> field becomes <key>_access_level; every other field already
+// matches its API name. GitLab exposes CI under builds_access_level, so the
+// friendlier "ci" key is the one exception to the mechanical mapping.
+func apiParam(field string) string {
+	key, ok := strings.CutPrefix(field, "features.")
+	if !ok {
+		return field
+	}
+	if key == "ci" {
+		key = "builds"
+	}
+	return key + "_access_level"
 }
 
 // Updates one scalar project setting with a PUT to the projects endpoint.
