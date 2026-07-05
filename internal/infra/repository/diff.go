@@ -23,6 +23,7 @@ const (
 	fieldVisibility  = "visibility"
 	fieldArchived    = "archived"
 	fieldTopics      = "topics"
+	fieldRepository  = "repository"
 )
 
 // One planned difference between a declared manifest and the live project: a
@@ -55,7 +56,7 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	name := desired.Metadata.Owner + "/" + desired.Metadata.Name
 
 	if current.IsNew {
-		return []Change{{Type: ChangeCreate, Name: name, Field: "repository", NewValue: name}}
+		return []Change{{Type: ChangeCreate, Name: name, Field: fieldRepository, NewValue: name}}
 	}
 
 	var changes []Change
@@ -83,7 +84,43 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 			OldValue: current.Topics, NewValue: spec.Topics,
 		})
 	}
+	// A nil features block manages no feature, so its access levels are left
+	// as-is; a declared block still leaves its own nil fields untouched.
+	if spec.Features != nil {
+		diffFeatures(&changes, name, spec.Features, current)
+	}
 	return changes
+}
+
+// Records drift for each declared per-feature access level, under a
+// "features.<key>" field mirroring the manifest path.
+func diffFeatures(changes *[]Change, name string, desired *manifest.RepositoryFeatures, current *CurrentState) {
+	level := func(field string, want *manifest.AccessLevel, live reported) {
+		appendChanged(changes, name, field, want, manifest.AccessLevel(live))
+	}
+	public := func(field string, want *manifest.PublicAccessLevel, live reported) {
+		appendChanged(changes, name, field, want, manifest.PublicAccessLevel(live))
+	}
+	level("features.issues", desired.Issues, current.IssuesAccessLevel)
+	level("features.repository", desired.Repository, current.RepositoryAccessLevel)
+	level("features.merge_requests", desired.MergeRequests, current.MergeRequestsAccessLevel)
+	level("features.forking", desired.Forking, current.ForkingAccessLevel)
+	level("features.ci", desired.CICD, current.BuildsAccessLevel)
+	level("features.container_registry", desired.ContainerRegistry, current.ContainerRegistryAccessLevel)
+	level("features.analytics", desired.Analytics, current.AnalyticsAccessLevel)
+	level("features.requirements", desired.Requirements, current.RequirementsAccessLevel)
+	level("features.security_and_compliance", desired.SecurityAndCompliance, current.SecurityAndComplianceAccessLevel)
+	level("features.wiki", desired.Wiki, current.WikiAccessLevel)
+	level("features.snippets", desired.Snippets, current.SnippetsAccessLevel)
+	public("features.package_registry", desired.PackageRegistry, current.PackageRegistryAccessLevel)
+	level("features.model_experiments", desired.ModelExperiments, current.ModelExperimentsAccessLevel)
+	level("features.model_registry", desired.ModelRegistry, current.ModelRegistryAccessLevel)
+	public("features.pages", desired.Pages, current.PagesAccessLevel)
+	level("features.monitor", desired.Monitor, current.MonitorAccessLevel)
+	level("features.environments", desired.Environments, current.EnvironmentsAccessLevel)
+	level("features.feature_flags", desired.FeatureFlags, current.FeatureFlagsAccessLevel)
+	level("features.infrastructure", desired.Infrastructure, current.InfrastructureAccessLevel)
+	level("features.releases", desired.Releases, current.ReleasesAccessLevel)
 }
 
 // A nil pointer is the live value GitLab did not report; it counts as the zero

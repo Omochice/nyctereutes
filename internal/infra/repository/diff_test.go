@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
@@ -280,39 +281,39 @@ func TestDiffIgnoresAbsentFeaturesBlock(t *testing.T) {
 	}
 }
 
-// Every feature key must diff against its own live access level. Each live
-// level carries a sentinel equal to its manifest key, so a change reporting the
-// wrong old value means the wrong live field was read, and a missing or extra
-// key means the wiring is off.
-func TestDiffMapsEveryFeature(t *testing.T) {
+// everyFeatureDeclared asks for "enabled" on every feature so a single Diff
+// exercises all the feature wiring at once.
+func everyFeatureDeclared() *manifest.RepositoryFeatures {
 	level := manifest.AccessLevel("enabled")
 	public := manifest.PublicAccessLevel("enabled")
-	desired := &manifest.Repository{
-		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
-		Spec: manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{
-			Issues:                &level,
-			Repository:            &level,
-			MergeRequests:         &level,
-			Forking:               &level,
-			CICD:                  &level,
-			ContainerRegistry:     &level,
-			Analytics:             &level,
-			Requirements:          &level,
-			SecurityAndCompliance: &level,
-			Wiki:                  &level,
-			Snippets:              &level,
-			PackageRegistry:       &public,
-			ModelExperiments:      &level,
-			ModelRegistry:         &level,
-			Pages:                 &public,
-			Monitor:               &level,
-			Environments:          &level,
-			FeatureFlags:          &level,
-			Infrastructure:        &level,
-			Releases:              &level,
-		}},
+	return &manifest.RepositoryFeatures{
+		Issues:                &level,
+		Repository:            &level,
+		MergeRequests:         &level,
+		Forking:               &level,
+		CICD:                  &level,
+		ContainerRegistry:     &level,
+		Analytics:             &level,
+		Requirements:          &level,
+		SecurityAndCompliance: &level,
+		Wiki:                  &level,
+		Snippets:              &level,
+		PackageRegistry:       &public,
+		ModelExperiments:      &level,
+		ModelRegistry:         &level,
+		Pages:                 &public,
+		Monitor:               &level,
+		Environments:          &level,
+		FeatureFlags:          &level,
+		Infrastructure:        &level,
+		Releases:              &level,
 	}
-	current := &CurrentState{rawProject: rawProject{
+}
+
+// everyFeatureLive gives each live access level a sentinel equal to its
+// manifest feature key, so a change's old value reveals which field was read.
+func everyFeatureLive() rawProject {
+	return rawProject{
 		IssuesAccessLevel:                "issues",
 		RepositoryAccessLevel:            "repository",
 		MergeRequestsAccessLevel:         "merge_requests",
@@ -333,43 +334,31 @@ func TestDiffMapsEveryFeature(t *testing.T) {
 		FeatureFlagsAccessLevel:          "feature_flags",
 		InfrastructureAccessLevel:        "infrastructure",
 		ReleasesAccessLevel:              "releases",
-	}}
-	want := map[string]string{
-		"features.issues":                  "issues",
-		"features.repository":              "repository",
-		"features.merge_requests":          "merge_requests",
-		"features.forking":                 "forking",
-		"features.ci":                      "ci",
-		"features.container_registry":      "container_registry",
-		"features.analytics":               "analytics",
-		"features.requirements":            "requirements",
-		"features.security_and_compliance": "security_and_compliance",
-		"features.wiki":                    "wiki",
-		"features.snippets":                "snippets",
-		"features.package_registry":        "package_registry",
-		"features.model_experiments":       "model_experiments",
-		"features.model_registry":          "model_registry",
-		"features.pages":                   "pages",
-		"features.monitor":                 "monitor",
-		"features.environments":            "environments",
-		"features.feature_flags":           "feature_flags",
-		"features.infrastructure":          "infrastructure",
-		"features.releases":                "releases",
+	}
+}
+
+// Every feature key must diff against its own live access level: with the
+// sentinels above, each change's old value must equal the key after
+// "features.", and a missing or extra key means the wiring is off.
+func TestDiffMapsEveryFeature(t *testing.T) {
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{Features: everyFeatureDeclared()},
 	}
 
-	changes := Diff(desired, current)
+	changes := Diff(desired, &CurrentState{rawProject: everyFeatureLive()})
 
-	if len(changes) != len(want) {
-		t.Fatalf("got %d changes, want %d features", len(changes), len(want))
+	if len(changes) != 20 {
+		t.Fatalf("got %d changes, want 20 features", len(changes))
 	}
 	for _, change := range changes {
-		wantOld, ok := want[change.Field]
+		key, ok := strings.CutPrefix(change.Field, "features.")
 		if !ok {
-			t.Errorf("unexpected change field %q", change.Field)
+			t.Errorf("change field %q is not under features", change.Field)
 			continue
 		}
-		if got := fmt.Sprint(change.OldValue); got != wantOld {
-			t.Errorf("%s old = %q, want %q (wrong live field mapped?)", change.Field, got, wantOld)
+		if got := fmt.Sprint(change.OldValue); got != key {
+			t.Errorf("%s old = %q, want %q (wrong live field mapped?)", change.Field, got, key)
 		}
 		if got := fmt.Sprint(change.NewValue); got != "enabled" {
 			t.Errorf("%s new = %q, want enabled", change.Field, got)
@@ -380,7 +369,9 @@ func TestDiffMapsEveryFeature(t *testing.T) {
 func TestDiffLeavesUndeclaredFeaturesUnchanged(t *testing.T) {
 	desired := &manifest.Repository{
 		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
-		Spec:     manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{Issues: new(manifest.AccessLevel("enabled"))}},
+		Spec: manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{
+			Issues: new(manifest.AccessLevel("enabled")),
+		}},
 	}
 	current := &CurrentState{rawProject: rawProject{
 		IssuesAccessLevel: "disabled",
@@ -397,7 +388,9 @@ func TestDiffLeavesUndeclaredFeaturesUnchanged(t *testing.T) {
 func TestDiffAcceptsPublicAccessLevelFeatures(t *testing.T) {
 	desired := &manifest.Repository{
 		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
-		Spec:     manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{Pages: new(manifest.PublicAccessLevel("public"))}},
+		Spec: manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{
+			Pages: new(manifest.PublicAccessLevel("public")),
+		}},
 	}
 	current := &CurrentState{rawProject: rawProject{PagesAccessLevel: "disabled"}}
 
