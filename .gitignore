@@ -38,6 +38,9 @@ result-*
 # Ignore automatically generated direnv output
 .direnv
 
+# Ignore the pre-commit config the git-hooks dev shell generates
+.pre-commit-config.yaml
+
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history
 
