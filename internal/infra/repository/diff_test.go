@@ -169,3 +169,78 @@ func TestDiffComparesTopicsAsSet(t *testing.T) {
 		}
 	})
 }
+
+func TestDiffReportsBooleanChanges(t *testing.T) {
+	yes := true
+	no := false
+	cases := []struct {
+		name  string
+		spec  manifest.RepositorySpec
+		state rawProject
+	}{
+		{"request_access_enabled", manifest.RepositorySpec{RequestAccessEnabled: &yes}, rawProject{RequestAccessEnabled: &no}},
+		{"enforce_auth_checks_on_uploads", manifest.RepositorySpec{EnforceAuthChecksOnUploads: &yes}, rawProject{EnforceAuthChecksOnUploads: &no}},
+	}
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			desired := &manifest.Repository{
+				Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+				Spec:     attr.spec,
+			}
+			changes := Diff(desired, &CurrentState{rawProject: attr.state})
+			if len(changes) != 1 || changes[0].Field != attr.name {
+				t.Fatalf("changes = %+v, want one %s update", changes, attr.name)
+			}
+			if changes[0].OldValue != false || changes[0].NewValue != true {
+				t.Errorf("values = %v → %v, want false → true", changes[0].OldValue, changes[0].NewValue)
+			}
+		})
+	}
+}
+
+func TestDiffReportsDefaultBranchChange(t *testing.T) {
+	main := "main"
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{DefaultBranch: &main},
+	}
+	current := &CurrentState{rawProject: rawProject{DefaultBranch: "master"}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "default_branch" {
+		t.Fatalf("changes = %+v, want one default_branch update", changes)
+	}
+	if changes[0].OldValue != "master" || changes[0].NewValue != "main" {
+		t.Errorf("values = %v → %v, want master → main", changes[0].OldValue, changes[0].NewValue)
+	}
+}
+
+func TestDiffReportsTemplateChanges(t *testing.T) {
+	want := "new"
+	live := freeText("old")
+	cases := []struct {
+		name  string
+		spec  manifest.RepositorySpec
+		state rawProject
+	}{
+		{"merge_commit_template", manifest.RepositorySpec{MergeCommitTemplate: &want}, rawProject{MergeCommitTemplate: &live}},
+		{"squash_commit_template", manifest.RepositorySpec{SquashCommitTemplate: &want}, rawProject{SquashCommitTemplate: &live}},
+		{"merge_requests_template", manifest.RepositorySpec{MergeRequestsTemplate: &want}, rawProject{MergeRequestsTemplate: &live}},
+	}
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			desired := &manifest.Repository{
+				Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+				Spec:     attr.spec,
+			}
+			changes := Diff(desired, &CurrentState{rawProject: attr.state})
+			if len(changes) != 1 || changes[0].Field != attr.name {
+				t.Fatalf("changes = %+v, want one %s update", changes, attr.name)
+			}
+			if changes[0].OldValue != "old" || changes[0].NewValue != "new" {
+				t.Errorf("values = %v → %v, want old → new", changes[0].OldValue, changes[0].NewValue)
+			}
+		})
+	}
+}
