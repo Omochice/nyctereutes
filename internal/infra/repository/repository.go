@@ -126,9 +126,9 @@ func parseProject(out []byte) (*CurrentState, error) {
 	return &CurrentState{rawProject: raw}, nil
 }
 
-// Reports whether err is a GitLab 404. It relies on the sentinel the glab
-// runner wraps around a classified not-found response, so an unrelated failure
-// whose text merely mentions 404 is not mistaken for a missing project.
+// Matches on the sentinel the glab runner wraps around a classified not-found
+// response, so an unrelated failure whose text merely mentions 404 is not
+// mistaken for a missing project.
 func isNotFound(err error) bool {
 	return errors.Is(err, glab.ErrNotFound)
 }
