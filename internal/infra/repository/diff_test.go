@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
@@ -168,4 +170,264 @@ func TestDiffComparesTopicsAsSet(t *testing.T) {
 			t.Fatalf("changes = %+v, want one topics update", changes)
 		}
 	})
+}
+
+func TestDiffReportsBooleanChanges(t *testing.T) {
+	enabled := true
+	disabled := false
+	cases := []struct {
+		name  string
+		spec  manifest.RepositorySpec
+		state rawProject
+	}{
+		{
+			name:  "request_access_enabled",
+			spec:  manifest.RepositorySpec{RequestAccessEnabled: &enabled},
+			state: rawProject{RequestAccessEnabled: &disabled},
+		},
+		{
+			name:  "enforce_auth_checks_on_uploads",
+			spec:  manifest.RepositorySpec{EnforceAuthChecksOnUploads: &enabled},
+			state: rawProject{EnforceAuthChecksOnUploads: &disabled},
+		},
+	}
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			desired := &manifest.Repository{
+				Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+				Spec:     attr.spec,
+			}
+			changes := Diff(desired, &CurrentState{rawProject: attr.state})
+			if len(changes) != 1 || changes[0].Field != attr.name {
+				t.Fatalf("changes = %+v, want one %s update", changes, attr.name)
+			}
+			if changes[0].OldValue != false || changes[0].NewValue != true {
+				t.Errorf("values = %v → %v, want false → true", changes[0].OldValue, changes[0].NewValue)
+			}
+		})
+	}
+}
+
+func TestDiffReportsDefaultBranchChange(t *testing.T) {
+	main := "main"
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{DefaultBranch: &main},
+	}
+	current := &CurrentState{rawProject: rawProject{DefaultBranch: "master"}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "default_branch" {
+		t.Fatalf("changes = %+v, want one default_branch update", changes)
+	}
+	if changes[0].OldValue != "master" || changes[0].NewValue != "main" {
+		t.Errorf("values = %v → %v, want master → main", changes[0].OldValue, changes[0].NewValue)
+	}
+}
+
+func TestDiffReportsTemplateChanges(t *testing.T) {
+	want := "new"
+	live := freeText("old")
+	cases := []struct {
+		name  string
+		spec  manifest.RepositorySpec
+		state rawProject
+	}{
+		{
+			name:  "merge_commit_template",
+			spec:  manifest.RepositorySpec{MergeCommitTemplate: &want},
+			state: rawProject{MergeCommitTemplate: &live},
+		},
+		{
+			name:  "squash_commit_template",
+			spec:  manifest.RepositorySpec{SquashCommitTemplate: &want},
+			state: rawProject{SquashCommitTemplate: &live},
+		},
+		{
+			name:  "merge_requests_template",
+			spec:  manifest.RepositorySpec{MergeRequestsTemplate: &want},
+			state: rawProject{MergeRequestsTemplate: &live},
+		},
+	}
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			desired := &manifest.Repository{
+				Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+				Spec:     attr.spec,
+			}
+			changes := Diff(desired, &CurrentState{rawProject: attr.state})
+			if len(changes) != 1 || changes[0].Field != attr.name {
+				t.Fatalf("changes = %+v, want one %s update", changes, attr.name)
+			}
+			if changes[0].OldValue != "old" || changes[0].NewValue != "new" {
+				t.Errorf("values = %v → %v, want old → new", changes[0].OldValue, changes[0].NewValue)
+			}
+		})
+	}
+}
+
+// An unreported bool or template (nil live pointer) counts as the zero value,
+// so a manifest declaring that zero is not seen as drift.
+func TestDiffTreatsUnreportedAsZero(t *testing.T) {
+	off := false
+	empty := ""
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec: manifest.RepositorySpec{
+			RequestAccessEnabled: &off,
+			MergeCommitTemplate:  &empty,
+		},
+	}
+	current := &CurrentState{rawProject: rawProject{
+		RequestAccessEnabled: nil,
+		MergeCommitTemplate:  nil,
+	}}
+
+	if changes := Diff(desired, current); len(changes) != 0 {
+		t.Errorf("changes = %+v, want none when declared zero matches unreported live", changes)
+	}
+}
+
+// A manifest that omits the features block manages no feature, so live access
+// levels must not surface as drift.
+func TestDiffIgnoresAbsentFeaturesBlock(t *testing.T) {
+	desired := &manifest.Repository{Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"}}
+	current := &CurrentState{rawProject: rawProject{
+		IssuesAccessLevel: "disabled",
+		WikiAccessLevel:   "enabled",
+	}}
+
+	if changes := Diff(desired, current); len(changes) != 0 {
+		t.Errorf("changes = %+v, want none when the features block is absent", changes)
+	}
+}
+
+// everyFeatureDeclared asks for "enabled" on every feature so a single Diff
+// exercises all the feature wiring at once.
+func everyFeatureDeclared() *manifest.RepositoryFeatures {
+	level := manifest.AccessLevel("enabled")
+	public := manifest.PublicAccessLevel("enabled")
+	return &manifest.RepositoryFeatures{
+		Issues:                &level,
+		Repository:            &level,
+		MergeRequests:         &level,
+		Forking:               &level,
+		CICD:                  &level,
+		ContainerRegistry:     &level,
+		Analytics:             &level,
+		Requirements:          &level,
+		SecurityAndCompliance: &level,
+		Wiki:                  &level,
+		Snippets:              &level,
+		PackageRegistry:       &public,
+		ModelExperiments:      &level,
+		ModelRegistry:         &level,
+		Pages:                 &public,
+		Monitor:               &level,
+		Environments:          &level,
+		FeatureFlags:          &level,
+		Infrastructure:        &level,
+		Releases:              &level,
+	}
+}
+
+// everyFeatureLive gives each live access level a sentinel equal to its
+// manifest feature key, so a change's old value reveals which field was read.
+func everyFeatureLive() rawProject {
+	return rawProject{
+		IssuesAccessLevel:                "issues",
+		RepositoryAccessLevel:            "repository",
+		MergeRequestsAccessLevel:         "merge_requests",
+		ForkingAccessLevel:               "forking",
+		BuildsAccessLevel:                "ci",
+		ContainerRegistryAccessLevel:     "container_registry",
+		AnalyticsAccessLevel:             "analytics",
+		RequirementsAccessLevel:          "requirements",
+		SecurityAndComplianceAccessLevel: "security_and_compliance",
+		WikiAccessLevel:                  "wiki",
+		SnippetsAccessLevel:              "snippets",
+		PackageRegistryAccessLevel:       "package_registry",
+		ModelExperimentsAccessLevel:      "model_experiments",
+		ModelRegistryAccessLevel:         "model_registry",
+		PagesAccessLevel:                 "pages",
+		MonitorAccessLevel:               "monitor",
+		EnvironmentsAccessLevel:          "environments",
+		FeatureFlagsAccessLevel:          "feature_flags",
+		InfrastructureAccessLevel:        "infrastructure",
+		ReleasesAccessLevel:              "releases",
+	}
+}
+
+// Every feature key must diff against its own live access level: with the
+// sentinels above, each change's old value must equal the key after
+// "features.". Distinct keys are counted so a duplicate cannot silently stand
+// in for an omitted one while the total still looks right.
+func TestDiffMapsEveryFeature(t *testing.T) {
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{Features: everyFeatureDeclared()},
+	}
+
+	changes := Diff(desired, &CurrentState{rawProject: everyFeatureLive()})
+
+	if len(changes) != 20 {
+		t.Fatalf("got %d changes, want 20 features", len(changes))
+	}
+	seen := make(map[string]bool, len(changes))
+	for _, change := range changes {
+		key, ok := strings.CutPrefix(change.Field, "features.")
+		if !ok {
+			t.Errorf("change field %q is not under features", change.Field)
+			continue
+		}
+		if seen[key] {
+			t.Errorf("feature key %q reported twice", key)
+		}
+		seen[key] = true
+		if got := fmt.Sprint(change.OldValue); got != key {
+			t.Errorf("%s old = %q, want %q (wrong live field mapped?)", change.Field, got, key)
+		}
+		if got := fmt.Sprint(change.NewValue); got != "enabled" {
+			t.Errorf("%s new = %q, want enabled", change.Field, got)
+		}
+	}
+}
+
+func TestDiffLeavesUndeclaredFeaturesUnchanged(t *testing.T) {
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec: manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{
+			Issues: new(manifest.AccessLevel("enabled")),
+		}},
+	}
+	current := &CurrentState{rawProject: rawProject{
+		IssuesAccessLevel: "disabled",
+		WikiAccessLevel:   "disabled",
+	}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "features.issues" {
+		t.Fatalf("changes = %+v, want only the declared feature to drift", changes)
+	}
+}
+
+func TestDiffAcceptsPublicAccessLevelFeatures(t *testing.T) {
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec: manifest.RepositorySpec{Features: &manifest.RepositoryFeatures{
+			Pages: new(manifest.PublicAccessLevel("public")),
+		}},
+	}
+	current := &CurrentState{rawProject: rawProject{PagesAccessLevel: "disabled"}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "features.pages" {
+		t.Fatalf("changes = %+v, want one features.pages update", changes)
+	}
+	if got := fmt.Sprint(changes[0].NewValue); got != "public" {
+		t.Errorf("new value = %q, want public", got)
+	}
 }
