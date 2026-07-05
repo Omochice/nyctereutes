@@ -361,7 +361,8 @@ func everyFeatureLive() rawProject {
 
 // Every feature key must diff against its own live access level: with the
 // sentinels above, each change's old value must equal the key after
-// "features.", and a missing or extra key means the wiring is off.
+// "features.". Distinct keys are counted so a duplicate cannot silently stand
+// in for an omitted one while the total still looks right.
 func TestDiffMapsEveryFeature(t *testing.T) {
 	desired := &manifest.Repository{
 		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
@@ -373,18 +374,26 @@ func TestDiffMapsEveryFeature(t *testing.T) {
 	if len(changes) != 20 {
 		t.Fatalf("got %d changes, want 20 features", len(changes))
 	}
+	seen := make(map[string]bool, len(changes))
 	for _, change := range changes {
 		key, ok := strings.CutPrefix(change.Field, "features.")
 		if !ok {
 			t.Errorf("change field %q is not under features", change.Field)
 			continue
 		}
+		if seen[key] {
+			t.Errorf("feature key %q reported twice", key)
+		}
+		seen[key] = true
 		if got := fmt.Sprint(change.OldValue); got != key {
 			t.Errorf("%s old = %q, want %q (wrong live field mapped?)", change.Field, got, key)
 		}
 		if got := fmt.Sprint(change.NewValue); got != "enabled" {
 			t.Errorf("%s new = %q, want enabled", change.Field, got)
 		}
+	}
+	if len(seen) != 20 {
+		t.Errorf("saw %d distinct feature keys, want 20", len(seen))
 	}
 }
 
