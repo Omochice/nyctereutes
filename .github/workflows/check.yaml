@@ -62,7 +62,7 @@ jobs:
       - name: Report coverage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: nix develop --command octocov
+        run: nix develop --command octocov --config octocov.yaml
   status-check:
     timeout-minutes: 5
     runs-on: ubuntu-latest
