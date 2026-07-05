@@ -50,7 +50,7 @@ func TestApplyPutsScalarField(t *testing.T) {
 }
 
 func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name    string
 		field   string
 		wantArg string
@@ -59,10 +59,10 @@ func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
 		{"container_registry", "features.container_registry", "-f container_registry_access_level=enabled"},
 		{"ci maps to builds", "features.ci", "-f builds_access_level=enabled"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			writer := &recordingWriter{}
 			changes := []Change{
-				{Type: ChangeUpdate, Name: "group/proj", Field: tc.field, NewValue: manifest.AccessLevel("enabled")},
+				{Type: ChangeUpdate, Name: "group/proj", Field: testCase.field, NewValue: manifest.AccessLevel("enabled")},
 			}
 
 			results := NewApplier(writer).Apply(context.Background(), changes)
@@ -70,7 +70,7 @@ func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
 			if len(results) != 1 || results[0].Err != nil {
 				t.Fatalf("results = %+v, want one successful result", results)
 			}
-			want := "api projects/group%2Fproj --method PUT " + tc.wantArg
+			want := "api projects/group%2Fproj --method PUT " + testCase.wantArg
 			if got := strings.Join(writer.calls[0].args, " "); got != want {
 				t.Errorf("glab args = %q, want %q", got, want)
 			}
@@ -79,7 +79,7 @@ func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
 }
 
 func TestApplyReplacesTopicsViaJSONStdin(t *testing.T) {
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name     string
 		topics   []string
 		wantBody string
@@ -87,9 +87,9 @@ func TestApplyReplacesTopicsViaJSONStdin(t *testing.T) {
 		{"replace", []string{"go", "cli"}, `{"topics":["go","cli"]}`},
 		{"clear", []string{}, `{"topics":[]}`},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			writer := &recordingWriter{}
-			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldTopics, NewValue: tc.topics}}
+			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldTopics, NewValue: testCase.topics}}
 
 			results := NewApplier(writer).Apply(context.Background(), changes)
 
@@ -100,15 +100,15 @@ func TestApplyReplacesTopicsViaJSONStdin(t *testing.T) {
 			if got := strings.Join(writer.calls[0].args, " "); got != wantArgs {
 				t.Errorf("glab args = %q, want %q", got, wantArgs)
 			}
-			if got := string(writer.calls[0].stdin); got != tc.wantBody {
-				t.Errorf("stdin = %q, want %q", got, tc.wantBody)
+			if got := string(writer.calls[0].stdin); got != testCase.wantBody {
+				t.Errorf("stdin = %q, want %q", got, testCase.wantBody)
 			}
 		})
 	}
 }
 
 func TestApplyArchivesThroughDedicatedEndpoint(t *testing.T) {
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name     string
 		archived bool
 		wantPath string
@@ -116,16 +116,16 @@ func TestApplyArchivesThroughDedicatedEndpoint(t *testing.T) {
 		{"archive", true, "projects/group%2Fproj/archive"},
 		{"unarchive", false, "projects/group%2Fproj/unarchive"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			writer := &recordingWriter{}
-			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldArchived, NewValue: tc.archived}}
+			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldArchived, NewValue: testCase.archived}}
 
 			results := NewApplier(writer).Apply(context.Background(), changes)
 
 			if len(results) != 1 || results[0].Err != nil {
 				t.Fatalf("results = %+v, want one successful result", results)
 			}
-			want := "api " + tc.wantPath + " --method POST"
+			want := "api " + testCase.wantPath + " --method POST"
 			if got := strings.Join(writer.calls[0].args, " "); got != want {
 				t.Errorf("glab args = %q, want %q", got, want)
 			}
@@ -134,7 +134,7 @@ func TestApplyArchivesThroughDedicatedEndpoint(t *testing.T) {
 }
 
 func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name     string
 		field    string
 		newValue any
@@ -146,16 +146,16 @@ func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
 		{"request_access_enabled", fieldRequestAccessEnabled, true, "-f request_access_enabled=true"},
 		{"enforce_auth_checks", fieldEnforceAuthChecksOnUploads, false, "-f enforce_auth_checks_on_uploads=false"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			writer := &recordingWriter{}
-			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: tc.field, NewValue: tc.newValue}}
+			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: testCase.field, NewValue: testCase.newValue}}
 
 			results := NewApplier(writer).Apply(context.Background(), changes)
 
 			if len(results) != 1 || results[0].Err != nil {
 				t.Fatalf("results = %+v, want one successful result", results)
 			}
-			want := "api projects/group%2Fproj --method PUT " + tc.wantArg
+			want := "api projects/group%2Fproj --method PUT " + testCase.wantArg
 			if got := strings.Join(writer.calls[0].args, " "); got != want {
 				t.Errorf("glab args = %q, want %q", got, want)
 			}
