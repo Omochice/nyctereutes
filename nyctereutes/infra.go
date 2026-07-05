@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,7 +139,7 @@ func (c *infraValidateCommand) Execute(args []string) error {
 			continue
 		}
 		for _, file := range files {
-			parsed, failed := c.validateFile(file)
+			parsed, failed := readManifestFile(c.inout.Stderr, file)
 			repos = append(repos, parsed...)
 			failures += failed
 		}
@@ -154,17 +155,19 @@ func (c *infraValidateCommand) Execute(args []string) error {
 	return nil
 }
 
-// Reports every schema violation in one file to stderr and returns the
-// documents that validated along with the number of problems found.
-func (c *infraValidateCommand) validateFile(path string) ([]*manifest.Repository, int) {
+// Reads and parses one manifest file, reporting an unreadable file or any
+// parse error to stderr and returning the documents that parsed with the
+// number of problems found. Validate and plan share it so the two commands
+// read manifests identically.
+func readManifestFile(stderr io.Writer, path string) ([]*manifest.Repository, int) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
-		_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
 		return nil, 1
 	}
 	repos, errs := manifest.Parse(data)
 	for _, parseErr := range errs {
-		_, _ = fmt.Fprintf(c.inout.Stderr, "%s: %v\n", path, parseErr)
+		_, _ = fmt.Fprintf(stderr, "%s: %v\n", path, parseErr)
 	}
 	return repos, len(errs)
 }
@@ -257,16 +260,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 func (c *infraPlanCommand) planFile(
 	ctx context.Context, client *repository.Client, file string,
 ) (changed, failures int) {
-	data, err := os.ReadFile(filepath.Clean(file))
-	if err != nil {
-		_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
-		return 0, 1
-	}
-	repos, errs := manifest.Parse(data)
-	for _, parseErr := range errs {
-		_, _ = fmt.Fprintf(c.inout.Stderr, "%s: %v\n", file, parseErr)
-		failures++
-	}
+	repos, failures := readManifestFile(c.inout.Stderr, file)
 	for _, repo := range repos {
 		state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
 		if err != nil {
