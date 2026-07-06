@@ -9,6 +9,11 @@ import (
 )
 
 func run(args []string) (exit int, stderr string) {
+	exit, _, stderr = runOut(args)
+	return exit, stderr
+}
+
+func runOut(args []string) (exit int, stdout, stderr string) {
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 	exit = MainCommand(args, &cli.ProcInout{
@@ -16,7 +21,7 @@ func run(args []string) (exit int, stderr string) {
 		Stdout: outBuf,
 		Stderr: errBuf,
 	})
-	return exit, errBuf.String()
+	return exit, outBuf.String(), errBuf.String()
 }
 
 func TestInfraRequiresSubcommand(t *testing.T) {
