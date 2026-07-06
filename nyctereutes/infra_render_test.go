@@ -85,9 +85,14 @@ func TestWantsColorFalseForNonTerminal(t *testing.T) {
 	}
 }
 
-func TestWantsColorFalseWhenNoColorSet(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	if wantsColor(&bytes.Buffer{}) {
-		t.Error("wantsColor with NO_COLOR set = true, want false")
+// NO_COLOR disables color by its mere presence, so an empty value counts too.
+// This is asserted on noColor directly because wantsColor also demands a
+// terminal writer, which a test buffer can never be.
+func TestNoColorHonorsPresence(t *testing.T) {
+	for _, value := range []string{"", "1"} {
+		t.Setenv("NO_COLOR", value)
+		if !noColor() {
+			t.Errorf("noColor() = false with NO_COLOR=%q present, want true", value)
+		}
 	}
 }
