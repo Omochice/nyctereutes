@@ -25,7 +25,9 @@ func runOut(args []string) (exit int, stdout, stderr string) {
 }
 
 func TestVersionReportsVersion(t *testing.T) {
-	for _, args := range [][]string{{"-v"}, {"--version"}, {"version"}} {
+	// "-v help" pairs the flag with a subcommand whose Execute writes to stderr,
+	// proving the flag short-circuits before any subcommand runs.
+	for _, args := range [][]string{{"-v"}, {"--version"}, {"version"}, {"-v", "help"}} {
 		exit, stdout, stderr := runOut(args)
 
 		if exit != 0 {
@@ -33,6 +35,9 @@ func TestVersionReportsVersion(t *testing.T) {
 		}
 		if strings.TrimSpace(stdout) != version {
 			t.Errorf("%v: want stdout %q, got %q", args, version, stdout)
+		}
+		if stderr != "" {
+			t.Errorf("%v: want empty stderr, got %q", args, stderr)
 		}
 	}
 }

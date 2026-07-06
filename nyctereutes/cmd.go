@@ -61,10 +61,17 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
 	parser.Name = "nyctereutes"
+	// --version is a top-level flag, so short-circuit before running any
+	// subcommand; otherwise go-flags would execute it (and its side effects)
+	// during ParseArgs while the flag is set.
+	parser.CommandHandler = func(command flags.Commander, cmdArgs []string) error {
+		if opts.Version {
+			return nil
+		}
+		return command.Execute(cmdArgs)
+	}
 
 	_, err := parser.ParseArgs(args)
-	// --version is a top-level flag, so go-flags still reports the missing
-	// subcommand; the flag itself is honored before that error is surfaced.
 	if opts.Version {
 		_, _ = fmt.Fprintln(inout.Stdout, version)
 		return 0
