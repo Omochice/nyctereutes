@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/term"
@@ -18,30 +19,41 @@ const (
 	colorUpdateLine = "226" // yellow
 )
 
-// printChanges writes one project's header followed by its indented change
-// lines, coloring each line by its kind when colorize is set.
-func printChanges(w io.Writer, name string, changes []repository.Change, colorize bool) {
-	_, _ = fmt.Fprintf(w, "%s\n", name)
+// printChanges writes one project's header followed by its change lines, each
+// indented and colored by its kind when colorize is set. A change spanning
+// several lines has every line indented and colored alike.
+func printChanges(out io.Writer, name string, changes []repository.Change, colorize bool) {
+	_, _ = fmt.Fprintf(out, "%s\n", name)
 	for _, change := range changes {
-		_, _ = fmt.Fprintf(w, "  %s\n", renderChange(change, colorize))
+		color := ""
+		if colorize {
+			color = lineColor(change.Type)
+		}
+		for line := range strings.SplitSeq(change.String(), "\n") {
+			_, _ = fmt.Fprintf(out, "  %s\n", styleLine(line, color))
+		}
 	}
 }
 
-// renderChange returns change's line, colored by its kind when colorize is set
-// and returned verbatim otherwise.
-func renderChange(change repository.Change, colorize bool) string {
-	line := change.String()
-	if !colorize {
-		return line
-	}
-	switch change.Type {
+// lineColor returns the ANSI color for a change kind, or "" for kinds left
+// uncolored.
+func lineColor(changeType repository.ChangeType) string {
+	switch changeType {
 	case repository.ChangeCreate:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorCreateLine)).Render(line)
+		return colorCreateLine
 	case repository.ChangeUpdate:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorUpdateLine)).Render(line)
+		return colorUpdateLine
 	default:
+		return ""
+	}
+}
+
+// styleLine renders line in the given ANSI color, or verbatim when color is "".
+func styleLine(line, color string) string {
+	if color == "" {
 		return line
 	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(line)
 }
 
 // wantsColor reports whether ANSI color should be written to w: only when w is a

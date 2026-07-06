@@ -10,43 +10,7 @@ import (
 
 const ansiEscape = "\x1b["
 
-func TestRenderChangePlainWhenColorizeOff(t *testing.T) {
-	change := repository.Change{
-		Type: repository.ChangeUpdate, Field: "description", OldValue: "old", NewValue: "new",
-	}
-	got := renderChange(change, false)
-	if want := change.String(); got != want {
-		t.Errorf("renderChange(colorize=false) = %q, want the verbatim line %q", got, want)
-	}
-	if strings.Contains(got, ansiEscape) {
-		t.Errorf("renderChange(colorize=false) leaked an ANSI escape: %q", got)
-	}
-}
-
-func TestRenderChangeColorsEachKind(t *testing.T) {
-	cases := []struct {
-		name   string
-		change repository.Change
-	}{
-		{"create", repository.Change{Type: repository.ChangeCreate}},
-		{"update", repository.Change{
-			Type: repository.ChangeUpdate, Field: "archived", OldValue: false, NewValue: true,
-		}},
-	}
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			got := renderChange(testCase.change, true)
-			if !strings.Contains(got, ansiEscape) {
-				t.Errorf("renderChange(colorize=true) emitted no ANSI escape: %q", got)
-			}
-			if plain := testCase.change.String(); !strings.Contains(got, plain) {
-				t.Errorf("renderChange(colorize=true) = %q, want it to keep the plain line %q", got, plain)
-			}
-		})
-	}
-}
-
-func TestPrintChangesLayout(t *testing.T) {
+func TestPrintChangesSingleLinePlain(t *testing.T) {
 	var buf bytes.Buffer
 	changes := []repository.Change{
 		{Type: repository.ChangeUpdate, Field: "description", OldValue: "old", NewValue: "new"},
@@ -54,7 +18,47 @@ func TestPrintChangesLayout(t *testing.T) {
 	printChanges(&buf, "group/proj", changes, false)
 	want := "group/proj\n  ~ description: old → new\n"
 	if buf.String() != want {
-		t.Errorf("printChanges layout = %q, want %q", buf.String(), want)
+		t.Errorf("printChanges single-line = %q, want %q", buf.String(), want)
+	}
+}
+
+func TestPrintChangesMultilineBlock(t *testing.T) {
+	var buf bytes.Buffer
+	changes := []repository.Change{
+		{Type: repository.ChangeUpdate, Field: "merge_commit_template", OldValue: "a\n\nb", NewValue: "c"},
+	}
+	printChanges(&buf, "group/proj", changes, false)
+	want := "group/proj\n" +
+		"  ~ merge_commit_template:\n" +
+		"      - a\n" +
+		"      -\n" +
+		"      - b\n" +
+		"      + c\n"
+	if buf.String() != want {
+		t.Errorf("printChanges multiline = %q, want %q", buf.String(), want)
+	}
+}
+
+func TestPrintChangesColorsEveryLine(t *testing.T) {
+	var buf bytes.Buffer
+	changes := []repository.Change{
+		{Type: repository.ChangeUpdate, Field: "merge_commit_template", OldValue: "a\nb", NewValue: "c"},
+	}
+	printChanges(&buf, "group/proj", changes, true)
+	got := buf.String()
+	if !strings.Contains(got, ansiEscape) {
+		t.Errorf("printChanges(colorize=true) emitted no ANSI escape: %q", got)
+	}
+	for _, plain := range []string{"~ merge_commit_template:", "- a", "- b", "+ c"} {
+		if !strings.Contains(got, plain) {
+			t.Errorf("printChanges(colorize=true) = %q, want it to keep the plain fragment %q", got, plain)
+		}
+	}
+}
+
+func TestStyleLinePlainWhenNoColor(t *testing.T) {
+	if got := styleLine("~ description: old → new", ""); strings.Contains(got, ansiEscape) {
+		t.Errorf("styleLine with empty color leaked an ANSI escape: %q", got)
 	}
 }
 

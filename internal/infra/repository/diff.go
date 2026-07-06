@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
@@ -49,10 +50,31 @@ func (c Change) String() string {
 	case ChangeCreate:
 		return "+ new repository"
 	case ChangeUpdate:
+		old := fmt.Sprintf("%v", c.OldValue)
+		next := fmt.Sprintf("%v", c.NewValue)
+		// A single-line arrow buries a multi-line template's newlines, so such a
+		// value is shown as a marked block instead.
+		if strings.Contains(old, "\n") || strings.Contains(next, "\n") {
+			return fmt.Sprintf("~ %s:\n%s\n%s", c.Field, markLines(old, "-"), markLines(next, "+"))
+		}
 		return fmt.Sprintf("~ %s: %v → %v", c.Field, c.OldValue, c.NewValue)
 	default:
 		return ""
 	}
+}
+
+// markLines prefixes every line of text with a diff marker, indented so the
+// block sits under its field header. An empty line carries the bare marker.
+func markLines(text, marker string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if line == "" {
+			lines[i] = "    " + marker
+		} else {
+			lines[i] = "    " + marker + " " + line
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // Reports how the live project differs from the declared manifest: a create
