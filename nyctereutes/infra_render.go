@@ -12,48 +12,57 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/repository"
 )
 
-// ANSI 256-color codes for plan/apply diff lines, matching the palette the dep
-// TUI uses so both surfaces read alike.
+// ANSI 256-color codes, matching the palette the dep TUI uses so both surfaces
+// read alike.
 const (
-	colorCreateLine = "42"  // green
-	colorUpdateLine = "226" // yellow
+	colorGreen  = "42"
+	colorYellow = "226"
+	colorRed    = "196"
 )
 
 // printChanges writes one project's header followed by its change lines, each
-// indented and colored by its kind when colorize is set. A change spanning
-// several lines has every line indented and colored alike.
+// indented and colored by its diff marker when colorize is set.
 func printChanges(out io.Writer, name string, changes []repository.Change, colorize bool) {
 	_, _ = fmt.Fprintf(out, "%s\n", name)
 	for _, change := range changes {
-		color := ""
-		if colorize {
-			color = lineColor(change.Type)
-		}
 		for line := range strings.SplitSeq(change.String(), "\n") {
-			_, _ = fmt.Fprintf(out, "  %s\n", styleLine(line, color))
+			_, _ = fmt.Fprintf(out, "  %s\n", styleLine(line, colorize))
 		}
 	}
 }
 
-// lineColor returns the ANSI color for a change kind, or "" for kinds left
-// uncolored.
-func lineColor(changeType repository.ChangeType) string {
-	switch changeType {
-	case repository.ChangeCreate:
-		return colorCreateLine
-	case repository.ChangeUpdate:
-		return colorUpdateLine
-	default:
-		return ""
+// styleLine colors line by the diff marker it leads with: "+" green, "-" red,
+// "~" yellow, so an addition, a removal and an update header read differently
+// on one scale. Any other line, and every line when colorize is unset, is
+// returned verbatim.
+func styleLine(line string, colorize bool) string {
+	if !colorize {
+		return line
 	}
-}
-
-// styleLine renders line in the given ANSI color, or verbatim when color is "".
-func styleLine(line, color string) string {
+	color := markerColor(line)
 	if color == "" {
 		return line
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(line)
+}
+
+// markerColor returns the color for line's leading diff marker, ignoring the
+// indentation a block line carries, or "" when the line has no marker.
+func markerColor(line string) string {
+	trimmed := strings.TrimLeft(line, " ")
+	if trimmed == "" {
+		return ""
+	}
+	switch trimmed[0] {
+	case '+':
+		return colorGreen
+	case '-':
+		return colorRed
+	case '~':
+		return colorYellow
+	default:
+		return ""
+	}
 }
 
 // wantsColor reports whether ANSI color should be written to w: only when w is a

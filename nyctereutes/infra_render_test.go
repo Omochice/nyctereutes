@@ -39,26 +39,41 @@ func TestPrintChangesMultilineBlock(t *testing.T) {
 	}
 }
 
-func TestPrintChangesColorsEveryLine(t *testing.T) {
+// A multi-line block colors removed lines red and added lines green so the two
+// sides are told apart rather than washed in one color.
+func TestPrintChangesBlockUsesRedAndGreen(t *testing.T) {
 	var buf bytes.Buffer
 	changes := []repository.Change{
-		{Type: repository.ChangeUpdate, Field: "merge_commit_template", OldValue: "a\nb", NewValue: "c"},
+		{Type: repository.ChangeUpdate, Field: "merge_commit_template", OldValue: "a", NewValue: "b\nc"},
 	}
 	printChanges(&buf, "group/proj", changes, true)
 	got := buf.String()
-	if !strings.Contains(got, ansiEscape) {
-		t.Errorf("printChanges(colorize=true) emitted no ANSI escape: %q", got)
-	}
-	for _, plain := range []string{"~ merge_commit_template:", "- a", "- b", "+ c"} {
-		if !strings.Contains(got, plain) {
-			t.Errorf("printChanges(colorize=true) = %q, want it to keep the plain fragment %q", got, plain)
+	for _, code := range []string{"38;5;196", "38;5;42"} {
+		if !strings.Contains(got, code) {
+			t.Errorf("colored block = %q, want it to contain SGR %q", got, code)
 		}
 	}
 }
 
-func TestStyleLinePlainWhenNoColor(t *testing.T) {
-	if got := styleLine("~ description: old → new", ""); strings.Contains(got, ansiEscape) {
-		t.Errorf("styleLine with empty color leaked an ANSI escape: %q", got)
+func TestMarkerColor(t *testing.T) {
+	cases := map[string]string{
+		"+ new repository":     colorGreen,
+		"    + c":              colorGreen,
+		"    - a":              colorRed,
+		"~ description: x → y": colorYellow,
+		"  ~ merge_template:":  colorYellow,
+		"plain text no marker": "",
+	}
+	for line, want := range cases {
+		if got := markerColor(line); got != want {
+			t.Errorf("markerColor(%q) = %q, want %q", line, got, want)
+		}
+	}
+}
+
+func TestStyleLineVerbatimWhenColorizeOff(t *testing.T) {
+	if got := styleLine("    - a", false); strings.Contains(got, ansiEscape) {
+		t.Errorf("styleLine(colorize=false) leaked an ANSI escape: %q", got)
 	}
 }
 
