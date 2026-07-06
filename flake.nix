@@ -121,12 +121,19 @@
             };
           }
         );
-        nyctereutes = pkgs.buildGoModule {
-          pname = "nyctereutes";
-          version = "0.1.0";
-          src = self;
-          vendorHash = "sha256-QFH+ugrVqXFzov6Z+gQg2rh67+HbNavhG5xSfeCH0Nk=";
-        };
+        nyctereutes =
+          let
+            version = "0.1.0";
+          in
+          pkgs.buildGoModule {
+            pname = "nyctereutes";
+            inherit version;
+            src = self;
+            vendorHash = "sha256-QFH+ugrVqXFzov6Z+gQg2rh67+HbNavhG5xSfeCH0Nk=";
+            ldflags = [
+              "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}"
+            ];
+          };
         # Run golangci-lint by reusing buildGoModule's module fetching so the
         # dependency type information is available inside the sealed
         # `nix flake check` sandbox, where the git-hooks runner cannot reach

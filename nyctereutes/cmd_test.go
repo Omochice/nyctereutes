@@ -24,6 +24,19 @@ func runOut(args []string) (exit int, stdout, stderr string) {
 	return exit, outBuf.String(), errBuf.String()
 }
 
+func TestVersionReportsVersion(t *testing.T) {
+	for _, args := range [][]string{{"-v"}, {"--version"}, {"version"}} {
+		exit, stdout, stderr := runOut(args)
+
+		if exit != 0 {
+			t.Errorf("%v: want exit status 0, got %d (stderr=%q)", args, exit, stderr)
+		}
+		if strings.TrimSpace(stdout) != version {
+			t.Errorf("%v: want stdout %q, got %q", args, version, stdout)
+		}
+	}
+}
+
 func TestInfraRequiresSubcommand(t *testing.T) {
 	exit, stderr := run([]string{"infra"})
 
