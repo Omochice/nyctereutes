@@ -4,7 +4,6 @@ package nyctereutes
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	flags "github.com/jessevdk/go-flags"
 
@@ -14,24 +13,17 @@ import (
 
 var errNotImplemented = errors.New("not implemented")
 
-// The build version, overridden at link time via -ldflags "-X". It falls back
-// to a sentinel so binaries built without the flag report an obvious value
-// rather than an empty string.
+// Build version, stamped in at link time via -ldflags "-X"; the sentinel keeps
+// an un-stamped build recognizable instead of printing an empty string.
 var version = "(devel)"
 
-// Writes the build version as a single line.
-func writeVersion(w io.Writer) {
-	_, _ = fmt.Fprintln(w, version)
-}
-
-// Prints the build version. It backs the "version" subcommand; the same output
-// is produced by the top-level --version flag.
+// Backs the "version" subcommand, echoing the same build version as --version.
 type versionCommand struct {
 	inout *cli.ProcInout
 }
 
 func (c *versionCommand) Execute(_ []string) error {
-	writeVersion(c.inout.Stdout)
+	_, _ = fmt.Fprintln(c.inout.Stdout, version)
 	return nil
 }
 
@@ -74,7 +66,7 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	// --version is a top-level flag, so go-flags still reports the missing
 	// subcommand; the flag itself is honored before that error is surfaced.
 	if opts.Version {
-		writeVersion(inout.Stdout)
+		_, _ = fmt.Fprintln(inout.Stdout, version)
 		return 0
 	}
 	if err != nil {
