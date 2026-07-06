@@ -277,10 +277,7 @@ func (c *infraPlanCommand) planFile(
 			continue
 		}
 		changed++
-		_, _ = fmt.Fprintf(c.inout.Stdout, "%s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
-		for _, change := range changes {
-			_, _ = fmt.Fprintf(c.inout.Stdout, "  %s\n", change)
-		}
+		printChanges(c.inout.Stdout, repo.Metadata.Owner+"/"+repo.Metadata.Name, changes)
 	}
 	return changed, failures
 }

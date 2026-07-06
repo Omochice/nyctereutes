@@ -109,10 +109,7 @@ func (c *infraApplyCommand) buildPlans(
 // Prints the pending changes in the same layout as infra plan.
 func (c *infraApplyCommand) printPlans(plans []repoPlan) {
 	for _, plan := range plans {
-		_, _ = fmt.Fprintf(c.inout.Stdout, "%s\n", plan.name)
-		for _, change := range plan.changes {
-			_, _ = fmt.Fprintf(c.inout.Stdout, "  %s\n", change)
-		}
+		printChanges(c.inout.Stdout, plan.name, plan.changes)
 	}
 }
 
