@@ -66,9 +66,11 @@ func markerColor(line string) string {
 }
 
 // wantsColor reports whether ANSI color should be written to w: only when w is a
-// real terminal and NO_COLOR is unset, so piped or captured output stays plain.
+// real terminal and NO_COLOR is absent, so piped or captured output stays plain.
+// Per the NO_COLOR convention the variable disables color whenever it is
+// present, even with an empty value.
 func wantsColor(w io.Writer) bool {
-	if os.Getenv("NO_COLOR") != "" {
+	if _, ok := os.LookupEnv("NO_COLOR"); ok {
 		return false
 	}
 	file, ok := w.(*os.File)
