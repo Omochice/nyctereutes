@@ -53,7 +53,7 @@ func (c *infraApplyCommand) Execute(args []string) error {
 		return c.result(failures)
 	}
 
-	c.printPlans(plans)
+	c.printPlans(plans, wantsColor(c.inout.Stdout))
 	if c.AutoApprove || c.confirm() {
 		failures += c.applyPlans(ctx, plans)
 	} else {
@@ -107,9 +107,9 @@ func (c *infraApplyCommand) buildPlans(
 }
 
 // Prints the pending changes in the same layout as infra plan.
-func (c *infraApplyCommand) printPlans(plans []repoPlan) {
+func (c *infraApplyCommand) printPlans(plans []repoPlan, colorize bool) {
 	for _, plan := range plans {
-		printChanges(c.inout.Stdout, plan.name, plan.changes)
+		printChanges(c.inout.Stdout, plan.name, plan.changes, colorize)
 	}
 }
 

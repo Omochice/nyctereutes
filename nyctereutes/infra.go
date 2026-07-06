@@ -228,6 +228,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
+	colorize := wantsColor(c.inout.Stdout)
 	changed := 0
 	failures := 0
 	for _, path := range args {
@@ -238,7 +239,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 			continue
 		}
 		for _, file := range files {
-			fileChanged, fileFailures := c.planFile(ctx, client, file)
+			fileChanged, fileFailures := c.planFile(ctx, client, file, colorize)
 			changed += fileChanged
 			failures += fileFailures
 		}
@@ -262,7 +263,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 // reported and counted rather than fatal, so one bad document or project never
 // hides the rest.
 func (c *infraPlanCommand) planFile(
-	ctx context.Context, client *repository.Client, file string,
+	ctx context.Context, client *repository.Client, file string, colorize bool,
 ) (changed, failures int) {
 	repos, failures := readManifestFile(c.inout.Stderr, file)
 	for _, repo := range repos {
@@ -277,7 +278,7 @@ func (c *infraPlanCommand) planFile(
 			continue
 		}
 		changed++
-		printChanges(c.inout.Stdout, repo.Metadata.Owner+"/"+repo.Metadata.Name, changes)
+		printChanges(c.inout.Stdout, repo.Metadata.Owner+"/"+repo.Metadata.Name, changes, colorize)
 	}
 	return changed, failures
 }
