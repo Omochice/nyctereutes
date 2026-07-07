@@ -272,6 +272,12 @@ func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
 		{"merge_commit_template", fieldMergeCommitTemplate, "%{title}", "-f merge_commit_template=%{title}"},
 		{"request_access_enabled", fieldRequestAccessEnabled, true, "-f request_access_enabled=true"},
 		{"enforce_auth_checks", fieldEnforceAuthChecksOnUploads, false, "-f enforce_auth_checks_on_uploads=false"},
+		{"pipeline_succeeds", fieldOnlyAllowMergeIfPipelineSucceeds, true, "-f only_allow_merge_if_pipeline_succeeds=true"},
+		{"skipped_pipeline", fieldAllowMergeOnSkippedPipeline, false, "-f allow_merge_on_skipped_pipeline=false"},
+		{
+			"discussions_resolved", fieldOnlyAllowMergeIfAllDiscussionsAreResolved, true,
+			"-f only_allow_merge_if_all_discussions_are_resolved=true",
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			writer := &recordingWriter{}

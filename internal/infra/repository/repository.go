@@ -91,12 +91,16 @@ type rawProject struct {
 	MergeMethod reported `json:"merge_method"`
 	// Pointer booleans and templates keep "not reported" (JSON absence or
 	// null) apart from an intentional false or empty string.
-	Archived                   *bool     `json:"archived"`
-	RequestAccessEnabled       *bool     `json:"request_access_enabled"`
-	EnforceAuthChecksOnUploads *bool     `json:"enforce_auth_checks_on_uploads"`
-	MergeCommitTemplate        *freeText `json:"merge_commit_template"`
-	SquashCommitTemplate       *freeText `json:"squash_commit_template"`
-	MergeRequestsTemplate      *freeText `json:"merge_requests_template"`
+	Archived                   *bool `json:"archived"`
+	RequestAccessEnabled       *bool `json:"request_access_enabled"`
+	EnforceAuthChecksOnUploads *bool `json:"enforce_auth_checks_on_uploads"`
+	// Merge checks; the gates on a green pipeline and on resolved threads.
+	OnlyAllowMergeIfPipelineSucceeds          *bool     `json:"only_allow_merge_if_pipeline_succeeds"`
+	AllowMergeOnSkippedPipeline               *bool     `json:"allow_merge_on_skipped_pipeline"`
+	OnlyAllowMergeIfAllDiscussionsAreResolved *bool     `json:"only_allow_merge_if_all_discussions_are_resolved"`
+	MergeCommitTemplate                       *freeText `json:"merge_commit_template"`
+	SquashCommitTemplate                      *freeText `json:"squash_commit_template"`
+	MergeRequestsTemplate                     *freeText `json:"merge_requests_template"`
 	// Per-feature access levels, in GitLab settings-UI display order.
 	IssuesAccessLevel                reported `json:"issues_access_level"`
 	RepositoryAccessLevel            reported `json:"repository_access_level"`
@@ -142,18 +146,21 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Owner: state.Owner,
 		},
 		Spec: manifest.RepositorySpec{
-			Description:                new(string(state.Description)),
-			Visibility:                 optional[manifest.Visibility](state.Visibility),
-			RequestAccessEnabled:       state.RequestAccessEnabled,
-			EnforceAuthChecksOnUploads: state.EnforceAuthChecksOnUploads,
-			Archived:                   state.Archived,
-			Topics:                     state.Topics,
-			DefaultBranch:              optional[string](state.DefaultBranch),
-			MergeMethod:                optional[manifest.MergeMethod](state.MergeMethod),
-			MergeCommitTemplate:        (*string)(state.MergeCommitTemplate),
-			SquashCommitTemplate:       (*string)(state.SquashCommitTemplate),
-			MergeRequestsTemplate:      (*string)(state.MergeRequestsTemplate),
-			Features:                   toFeatures(state),
+			Description:                      new(string(state.Description)),
+			Visibility:                       optional[manifest.Visibility](state.Visibility),
+			RequestAccessEnabled:             state.RequestAccessEnabled,
+			EnforceAuthChecksOnUploads:       state.EnforceAuthChecksOnUploads,
+			Archived:                         state.Archived,
+			Topics:                           state.Topics,
+			DefaultBranch:                    optional[string](state.DefaultBranch),
+			MergeMethod:                      optional[manifest.MergeMethod](state.MergeMethod),
+			OnlyAllowMergeIfPipelineSucceeds: state.OnlyAllowMergeIfPipelineSucceeds,
+			AllowMergeOnSkippedPipeline:      state.AllowMergeOnSkippedPipeline,
+			OnlyAllowMergeIfAllDiscussionsAreResolved: state.OnlyAllowMergeIfAllDiscussionsAreResolved,
+			MergeCommitTemplate:                       (*string)(state.MergeCommitTemplate),
+			SquashCommitTemplate:                      (*string)(state.SquashCommitTemplate),
+			MergeRequestsTemplate:                     (*string)(state.MergeRequestsTemplate),
+			Features:                                  toFeatures(state),
 		},
 	}
 }

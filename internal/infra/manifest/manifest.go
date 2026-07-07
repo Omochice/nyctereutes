@@ -206,6 +206,12 @@ type RepositorySpec struct {
 	// whether an accepted MR lands as a merge commit, a semi-linear merge or a
 	// fast-forward.
 	MergeMethod *MergeMethod `yaml:"merge_method,omitempty"`
+	// Merge checks from Settings > Merge requests: an accepted MR is gated on a
+	// green pipeline and on resolved threads. allow_merge_on_skipped_pipeline
+	// relaxes the pipeline gate, treating a skipped pipeline as a success.
+	OnlyAllowMergeIfPipelineSucceeds          *bool `yaml:"only_allow_merge_if_pipeline_succeeds,omitempty"`
+	AllowMergeOnSkippedPipeline               *bool `yaml:"allow_merge_on_skipped_pipeline,omitempty"`
+	OnlyAllowMergeIfAllDiscussionsAreResolved *bool `yaml:"only_allow_merge_if_all_discussions_are_resolved,omitempty"`
 	// Commit message and MR description templates from Settings > Merge
 	// requests; GitLab reports null for an unset template, hence pointers.
 	MergeCommitTemplate   *string             `yaml:"merge_commit_template,omitempty"`

@@ -190,6 +190,21 @@ func TestDiffReportsBooleanChanges(t *testing.T) {
 			spec:  manifest.RepositorySpec{EnforceAuthChecksOnUploads: &enabled},
 			state: rawProject{EnforceAuthChecksOnUploads: &disabled},
 		},
+		{
+			name:  "only_allow_merge_if_pipeline_succeeds",
+			spec:  manifest.RepositorySpec{OnlyAllowMergeIfPipelineSucceeds: &enabled},
+			state: rawProject{OnlyAllowMergeIfPipelineSucceeds: &disabled},
+		},
+		{
+			name:  "allow_merge_on_skipped_pipeline",
+			spec:  manifest.RepositorySpec{AllowMergeOnSkippedPipeline: &enabled},
+			state: rawProject{AllowMergeOnSkippedPipeline: &disabled},
+		},
+		{
+			name:  "only_allow_merge_if_all_discussions_are_resolved",
+			spec:  manifest.RepositorySpec{OnlyAllowMergeIfAllDiscussionsAreResolved: &enabled},
+			state: rawProject{OnlyAllowMergeIfAllDiscussionsAreResolved: &disabled},
+		},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {
