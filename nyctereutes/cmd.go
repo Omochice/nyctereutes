@@ -13,11 +13,11 @@ import (
 
 var errNotImplemented = errors.New("not implemented")
 
-// Build version, stamped in at link time via -ldflags "-X"; the sentinel keeps
-// an un-stamped build recognizable instead of printing an empty string.
+// Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
+// an un-stamped build.
 var version = "(devel)"
 
-// Backs the "version" subcommand, echoing the same build version as --version.
+// Backs the "version" subcommand.
 type versionCommand struct {
 	inout *cli.ProcInout
 }
@@ -61,9 +61,8 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
 	parser.Name = "nyctereutes"
-	// --version is a top-level flag, so short-circuit before running any
-	// subcommand; otherwise go-flags would execute it (and its side effects)
-	// during ParseArgs while the flag is set.
+	// With --version set, go-flags would still run the subcommand (and its side
+	// effects) during ParseArgs, so skip execution here.
 	parser.CommandHandler = func(command flags.Commander, cmdArgs []string) error {
 		if opts.Version {
 			return nil
@@ -72,9 +71,8 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	}
 
 	_, err := parser.ParseArgs(args)
-	// A bare --version legitimately has no subcommand, so ErrCommandRequired is
-	// expected; any other parse error (e.g. an unknown flag) is a real mistake
-	// that must still surface rather than be masked by the version shortcut.
+	// Bare --version yields the expected ErrCommandRequired; any other parse
+	// error (e.g. an unknown flag) must still surface instead of being masked.
 	if opts.Version {
 		var flagsErr *flags.Error
 		if err == nil || (errors.As(err, &flagsErr) && flagsErr.Type == flags.ErrCommandRequired) {
