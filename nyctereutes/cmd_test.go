@@ -42,6 +42,20 @@ func TestVersionReportsVersion(t *testing.T) {
 	}
 }
 
+func TestVersionFlagDoesNotMaskParseError(t *testing.T) {
+	exit, stdout, stderr := runOut([]string{"--version", "--bogus"})
+
+	if exit != 1 {
+		t.Errorf("want exit status 1, got %d", exit)
+	}
+	if stdout != "" {
+		t.Errorf("want no version output on a failed parse, got stdout %q", stdout)
+	}
+	if !strings.Contains(stderr, "bogus") {
+		t.Errorf("want stderr to report the unknown flag, got %q", stderr)
+	}
+}
+
 func TestInfraRequiresSubcommand(t *testing.T) {
 	exit, stderr := run([]string{"infra"})
 

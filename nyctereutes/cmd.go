@@ -72,9 +72,15 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	}
 
 	_, err := parser.ParseArgs(args)
+	// A bare --version legitimately has no subcommand, so ErrCommandRequired is
+	// expected; any other parse error (e.g. an unknown flag) is a real mistake
+	// that must still surface rather than be masked by the version shortcut.
 	if opts.Version {
-		_, _ = fmt.Fprintln(inout.Stdout, version)
-		return 0
+		var flagsErr *flags.Error
+		if err == nil || (errors.As(err, &flagsErr) && flagsErr.Type == flags.ErrCommandRequired) {
+			_, _ = fmt.Fprintln(inout.Stdout, version)
+			return 0
+		}
 	}
 	if err != nil {
 		if errors.Is(err, errNotImplemented) {
