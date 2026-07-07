@@ -24,6 +24,7 @@ func fullRepository() *Repository {
 			Archived:                   new(true),
 			Topics:                     []string{"go"},
 			DefaultBranch:              new("main"),
+			MergeMethod:                new(MergeMethod("ff")),
 			MergeCommitTemplate:        new("%{title}"),
 			SquashCommitTemplate:       new("%{title}"),
 			MergeRequestsTemplate:      new("%{title}"),
@@ -59,6 +60,7 @@ func settingsUIKeyOrder() []string {
 	return []string{
 		"description", "visibility", "request_access_enabled",
 		"enforce_auth_checks_on_uploads", "archived", "topics", "default_branch",
+		"merge_method",
 		"merge_commit_template", "squash_commit_template", "merge_requests_template",
 		"features",
 		"issues", "repository", "merge_requests", "forking", "ci",

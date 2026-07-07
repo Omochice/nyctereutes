@@ -19,6 +19,9 @@ func TestEnumValuesAcceptAllowedValues(t *testing.T) {
 		{"visibility_private", "visibility: private"},
 		{"visibility_internal", "visibility: internal"},
 		{"visibility_public", "visibility: public"},
+		{"merge_method_merge", "merge_method: merge"},
+		{"merge_method_rebase_merge", "merge_method: rebase_merge"},
+		{"merge_method_ff", "merge_method: ff"},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {
@@ -39,6 +42,7 @@ func TestEnumValuesRejectUnknownValues(t *testing.T) {
 		{"access_level_rejects_public", "features:\n  issues: public", "disabled, private, enabled"},
 		{"public_access_level_rejects_unknown", "features:\n  pages: open", "disabled, private, enabled, public"},
 		{"visibility_rejects_unknown", "visibility: hidden", "private, internal, public"},
+		{"merge_method_rejects_unknown", "merge_method: squash", "merge, rebase_merge, ff"},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {

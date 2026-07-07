@@ -396,6 +396,21 @@ func TestFetchRepositoryMapsDefaultBranch(t *testing.T) {
 	}
 }
 
+// GitLab reports a merge_method for every project, so a declared value must
+// round-trip; a response lacking the field (only in tests) must omit the key
+// rather than emit an empty string the enum would reject on re-import.
+func TestFetchRepositoryMapsMergeMethod(t *testing.T) {
+	out, spec := exportSpec(t, `{"visibility":"private","merge_method":"ff"}`)
+	if got := spec["merge_method"]; got != "ff" {
+		t.Errorf("spec.merge_method = %v, want %q\n%s", got, "ff", out)
+	}
+
+	out, spec = exportSpec(t, `{"visibility":"private"}`)
+	if got, ok := spec["merge_method"]; ok {
+		t.Errorf("spec.merge_method = %v, want the key omitted when the API did not report it\n%s", got, out)
+	}
+}
+
 // A project response without a visibility must omit the key rather than emit
 // `visibility: ""`: the empty string is not a member of the Visibility enum,
 // so emitting it would fail Marshal's round-trip verification and break the
