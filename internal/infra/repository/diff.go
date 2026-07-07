@@ -29,9 +29,14 @@ const (
 	fieldEnforceAuthChecksOnUploads = "enforce_auth_checks_on_uploads"
 	fieldDefaultBranch              = "default_branch"
 	fieldMergeMethod                = "merge_method"
-	fieldMergeCommitTemplate        = "merge_commit_template"
-	fieldSquashCommitTemplate       = "squash_commit_template"
-	fieldMergeRequestsTemplate      = "merge_requests_template"
+
+	fieldOnlyAllowMergeIfPipelineSucceeds          = "only_allow_merge_if_pipeline_succeeds"
+	fieldAllowMergeOnSkippedPipeline               = "allow_merge_on_skipped_pipeline"
+	fieldOnlyAllowMergeIfAllDiscussionsAreResolved = "only_allow_merge_if_all_discussions_are_resolved"
+
+	fieldMergeCommitTemplate   = "merge_commit_template"
+	fieldSquashCommitTemplate  = "squash_commit_template"
+	fieldMergeRequestsTemplate = "merge_requests_template"
 )
 
 // One planned difference between a declared manifest and the live project: a
@@ -99,6 +104,12 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 		spec.EnforceAuthChecksOnUploads, boolValue(current.EnforceAuthChecksOnUploads))
 	appendChanged(&changes, name, fieldDefaultBranch, spec.DefaultBranch, string(current.DefaultBranch))
 	appendChanged(&changes, name, fieldMergeMethod, spec.MergeMethod, manifest.MergeMethod(current.MergeMethod))
+	appendChanged(&changes, name, fieldOnlyAllowMergeIfPipelineSucceeds,
+		spec.OnlyAllowMergeIfPipelineSucceeds, boolValue(current.OnlyAllowMergeIfPipelineSucceeds))
+	appendChanged(&changes, name, fieldAllowMergeOnSkippedPipeline,
+		spec.AllowMergeOnSkippedPipeline, boolValue(current.AllowMergeOnSkippedPipeline))
+	appendChanged(&changes, name, fieldOnlyAllowMergeIfAllDiscussionsAreResolved,
+		spec.OnlyAllowMergeIfAllDiscussionsAreResolved, boolValue(current.OnlyAllowMergeIfAllDiscussionsAreResolved))
 	appendChanged(&changes, name, fieldMergeCommitTemplate,
 		spec.MergeCommitTemplate, textValue(current.MergeCommitTemplate))
 	appendChanged(&changes, name, fieldSquashCommitTemplate,
