@@ -87,6 +87,8 @@ type rawProject struct {
 	Topics      []string `json:"topics"`
 	// Empty when the repository has no commits yet: GitLab reports null.
 	DefaultBranch reported `json:"default_branch"`
+	// GitLab always reports a merge_method: "merge", "rebase_merge" or "ff".
+	MergeMethod reported `json:"merge_method"`
 	// Pointer booleans and templates keep "not reported" (JSON absence or
 	// null) apart from an intentional false or empty string.
 	Archived                   *bool     `json:"archived"`
@@ -147,6 +149,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Archived:                   state.Archived,
 			Topics:                     state.Topics,
 			DefaultBranch:              optional[string](state.DefaultBranch),
+			MergeMethod:                optional[manifest.MergeMethod](state.MergeMethod),
 			MergeCommitTemplate:        (*string)(state.MergeCommitTemplate),
 			SquashCommitTemplate:       (*string)(state.SquashCommitTemplate),
 			MergeRequestsTemplate:      (*string)(state.MergeRequestsTemplate),

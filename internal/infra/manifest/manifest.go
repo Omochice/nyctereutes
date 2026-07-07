@@ -153,6 +153,27 @@ func (level *PublicAccessLevel) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
+const (
+	valueMerge       = "merge"
+	valueRebaseMerge = "rebase_merge"
+	valueFastForward = "ff"
+)
+
+// How GitLab lands an accepted merge request on the target branch: "merge" (a
+// merge commit), "rebase_merge" (a merge commit atop a rebased, semi-linear
+// history) or "ff" (fast-forward, adding no merge commit).
+type MergeMethod string
+
+// Rejects values outside the merge-method set at decode time.
+func (method *MergeMethod) UnmarshalYAML(data []byte) error {
+	value, err := enumValue(data, "merge method", valueMerge, valueRebaseMerge, valueFastForward)
+	if err != nil {
+		return err
+	}
+	*method = MergeMethod(value)
+	return nil
+}
+
 // Decodes a scalar enum value, rejecting anything outside allowed with an
 // error that lists the allowed values, so a typo in a hand-edited manifest
 // is self-explanatory.
@@ -181,6 +202,10 @@ type RepositorySpec struct {
 	// fully represents the project's current state.
 	Topics        []string `yaml:"topics"`
 	DefaultBranch *string  `yaml:"default_branch,omitempty"`
+	// GitLab's merge_method, from Settings > Merge requests > Merge method:
+	// whether an accepted MR lands as a merge commit, a semi-linear merge or a
+	// fast-forward.
+	MergeMethod *MergeMethod `yaml:"merge_method,omitempty"`
 	// Commit message and MR description templates from Settings > Merge
 	// requests; GitLab reports null for an unset template, hence pointers.
 	MergeCommitTemplate   *string             `yaml:"merge_commit_template,omitempty"`

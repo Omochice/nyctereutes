@@ -226,6 +226,24 @@ func TestDiffReportsDefaultBranchChange(t *testing.T) {
 	}
 }
 
+func TestDiffReportsMergeMethodChange(t *testing.T) {
+	ff := manifest.MergeMethod("ff")
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{MergeMethod: &ff},
+	}
+	current := &CurrentState{rawProject: rawProject{MergeMethod: "merge"}}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "merge_method" {
+		t.Fatalf("changes = %+v, want one merge_method update", changes)
+	}
+	if changes[0].OldValue != manifest.MergeMethod("merge") || changes[0].NewValue != manifest.MergeMethod("ff") {
+		t.Errorf("values = %v → %v, want merge → ff", changes[0].OldValue, changes[0].NewValue)
+	}
+}
+
 func TestDiffReportsTemplateChanges(t *testing.T) {
 	want := "new"
 	live := freeText("old")

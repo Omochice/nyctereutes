@@ -28,6 +28,7 @@ const (
 	fieldRequestAccessEnabled       = "request_access_enabled"
 	fieldEnforceAuthChecksOnUploads = "enforce_auth_checks_on_uploads"
 	fieldDefaultBranch              = "default_branch"
+	fieldMergeMethod                = "merge_method"
 	fieldMergeCommitTemplate        = "merge_commit_template"
 	fieldSquashCommitTemplate       = "squash_commit_template"
 	fieldMergeRequestsTemplate      = "merge_requests_template"
@@ -97,6 +98,7 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	appendChanged(&changes, name, fieldEnforceAuthChecksOnUploads,
 		spec.EnforceAuthChecksOnUploads, boolValue(current.EnforceAuthChecksOnUploads))
 	appendChanged(&changes, name, fieldDefaultBranch, spec.DefaultBranch, string(current.DefaultBranch))
+	appendChanged(&changes, name, fieldMergeMethod, spec.MergeMethod, manifest.MergeMethod(current.MergeMethod))
 	appendChanged(&changes, name, fieldMergeCommitTemplate,
 		spec.MergeCommitTemplate, textValue(current.MergeCommitTemplate))
 	appendChanged(&changes, name, fieldSquashCommitTemplate,

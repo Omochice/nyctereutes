@@ -268,6 +268,7 @@ func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
 	}{
 		{"visibility", fieldVisibility, manifest.Visibility("internal"), "-f visibility=internal"},
 		{"default_branch", fieldDefaultBranch, "main", "-f default_branch=main"},
+		{"merge_method", fieldMergeMethod, manifest.MergeMethod("ff"), "-f merge_method=ff"},
 		{"merge_commit_template", fieldMergeCommitTemplate, "%{title}", "-f merge_commit_template=%{title}"},
 		{"request_access_enabled", fieldRequestAccessEnabled, true, "-f request_access_enabled=true"},
 		{"enforce_auth_checks", fieldEnforceAuthChecksOnUploads, false, "-f enforce_auth_checks_on_uploads=false"},
