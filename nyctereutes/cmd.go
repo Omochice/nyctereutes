@@ -13,6 +13,20 @@ import (
 
 var errNotImplemented = errors.New("not implemented")
 
+// Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
+// an un-stamped build.
+var version = "(devel)"
+
+// Backs the "version" subcommand.
+type versionCommand struct {
+	inout *cli.ProcInout
+}
+
+func (c *versionCommand) Execute(_ []string) error {
+	_, _ = fmt.Fprintln(c.inout.Stdout, version)
+	return nil
+}
+
 // Shared stand-in for every subcommand not yet implemented.
 type stubCommand struct {
 	inout *cli.ProcInout
@@ -24,9 +38,11 @@ func (c *stubCommand) Execute(_ []string) error {
 }
 
 type options struct {
-	Dep   *depCommand   `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
-	Infra *infraCommand `command:"infra" description:"manage infrastructure"`
-	Help  *stubCommand  `command:"help" description:"show help"`
+	Version    bool            `short:"v" long:"version" description:"show version"`
+	Dep        *depCommand     `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
+	Infra      *infraCommand   `command:"infra" description:"manage infrastructure"`
+	Help       *stubCommand    `command:"help" description:"show help"`
+	VersionCmd *versionCommand `command:"version" description:"show version"`
 }
 
 // The production entry point; it drives the real glab CLI.
@@ -38,14 +54,33 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 // so tests can drive the commands with a fake glab instead of the real CLI.
 func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
-		Dep:   newDepCommand(inout, runner),
-		Infra: newInfraCommand(inout, runner),
-		Help:  &stubCommand{inout: inout},
+		Dep:        newDepCommand(inout, runner),
+		Infra:      newInfraCommand(inout, runner),
+		Help:       &stubCommand{inout: inout},
+		VersionCmd: &versionCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
 	parser.Name = "nyctereutes"
+	// With --version set, go-flags would still run the subcommand (and its side
+	// effects) during ParseArgs, so skip execution here.
+	parser.CommandHandler = func(command flags.Commander, cmdArgs []string) error {
+		if opts.Version {
+			return nil
+		}
+		return command.Execute(cmdArgs)
+	}
 
-	if _, err := parser.ParseArgs(args); err != nil {
+	_, err := parser.ParseArgs(args)
+	// Bare --version yields the expected ErrCommandRequired; any other parse
+	// error (e.g. an unknown flag) must still surface instead of being masked.
+	if opts.Version {
+		var flagsErr *flags.Error
+		if err == nil || (errors.As(err, &flagsErr) && flagsErr.Type == flags.ErrCommandRequired) {
+			_, _ = fmt.Fprintln(inout.Stdout, version)
+			return 0
+		}
+	}
+	if err != nil {
 		if errors.Is(err, errNotImplemented) {
 			return 1
 		}

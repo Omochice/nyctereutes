@@ -9,6 +9,11 @@ import (
 )
 
 func run(args []string) (exit int, stderr string) {
+	exit, _, stderr = runOut(args)
+	return exit, stderr
+}
+
+func runOut(args []string) (exit int, stdout, stderr string) {
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 	exit = MainCommand(args, &cli.ProcInout{
@@ -16,7 +21,39 @@ func run(args []string) (exit int, stderr string) {
 		Stdout: outBuf,
 		Stderr: errBuf,
 	})
-	return exit, errBuf.String()
+	return exit, outBuf.String(), errBuf.String()
+}
+
+func TestVersionReportsVersion(t *testing.T) {
+	// "-v help" pairs the flag with a subcommand whose Execute writes to stderr,
+	// proving the flag short-circuits before any subcommand runs.
+	for _, args := range [][]string{{"-v"}, {"--version"}, {"version"}, {"-v", "help"}} {
+		exit, stdout, stderr := runOut(args)
+
+		if exit != 0 {
+			t.Errorf("%v: want exit status 0, got %d (stderr=%q)", args, exit, stderr)
+		}
+		if strings.TrimSpace(stdout) != version {
+			t.Errorf("%v: want stdout %q, got %q", args, version, stdout)
+		}
+		if stderr != "" {
+			t.Errorf("%v: want empty stderr, got %q", args, stderr)
+		}
+	}
+}
+
+func TestVersionFlagDoesNotMaskParseError(t *testing.T) {
+	exit, stdout, stderr := runOut([]string{"--version", "--bogus"})
+
+	if exit != 1 {
+		t.Errorf("want exit status 1, got %d", exit)
+	}
+	if stdout != "" {
+		t.Errorf("want no version output on a failed parse, got stdout %q", stdout)
+	}
+	if !strings.Contains(stderr, "bogus") {
+		t.Errorf("want stderr to report the unknown flag, got %q", stderr)
+	}
 }
 
 func TestInfraRequiresSubcommand(t *testing.T) {
