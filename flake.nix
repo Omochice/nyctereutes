@@ -123,8 +123,6 @@
         );
         nyctereutes =
           let
-            # release-please owns the version; read it from its manifest so the
-            # release PR is the single place the number changes.
             version = pkgs.lib.pipe ./.github/release-please-manifest.json [
               builtins.readFile
               builtins.fromJSON
