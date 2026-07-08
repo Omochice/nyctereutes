@@ -98,6 +98,28 @@ func TestHelpMatchesHelpFlag(t *testing.T) {
 	}
 }
 
+func TestHelpNeverExecutesTheTargetCommand(t *testing.T) {
+	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
+	refExit, wantUsage, _ := runDep(fake, "dep", "list", "--help")
+	if refExit != 0 || wantUsage == "" {
+		t.Fatalf("dep list --help must supply the reference usage text, got exit %d stdout %q", refExit, wantUsage)
+	}
+
+	// The outer parser consumes the first "--", so one terminator survives
+	// into the help command's arguments.
+	exit, stdout, stderr := runDep(fake, "help", "dep", "list", "--", "--")
+
+	if exit != 0 {
+		t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
+	}
+	if stdout != wantUsage {
+		t.Errorf("want the usage text of dep list --help %q, got %q", wantUsage, stdout)
+	}
+	if stderr != "" {
+		t.Errorf("want empty stderr, got %q", stderr)
+	}
+}
+
 func TestHelpWithUnknownSubcommandReportsError(t *testing.T) {
 	exit, stdout, stderr := runOut([]string{"help", "nope"})
 
