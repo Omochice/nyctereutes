@@ -123,7 +123,11 @@
         );
         nyctereutes =
           let
-            version = "0.1.0";
+            version = pkgs.lib.pipe ./.github/release-please-manifest.json [
+              builtins.readFile
+              builtins.fromJSON
+              (pkgs.lib.getAttr ".")
+            ];
           in
           pkgs.buildGoModule {
             pname = "nyctereutes";
