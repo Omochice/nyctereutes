@@ -37,11 +37,24 @@ func (c *stubCommand) Execute(_ []string) error {
 	return errNotImplemented
 }
 
+// Backs the "help" subcommand by re-dispatching the requested command line
+// with --help appended, so the printed usage and the error handling stay
+// identical to the --help flag instead of duplicating them here.
+type helpCommand struct {
+	inout  *cli.ProcInout
+	runner glab.Runner
+}
+
+func (c *helpCommand) Execute(args []string) error {
+	dispatch(append(args, "--help"), c.inout, c.runner)
+	return nil
+}
+
 type options struct {
 	Version    bool            `short:"v" long:"version" description:"show version"`
 	Dep        *depCommand     `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
 	Infra      *infraCommand   `command:"infra" description:"manage infrastructure"`
-	Help       *stubCommand    `command:"help" description:"show help"`
+	Help       *helpCommand    `command:"help" description:"show help"`
 	VersionCmd *versionCommand `command:"version" description:"show version"`
 }
 
@@ -56,7 +69,7 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:        newDepCommand(inout, runner),
 		Infra:      newInfraCommand(inout, runner),
-		Help:       &stubCommand{inout: inout},
+		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
