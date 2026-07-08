@@ -10,3 +10,7 @@ It follows an import, validate, plan, apply cycle so the manifests stay the sing
 - `infra validate` validates manifest files against the schema.
 - `infra plan` shows the drift between manifests and live GitLab state.
 - `infra apply` applies manifests to live GitLab state after a confirmation prompt.
+
+## Inspired by
+
+This command is inspired by [babarot/gh-infra](https://github.com/babarot/gh-infra).
