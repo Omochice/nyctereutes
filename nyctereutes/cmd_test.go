@@ -67,14 +67,22 @@ func TestInfraRequiresSubcommand(t *testing.T) {
 	}
 }
 
-func TestHelpIsNotImplemented(t *testing.T) {
-	exit, stderr := run([]string{"help"})
-
-	if exit != 1 {
-		t.Errorf("want exit status 1, got %d", exit)
+func TestHelpPrintsUsage(t *testing.T) {
+	helpFlagExit, wantUsage, _ := runOut([]string{"--help"})
+	if helpFlagExit != 0 || wantUsage == "" {
+		t.Fatalf("--help must supply the reference usage text, got exit %d stdout %q", helpFlagExit, wantUsage)
 	}
-	if !strings.Contains(stderr, "not implemented") {
-		t.Errorf("want stderr to contain %q, got %q", "not implemented", stderr)
+
+	exit, stdout, stderr := runOut([]string{"help"})
+
+	if exit != 0 {
+		t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
+	}
+	if stdout != wantUsage {
+		t.Errorf("want the same usage text as --help %q, got %q", wantUsage, stdout)
+	}
+	if stderr != "" {
+		t.Errorf("want empty stderr, got %q", stderr)
 	}
 }
 
