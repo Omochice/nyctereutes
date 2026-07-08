@@ -4,6 +4,7 @@ package nyctereutes
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	flags "github.com/jessevdk/go-flags"
 
@@ -39,7 +40,15 @@ type helpCommand struct {
 var errAlreadyReported = errors.New("failure already reported")
 
 func (c *helpCommand) Execute(args []string) error {
-	if dispatch(append(args, "--help"), c.inout, c.runner) != 0 {
+	// A literal "--" surviving in args would demote a trailing --help to a
+	// plain positional under PassDoubleDash and really execute the target
+	// command, so the flag must precede the first terminator.
+	terminator := slices.Index(args, "--")
+	if terminator < 0 {
+		terminator = len(args)
+	}
+	helpArgs := slices.Insert(slices.Clone(args), terminator, "--help")
+	if dispatch(helpArgs, c.inout, c.runner) != 0 {
 		return errAlreadyReported
 	}
 	return nil
