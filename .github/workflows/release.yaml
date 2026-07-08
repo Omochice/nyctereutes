@@ -78,7 +78,7 @@ jobs:
           nix develop --command go build \
             -ldflags "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}" \
             -o "${binary}" .
-          gh release upload "${TAG_NAME}" "${binary}"
+          gh release upload "${TAG_NAME}" "${binary}" --clobber
 
   publish:
     needs:
