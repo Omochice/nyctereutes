@@ -95,7 +95,7 @@
             };
           in
           {
-            settings.global.excludes = [ ];
+            settings.global.excludes = [ "CHANGELOG.md" ];
             settings.formatter.rumdl-format.options = [
               "--config"
               (toString rumdlConfig)
