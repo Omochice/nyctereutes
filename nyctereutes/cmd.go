@@ -26,9 +26,8 @@ func (c *versionCommand) Execute(_ []string) error {
 	return nil
 }
 
-// Backs the "help" subcommand by re-dispatching the requested command line
-// with --help appended, so the printed usage and the error handling stay
-// identical to the --help flag instead of duplicating them here.
+// Backs the "help" subcommand by re-dispatching with --help, so the usage
+// rendering and error handling stay those of the flag instead of a copy.
 type helpCommand struct {
 	inout  *cli.ProcInout
 	runner glab.Runner
@@ -40,9 +39,8 @@ type helpCommand struct {
 var errAlreadyReported = errors.New("failure already reported")
 
 func (c *helpCommand) Execute(args []string) error {
-	// A literal "--" surviving in args would demote a trailing --help to a
-	// plain positional under PassDoubleDash and really execute the target
-	// command, so the flag must precede the first terminator.
+	// Inserted before any "--" terminator, after which PassDoubleDash would
+	// demote --help to a positional and really execute the target.
 	terminator := slices.Index(args, "--")
 	if terminator < 0 {
 		terminator = len(args)
