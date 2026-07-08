@@ -11,8 +11,6 @@ import (
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
-var errNotImplemented = errors.New("not implemented")
-
 // Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
 // an un-stamped build.
 var version = "(devel)"
@@ -25,16 +23,6 @@ type versionCommand struct {
 func (c *versionCommand) Execute(_ []string) error {
 	_, _ = fmt.Fprintln(c.inout.Stdout, version)
 	return nil
-}
-
-// Shared stand-in for every subcommand not yet implemented.
-type stubCommand struct {
-	inout *cli.ProcInout
-}
-
-func (c *stubCommand) Execute(_ []string) error {
-	_, _ = fmt.Fprintln(c.inout.Stderr, "not implemented")
-	return errNotImplemented
 }
 
 // Backs the "help" subcommand by re-dispatching the requested command line
@@ -94,9 +82,6 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 		}
 	}
 	if err != nil {
-		if errors.Is(err, errNotImplemented) {
-			return 1
-		}
 		var flagsErr *flags.Error
 		if errors.As(err, &flagsErr) {
 			if flagsErr.Type == flags.ErrHelp {

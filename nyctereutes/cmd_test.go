@@ -25,8 +25,9 @@ func runOut(args []string) (exit int, stdout, stderr string) {
 }
 
 func TestVersionReportsVersion(t *testing.T) {
-	// "-v help" pairs the flag with a subcommand whose Execute writes to stderr,
-	// proving the flag short-circuits before any subcommand runs.
+	// "-v help" pairs the flag with a subcommand whose Execute would add the
+	// usage text to stdout, proving the flag short-circuits before any
+	// subcommand runs.
 	for _, args := range [][]string{{"-v"}, {"--version"}, {"version"}, {"-v", "help"}} {
 		exit, stdout, stderr := runOut(args)
 
