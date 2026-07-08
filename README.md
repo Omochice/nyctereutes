@@ -22,7 +22,7 @@ go install github.com/Omochice/nyctereutes@latest
 
 ## Commands
 
-Each command is documented in its own page.
+The main commands are documented in their own pages.
 
 - [dep](doc/cmd/dep.md) manages dependency-update merge requests.
 - [infra](doc/cmd/infra.md) manages project settings through YAML manifests.
