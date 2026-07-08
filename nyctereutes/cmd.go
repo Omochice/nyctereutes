@@ -33,8 +33,15 @@ type helpCommand struct {
 	runner glab.Runner
 }
 
+// The inner dispatch has already written its diagnostics to stderr, so this
+// sentinel only carries the non-zero exit back through go-flags without
+// triggering a second report.
+var errHelpTargetFailed = errors.New("help target failed")
+
 func (c *helpCommand) Execute(args []string) error {
-	dispatch(append(args, "--help"), c.inout, c.runner)
+	if dispatch(append(args, "--help"), c.inout, c.runner) != 0 {
+		return errHelpTargetFailed
+	}
 	return nil
 }
 
@@ -82,6 +89,9 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 		}
 	}
 	if err != nil {
+		if errors.Is(err, errHelpTargetFailed) {
+			return 1
+		}
 		var flagsErr *flags.Error
 		if errors.As(err, &flagsErr) {
 			if flagsErr.Type == flags.ErrHelp {
