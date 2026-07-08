@@ -106,6 +106,20 @@ func TestHelpWithSubcommandPrintsItsHelp(t *testing.T) {
 	}
 }
 
+func TestHelpWithUnknownSubcommandReportsError(t *testing.T) {
+	exit, stdout, stderr := runOut([]string{"help", "nope"})
+
+	if exit != 1 {
+		t.Errorf("want exit status 1, got %d", exit)
+	}
+	if stdout != "" {
+		t.Errorf("want no usage on stdout for an unknown command, got %q", stdout)
+	}
+	if !strings.Contains(stderr, "nope") {
+		t.Errorf("want stderr to report the unknown command, got %q", stderr)
+	}
+}
+
 func TestNoSubcommandReportsError(t *testing.T) {
 	exit, stderr := run([]string{})
 
