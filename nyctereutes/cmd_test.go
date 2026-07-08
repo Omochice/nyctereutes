@@ -68,41 +68,33 @@ func TestInfraRequiresSubcommand(t *testing.T) {
 	}
 }
 
-func TestHelpPrintsUsage(t *testing.T) {
-	helpFlagExit, wantUsage, _ := runOut([]string{"--help"})
-	if helpFlagExit != 0 || wantUsage == "" {
-		t.Fatalf("--help must supply the reference usage text, got exit %d stdout %q", helpFlagExit, wantUsage)
-	}
+func TestHelpMatchesHelpFlag(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		flagArgs []string
+		helpArgs []string
+	}{
+		{"top-level usage", []string{"--help"}, []string{"help"}},
+		{"subcommand usage", []string{"dep", "--help"}, []string{"help", "dep"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			flagExit, wantUsage, _ := runOut(tt.flagArgs)
+			if flagExit != 0 || wantUsage == "" {
+				t.Fatalf("%v must supply the reference usage text, got exit %d stdout %q", tt.flagArgs, flagExit, wantUsage)
+			}
 
-	exit, stdout, stderr := runOut([]string{"help"})
+			exit, stdout, stderr := runOut(tt.helpArgs)
 
-	if exit != 0 {
-		t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
-	}
-	if stdout != wantUsage {
-		t.Errorf("want the same usage text as --help %q, got %q", wantUsage, stdout)
-	}
-	if stderr != "" {
-		t.Errorf("want empty stderr, got %q", stderr)
-	}
-}
-
-func TestHelpWithSubcommandPrintsItsHelp(t *testing.T) {
-	helpFlagExit, wantUsage, _ := runOut([]string{"dep", "--help"})
-	if helpFlagExit != 0 || wantUsage == "" {
-		t.Fatalf("dep --help must supply the reference usage text, got exit %d stdout %q", helpFlagExit, wantUsage)
-	}
-
-	exit, stdout, stderr := runOut([]string{"help", "dep"})
-
-	if exit != 0 {
-		t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
-	}
-	if stdout != wantUsage {
-		t.Errorf("want the same usage text as dep --help %q, got %q", wantUsage, stdout)
-	}
-	if stderr != "" {
-		t.Errorf("want empty stderr, got %q", stderr)
+			if exit != 0 {
+				t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
+			}
+			if stdout != wantUsage {
+				t.Errorf("want the same usage text as %v %q, got %q", tt.flagArgs, wantUsage, stdout)
+			}
+			if stderr != "" {
+				t.Errorf("want empty stderr, got %q", stderr)
+			}
+		})
 	}
 }
 
