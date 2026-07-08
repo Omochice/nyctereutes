@@ -36,3 +36,7 @@ nix develop
 go test ./...
 nix flake check
 ```
+
+## License
+
+This project is licensed under the [zlib License](LICENSE).
