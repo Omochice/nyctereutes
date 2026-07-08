@@ -6,9 +6,9 @@ It searches open merge requests, groups them by their target `package@version`, 
 
 ## Subcommands
 
-`dep list` shows the dependency merge requests.
-`dep approve` approves a group of merge requests.
-`dep merge` merges a group of merge requests.
+- `dep list` shows the dependency merge requests.
+- `dep approve` approves a group of merge requests.
+- `dep merge` merges a group of merge requests.
 
 ## Inspired by
 
