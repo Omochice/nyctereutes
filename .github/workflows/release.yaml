@@ -68,13 +68,15 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          VERSION: ${{ needs.release-please.outputs.tag_name }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
         run: |
+          # Strip the tag's v prefix so the stamped version matches the nix
+          # build, which reads the bare number from the release-please manifest.
+          version="${TAG_NAME#v}"
           binary="nyctereutes-${GOOS}-${GOARCH}"
           nix develop --command go build \
-            -ldflags "-X github.com/Omochice/nyctereutes/nyctereutes.version=${VERSION}" \
+            -ldflags "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}" \
             -o "${binary}" .
           gh release upload "${TAG_NAME}" "${binary}"
 
