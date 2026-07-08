@@ -87,6 +87,25 @@ func TestHelpPrintsUsage(t *testing.T) {
 	}
 }
 
+func TestHelpWithSubcommandPrintsItsHelp(t *testing.T) {
+	helpFlagExit, wantUsage, _ := runOut([]string{"dep", "--help"})
+	if helpFlagExit != 0 || wantUsage == "" {
+		t.Fatalf("dep --help must supply the reference usage text, got exit %d stdout %q", helpFlagExit, wantUsage)
+	}
+
+	exit, stdout, stderr := runOut([]string{"help", "dep"})
+
+	if exit != 0 {
+		t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
+	}
+	if stdout != wantUsage {
+		t.Errorf("want the same usage text as dep --help %q, got %q", wantUsage, stdout)
+	}
+	if stderr != "" {
+		t.Errorf("want empty stderr, got %q", stderr)
+	}
+}
+
 func TestNoSubcommandReportsError(t *testing.T) {
 	exit, stderr := run([]string{})
 
