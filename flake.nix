@@ -229,6 +229,7 @@
             pkgs.go
             pkgs.godoclint
             pkgs.golangci-lint
+            pkgs.nix-update
             pkgs.octocov
             treefmt.config.build.wrapper
           ];
