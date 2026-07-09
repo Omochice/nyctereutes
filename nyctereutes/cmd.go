@@ -4,14 +4,13 @@ package nyctereutes
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	flags "github.com/jessevdk/go-flags"
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
-
-var errNotImplemented = errors.New("not implemented")
 
 // Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
 // an un-stamped build.
@@ -27,21 +26,37 @@ func (c *versionCommand) Execute(_ []string) error {
 	return nil
 }
 
-// Shared stand-in for every subcommand not yet implemented.
-type stubCommand struct {
-	inout *cli.ProcInout
+// Backs the "help" subcommand by re-dispatching with --help, so the usage
+// rendering and error handling stay those of the flag instead of a copy.
+type helpCommand struct {
+	inout  *cli.ProcInout
+	runner glab.Runner
 }
 
-func (c *stubCommand) Execute(_ []string) error {
-	_, _ = fmt.Fprintln(c.inout.Stderr, "not implemented")
-	return errNotImplemented
+// Signals that an Execute has already written its own diagnostics to stderr,
+// so dispatch must only translate the failure into a non-zero exit instead of
+// reporting it a second time.
+var errAlreadyReported = errors.New("failure already reported")
+
+func (c *helpCommand) Execute(args []string) error {
+	// Inserted before any "--" terminator, after which PassDoubleDash would
+	// demote --help to a positional and really execute the target.
+	terminator := slices.Index(args, "--")
+	if terminator < 0 {
+		terminator = len(args)
+	}
+	helpArgs := slices.Insert(slices.Clone(args), terminator, "--help")
+	if dispatch(helpArgs, c.inout, c.runner) != 0 {
+		return errAlreadyReported
+	}
+	return nil
 }
 
 type options struct {
 	Version    bool            `short:"v" long:"version" description:"show version"`
 	Dep        *depCommand     `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
 	Infra      *infraCommand   `command:"infra" description:"manage infrastructure"`
-	Help       *stubCommand    `command:"help" description:"show help"`
+	Help       *helpCommand    `command:"help" description:"show help"`
 	VersionCmd *versionCommand `command:"version" description:"show version"`
 }
 
@@ -56,7 +71,7 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:        newDepCommand(inout, runner),
 		Infra:      newInfraCommand(inout, runner),
-		Help:       &stubCommand{inout: inout},
+		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
@@ -81,7 +96,7 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 		}
 	}
 	if err != nil {
-		if errors.Is(err, errNotImplemented) {
+		if errors.Is(err, errAlreadyReported) {
 			return 1
 		}
 		var flagsErr *flags.Error
