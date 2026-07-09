@@ -4,4 +4,9 @@
         "github>Omochice/personal-renovate-config#v1.16.0",
         "github>Omochice/personal-renovate-config:nix#v1.16.0",
     ],
+    // Commits written by the fix-vendor-hash workflow; without this Renovate
+    // would treat them as manual edits and stop rebasing the branch.
+    gitIgnoredAuthors: [
+        "41898282+github-actions[bot]@users.noreply.github.com",
+    ],
 }
