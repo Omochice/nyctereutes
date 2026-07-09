@@ -26,12 +26,20 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Refresh vendorHash from the updated go.mod
         run: nix develop --command nix-update --flake --version=skip default
+      # The default GITHUB_TOKEN would not trigger the check workflow on the
+      # pushed commit, leaving the PR without a status for its new head, so
+      # the push authenticates as a GitHub App instead.
+      - name: Generate an app token for the push
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
       - name: Push the refreshed hash back to the Renovate branch
-        # The default GITHUB_TOKEN would not trigger the check workflow on the
-        # pushed commit, leaving the PR without a status for its new head, so
-        # the push authenticates with a PAT instead.
         env:
-          PUSH_TOKEN: ${{ secrets.VENDOR_HASH_PUSH_TOKEN }}
+          PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           if git diff --quiet flake.nix; then
             echo "vendorHash is already up to date"
