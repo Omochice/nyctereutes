@@ -12,7 +12,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect:
+    # An on.push.paths filter would miss Renovate's rebase force-pushes: their
+    # before..after diff only holds what main changed in between, not the
+    # branch's own go.mod update, so the change is detected against main here
+    # instead. Gating on the pusher also keeps the workflow from re-running on
+    # the hash-fix commit the fix job itself pushes. The sender is matched by
+    # renovate[bot]'s numeric user ID, which unlike a login cannot be spoofed
+    # by a look-alike account name.
+    if: github.event.sender.id == 29139614
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      go-deps-changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Compare go.mod and go.sum against main
+        id: diff
+        run: |
+          if git diff --quiet origin/main...HEAD -- go.mod go.sum; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
   fix:
+    needs:
+      - detect
+    if: needs.detect.outputs.go-deps-changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
