@@ -4,10 +4,13 @@
 package ui
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
+	"maps"
+	"path"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -69,21 +72,17 @@ func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 		return u.writeJSON(groups)
 	}
 
-	keys := make([]string, 0, len(groups))
-	for key := range groups {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(groups))
 
 	tabWriter := newTabWriter(u.w)
 	_, _ = fmt.Fprintln(tabWriter, "GROUP\tPROJECT\tMR\tURL")
 	for _, key := range keys {
-		groupMRs := append([]types.MR(nil), groups[key]...)
-		sort.Slice(groupMRs, func(i, j int) bool {
-			if groupMRs[i].Project != groupMRs[j].Project {
-				return groupMRs[i].Project < groupMRs[j].Project
-			}
-			return groupMRs[i].IID < groupMRs[j].IID
+		groupMRs := slices.Clone(groups[key])
+		slices.SortFunc(groupMRs, func(left, right types.MR) int {
+			return cmp.Or(
+				cmp.Compare(left.Project, right.Project),
+				cmp.Compare(left.IID, right.IID),
+			)
 		})
 
 		for i, groupMR := range groupMRs {
@@ -91,8 +90,7 @@ func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 			if i == 0 {
 				groupCell = key
 			}
-			parts := strings.Split(groupMR.Project, "/")
-			_, _ = fmt.Fprintf(tabWriter, "%s\t%s\t!%d\t%s\n", groupCell, parts[len(parts)-1], groupMR.IID, groupMR.URL)
+			_, _ = fmt.Fprintf(tabWriter, "%s\t%s\t!%d\t%s\n", groupCell, path.Base(groupMR.Project), groupMR.IID, groupMR.URL)
 		}
 	}
 	return flush(tabWriter)
