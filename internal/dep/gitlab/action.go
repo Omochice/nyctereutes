@@ -2,9 +2,11 @@ package gitlab
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
-	"strings"
+
+	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
 // Approves a merge request via glab.
@@ -16,14 +18,10 @@ import (
 // own, so treating it as success here is safe.
 func (c *Client) ApproveMR(ctx context.Context, project string, iid int) error {
 	_, err := c.runner.Run(ctx, "mr", "approve", strconv.Itoa(iid), "-R", project)
-	if err == nil || isAlreadyApproved(err) {
+	if err == nil || errors.Is(err, glab.ErrUnauthorized) {
 		return nil
 	}
 	return fmt.Errorf("failed to approve MR !%d: %w", iid, err)
-}
-
-func isAlreadyApproved(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "401")
 }
 
 // Merges a merge request via glab. When autoMerge is true the merge is gated on
