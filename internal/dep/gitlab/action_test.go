@@ -3,6 +3,7 @@ package gitlab
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -12,9 +13,20 @@ import (
 
 const methodMerge = "merge"
 
+// The stub errors mirror what glabError hands back for a failed run: the args
+// line, then glab's stderr in client-go's "<method> <url>: <code> <message>"
+// format, wrapped with the classification sentinel when one applies.
 var (
-	errStub401 = errors.New("glab mr approve: exit status 1\nPUT ... 401 Unauthorized")
+	errStubUnauthorized = fmt.Errorf(
+		"%w: glab mr approve 12 -R g/proj: exit status 1\nPOST https://gitlab.com/api/v4/projects/g%%2Fproj/merge_requests/12/approve: 401 {message: 401 Unauthorized}",
+		glab.ErrUnauthorized,
+	)
 	errStub500 = errors.New("glab mr approve: 500 Internal Server Error")
+	// A 500 on MR !401: the IID digits sit in the args and URL while nothing
+	// marks the failure as unauthorized.
+	errStub500ForMR401 = errors.New(
+		"glab mr approve 401 -R g/proj: exit status 1\nPOST https://gitlab.com/api/v4/projects/g%2Fproj/merge_requests/401/approve: 500 {message: Internal Server Error}",
+	)
 )
 
 func TestApproveMRSucceeds(t *testing.T) {
@@ -32,13 +44,23 @@ func TestApproveMRSucceeds(t *testing.T) {
 	}
 }
 
-func TestApproveMRTreats401AsSuccess(t *testing.T) {
+func TestApproveMRTreatsUnauthorizedAsSuccess(t *testing.T) {
 	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-		return nil, errStub401
+		return nil, errStubUnauthorized
 	})
 
 	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 12); err != nil {
 		t.Errorf("ApproveMR() with 401 error = %v, want nil (idempotent)", err)
+	}
+}
+
+func TestApproveMRDoesNotMistakeIIDDigitsForUnauthorized(t *testing.T) {
+	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+		return nil, errStub500ForMR401
+	})
+
+	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 401); err == nil {
+		t.Error("ApproveMR(!401) with a 500 error = nil, want the failure propagated")
 	}
 }
 
