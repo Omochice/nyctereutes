@@ -4,4 +4,8 @@
         "github>Omochice/personal-renovate-config#v1.16.0",
         "github>Omochice/personal-renovate-config:nix#v1.16.0",
     ],
+    // The fix-vendor-hash workflow's commit identity.
+    gitIgnoredAuthors: [
+        "41898282+github-actions[bot]@users.noreply.github.com",
+    ],
 }
