@@ -13,9 +13,8 @@ import (
 
 const methodMerge = "merge"
 
-// The stub errors mirror what glabError hands back for a failed run: the args
-// line, then glab's stderr in client-go's "<method> <url>: <code> <message>"
-// format, wrapped with the classification sentinel when one applies.
+// The stub errors mirror what glabError hands back for a failed run,
+// classification sentinel included.
 var (
 	errStubUnauthorized = fmt.Errorf(
 		"%w: glab mr approve 12 -R g/proj: exit status 1\n"+
@@ -23,9 +22,7 @@ var (
 			": 401 {message: 401 Unauthorized}",
 		glab.ErrUnauthorized,
 	)
-	errStub500 = errors.New("glab mr approve: 500 Internal Server Error")
-	// A 500 on MR !401: the IID digits sit in the args and URL while nothing
-	// marks the failure as unauthorized.
+	errStub500         = errors.New("glab mr approve: 500 Internal Server Error")
 	errStub500ForMR401 = errors.New(
 		"glab mr approve 401 -R g/proj: exit status 1\n" +
 			"POST https://gitlab.com/api/v4/projects/g%2Fproj/merge_requests/401/approve" +
