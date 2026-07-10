@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/Omochice/nyctereutes/compare/v0.1.1...v0.2.0) (2026-07-10)
+
+
+### Features
+
+* add a help subcommand ([#49](https://github.com/Omochice/nyctereutes/issues/49)) ([739a487](https://github.com/Omochice/nyctereutes/commit/739a487f9eb47f59ae8ddb640a91156a9174638b))
+
+
+### Bug Fixes
+
+* **deps:** update module charm.land/bubbletea/v2 to v2.0.8 ([#27](https://github.com/Omochice/nyctereutes/issues/27)) ([76099f5](https://github.com/Omochice/nyctereutes/commit/76099f571f6df95c22c40d1363138162019eb9f2))
+* **deps:** update module charm.land/lipgloss/v2 to v2.0.5 ([#23](https://github.com/Omochice/nyctereutes/issues/23)) ([3b3cd1c](https://github.com/Omochice/nyctereutes/commit/3b3cd1cd1ce2ec7b96eedfd78728049d11395fc4))
+
 ## [0.1.1](https://github.com/Omochice/nyctereutes/compare/v0.1.0...v0.1.1) (2026-07-08)
 
 
