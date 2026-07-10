@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"path"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -89,8 +90,7 @@ func (u *UI) DisplayGroups(groups map[string][]types.MR) error {
 			if i == 0 {
 				groupCell = key
 			}
-			parts := strings.Split(groupMR.Project, "/")
-			_, _ = fmt.Fprintf(tabWriter, "%s\t%s\t!%d\t%s\n", groupCell, parts[len(parts)-1], groupMR.IID, groupMR.URL)
+			_, _ = fmt.Fprintf(tabWriter, "%s\t%s\t!%d\t%s\n", groupCell, path.Base(groupMR.Project), groupMR.IID, groupMR.URL)
 		}
 	}
 	return flush(tabWriter)
