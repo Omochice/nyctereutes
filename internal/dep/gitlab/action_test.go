@@ -18,14 +18,18 @@ const methodMerge = "merge"
 // format, wrapped with the classification sentinel when one applies.
 var (
 	errStubUnauthorized = fmt.Errorf(
-		"%w: glab mr approve 12 -R g/proj: exit status 1\nPOST https://gitlab.com/api/v4/projects/g%%2Fproj/merge_requests/12/approve: 401 {message: 401 Unauthorized}",
+		"%w: glab mr approve 12 -R g/proj: exit status 1\n"+
+			"POST https://gitlab.com/api/v4/projects/g%%2Fproj/merge_requests/12/approve"+
+			": 401 {message: 401 Unauthorized}",
 		glab.ErrUnauthorized,
 	)
 	errStub500 = errors.New("glab mr approve: 500 Internal Server Error")
 	// A 500 on MR !401: the IID digits sit in the args and URL while nothing
 	// marks the failure as unauthorized.
 	errStub500ForMR401 = errors.New(
-		"glab mr approve 401 -R g/proj: exit status 1\nPOST https://gitlab.com/api/v4/projects/g%2Fproj/merge_requests/401/approve: 500 {message: Internal Server Error}",
+		"glab mr approve 401 -R g/proj: exit status 1\n" +
+			"POST https://gitlab.com/api/v4/projects/g%2Fproj/merge_requests/401/approve" +
+			": 500 {message: Internal Server Error}",
 	)
 )
 
