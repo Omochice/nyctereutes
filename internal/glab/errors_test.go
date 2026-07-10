@@ -16,13 +16,23 @@ func TestClassify(t *testing.T) {
 		// token; a 400 carries no message on stderr.
 		{"not found", "glab: 404 Project Not Found (HTTP 404)", ErrNotFound},
 		{"forbidden", "glab: 403 Forbidden (HTTP 403)", ErrForbidden},
+		{"unauthorized api style", "glab: 401 Unauthorized (HTTP 401)", ErrUnauthorized},
 		{"validation 400 bare", "glab: HTTP 400", ErrValidation},
 		{"validation 422", "glab: 422 Unprocessable Entity (HTTP 422)", ErrValidation},
 		{"unclassified 500", "glab: 500 Internal Server Error (HTTP 500)", nil},
+		// The mr-family subcommands surface client-go's "<method> <url>: <code>
+		// <message>" format instead of an "HTTP <code>" token; the status text
+		// still classifies while the IID digits in the URL must not.
+		{
+			"unauthorized go-gitlab style",
+			"POST https://gitlab.com/api/v4/projects/g%2Fproj/merge_requests/401/approve: 401 {message: 401 Unauthorized}",
+			ErrUnauthorized,
+		},
 		// Digits outside the HTTP token must not classify, and must not shadow a
 		// real status: the 404 in a retry count stays nil, the 404 in a project
 		// name still classifies as its HTTP 400.
 		{"unrelated 404 digits", "glab: request failed after 404 retries", nil},
+		{"unrelated 401 digits", "glab: request failed after 401 retries", nil},
 		{"validation naming a 404 project", "glab: 400 name project-404 is taken (HTTP 400)", ErrValidation},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
