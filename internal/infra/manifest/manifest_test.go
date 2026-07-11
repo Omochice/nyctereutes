@@ -22,6 +22,7 @@ func fullRepository() *Repository {
 			RequestAccessEnabled:             new(true),
 			EnforceAuthChecksOnUploads:       new(true),
 			Archived:                         new(true),
+			CICatalog:                        new(true),
 			Topics:                           []string{"go"},
 			DefaultBranch:                    new("main"),
 			MergeMethod:                      new(MergeMethod("ff")),
@@ -62,7 +63,7 @@ func fullRepository() *Repository {
 func settingsUIKeyOrder() []string {
 	return []string{
 		"description", "visibility", "request_access_enabled",
-		"enforce_auth_checks_on_uploads", "archived", "topics", "default_branch",
+		"enforce_auth_checks_on_uploads", "archived", "ci_catalog", "topics", "default_branch",
 		"merge_method",
 		"only_allow_merge_if_pipeline_succeeds", "allow_merge_on_skipped_pipeline",
 		"only_allow_merge_if_all_discussions_are_resolved",

@@ -125,6 +125,41 @@ func TestParseRequiresMetadataFields(t *testing.T) {
 	}
 }
 
+// GitLab refuses to publish a project to the CI/CD Catalog without a
+// description, so a manifest asking for the catalog must carry one; both an
+// omitted and an empty description fail.
+func TestParseRequiresDescriptionForCICatalog(t *testing.T) {
+	cases := []struct{ name, description string }{
+		{"description_omitted", ""},
+		{"description_empty", "  description: \"\"\n"},
+	}
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			doc := validDoc + "  ci_catalog: true\n" + attr.description
+			_, errs := Parse([]byte(doc))
+			if len(errs) != 1 {
+				t.Fatalf("errs = %v, want exactly one required-field error", errs)
+			}
+			if !strings.Contains(errs[0].Error(), "spec.description") {
+				t.Errorf("error %q does not name the missing description", errs[0])
+			}
+		})
+	}
+}
+
+// A catalog project that does carry a description validates: the prerequisite
+// is met, so the manifest can apply.
+func TestParseAllowsCICatalogWithDescription(t *testing.T) {
+	doc := validDoc + "  ci_catalog: true\n  description: a reusable component\n"
+	repos, errs := Parse([]byte(doc))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want a described catalog project to validate", errs)
+	}
+	if len(repos) != 1 {
+		t.Errorf("parsed %d documents, want 1", len(repos))
+	}
+}
+
 // A hand-written manifest may omit spec fields entirely; only metadata is
 // required.
 func TestParseAllowsMinimalSpec(t *testing.T) {

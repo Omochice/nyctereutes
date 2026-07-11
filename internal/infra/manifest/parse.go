@@ -178,5 +178,14 @@ func (repo *Repository) validate() error {
 	if repo.Metadata.Owner == "" {
 		return fmt.Errorf("%w: metadata.owner", errRequiredField)
 	}
+	// GitLab rejects publishing a project to the CI/CD Catalog without a
+	// description, so a manifest that asks for the catalog while leaving the
+	// description empty could never apply; catching it here turns a remote
+	// rejection into a local validation error.
+	if repo.Spec.CICatalog != nil && *repo.Spec.CICatalog {
+		if repo.Spec.Description == nil || *repo.Spec.Description == "" {
+			return fmt.Errorf("%w: spec.description is required when spec.ci_catalog is true", errRequiredField)
+		}
+	}
 	return nil
 }

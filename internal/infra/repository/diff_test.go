@@ -84,6 +84,38 @@ func TestDiffReportsArchivedChange(t *testing.T) {
 	}
 }
 
+func TestDiffReportsCICatalogChange(t *testing.T) {
+	want := true
+	desired := &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+		Spec:     manifest.RepositorySpec{Description: new("a tool"), CICatalog: &want},
+	}
+	current := &CurrentState{
+		rawProject:      rawProject{Description: "a tool"},
+		CatalogResource: false,
+	}
+
+	changes := Diff(desired, current)
+
+	if len(changes) != 1 || changes[0].Field != "ci_catalog" {
+		t.Fatalf("changes = %+v, want one ci_catalog update", changes)
+	}
+	if changes[0].OldValue != false || changes[0].NewValue != true {
+		t.Errorf("values = %v → %v, want false → true", changes[0].OldValue, changes[0].NewValue)
+	}
+}
+
+// A manifest silent about ci_catalog manages neither state, so a live catalog
+// resource yields no drift when the field is omitted.
+func TestDiffLeavesCICatalogUnchangedWhenUndeclared(t *testing.T) {
+	desired := &manifest.Repository{Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"}}
+	current := &CurrentState{CatalogResource: true}
+
+	if changes := Diff(desired, current); len(changes) != 0 {
+		t.Errorf("changes = %+v, want none when ci_catalog is undeclared", changes)
+	}
+}
+
 // A manifest that declares no spec fields manages nothing, so a live project
 // that differs in those fields must still yield no drift.
 func TestDiffLeavesUndeclaredFieldsUnchanged(t *testing.T) {

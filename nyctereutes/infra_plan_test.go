@@ -17,6 +17,11 @@ type planFetchErrGlab struct {
 }
 
 func (f *planFetchErrGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	// Only okPath's REST fetch succeeds, so the catalog query is reached for
+	// okPath alone; a plain not-a-resource answer keeps that project healthy.
+	if _, ok := catalogRead(args); ok {
+		return catalogBody(false), nil
+	}
 	path, err := url.PathUnescape(strings.TrimPrefix(args[1], "projects/"))
 	if err != nil {
 		return nil, err

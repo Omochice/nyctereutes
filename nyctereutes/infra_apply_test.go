@@ -19,6 +19,7 @@ import (
 // in failWrites makes its write fail.
 type fakeApplyGlab struct {
 	projects   map[string]string // "owner/name" -> project JSON, absent means 404
+	catalog    map[string]bool   // "owner/name" -> catalog status, default false
 	writes     []string          // joined args of each write call, in order
 	writeBody  []string          // parallel to writes: stdin body, "" for none
 	failWrites map[string]bool   // "owner/name" whose writes fail
@@ -28,6 +29,11 @@ type fakeApplyGlab struct {
 func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if isProjectRead(args) {
 		return f.readProject(args)
+	}
+	// The catalog query is part of the read, not a write, so it must not be
+	// recorded as one.
+	if path, ok := catalogRead(args); ok {
+		return catalogBody(f.catalog[path]), nil
 	}
 	return f.recordWrite(nil, args)
 }
@@ -71,14 +77,41 @@ func runInfraApply(stdin string, runner glab.Runner, args ...string) (exit int, 
 }
 
 func (f *fakeApplyGlab) recordWrite(body []byte, args []string) ([]byte, error) {
-	f.writes = append(f.writes, strings.Join(args, " "))
+	joined := strings.Join(args, " ")
+	f.writes = append(f.writes, joined)
 	f.writeBody = append(f.writeBody, string(body))
 	for project := range f.failWrites {
-		if strings.Contains(args[1], url.PathEscape(project)) {
+		// A REST write carries the project URL-escaped in the endpoint (args[1]),
+		// while a catalog mutation carries it raw in a projectPath form arg, so
+		// both encodings are matched to fail either write path.
+		if strings.Contains(args[1], url.PathEscape(project)) ||
+			strings.Contains(joined, "projectPath="+project) {
 			return nil, errInfra404
 		}
 	}
+	// A catalog mutation's success is read from its payload, so it must answer
+	// with the realistic GraphQL shape (an empty errors array under the mutation
+	// field). A bare "{}" would decode to the same success while hiding a
+	// payload-parsing regression, so the real shape is returned instead.
+	if field, ok := catalogMutationField(args); ok {
+		return fmt.Appendf(nil, `{"data":{"%s":{"errors":[]}}}`, field), nil
+	}
 	return nil, nil
+}
+
+// catalogMutationField reports which catalog mutation a GraphQL write invokes,
+// so the fake can answer with a payload keyed by that mutation field.
+func catalogMutationField(args []string) (string, bool) {
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "graphql") {
+		return "", false
+	}
+	for _, field := range []string{"catalogResourcesCreate", "catalogResourcesDestroy"} {
+		if strings.Contains(joined, field) {
+			return field, true
+		}
+	}
+	return "", false
 }
 
 func TestInfraApplyRequiresPath(t *testing.T) {
@@ -105,6 +138,41 @@ func TestInfraApplyAutoApproveAppliesChanges(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "visibility") {
 		t.Errorf("stdout should show the plan before applying\n%s", stdout)
+	}
+}
+
+// catalogManifest asks to publish the project to the CI/CD Catalog; projJSON's
+// live state is not a catalog resource, so applying it must run the GraphQL
+// mutation rather than a REST PUT.
+const catalogManifest = `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: proj
+  owner: group
+spec:
+  description: a tool
+  ci_catalog: true
+`
+
+// A ci_catalog change is applied through the catalogResourcesCreate GraphQL
+// mutation, not the projects REST endpoint, so the end-to-end apply must issue
+// the mutation addressing the project by its raw projectPath.
+func TestInfraApplyPublishesCatalogThroughMutation(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", catalogManifest)
+	runner := &fakeApplyGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, _, _ := runDep(runner, "infra", "apply", "--auto-approve", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 for an approved apply", exit)
+	}
+	if len(runner.writes) != 1 {
+		t.Fatalf("writes = %v, want exactly one mutation", runner.writes)
+	}
+	for _, want := range []string{"api graphql", "catalogResourcesCreate", "projectPath=group/proj"} {
+		if !strings.Contains(runner.writes[0], want) {
+			t.Errorf("write %q missing %q", runner.writes[0], want)
+		}
 	}
 }
 

@@ -198,6 +198,11 @@ type RepositorySpec struct {
 	RequestAccessEnabled       *bool `yaml:"request_access_enabled,omitempty"`
 	EnforceAuthChecksOnUploads *bool `yaml:"enforce_auth_checks_on_uploads,omitempty"`
 	Archived                   *bool `yaml:"archived,omitempty"`
+	// GitLab's CI/CD Catalog resource toggle, read as isCatalogResource and
+	// written through the catalogResources GraphQL mutations rather than the
+	// projects REST endpoint. GitLab refuses to publish a project to the catalog
+	// without a description, a prerequisite validate enforces.
+	CICatalog *bool `yaml:"ci_catalog,omitempty"`
 	// No omitempty: an explicit empty topic list must survive export so the YAML
 	// fully represents the project's current state.
 	Topics        []string `yaml:"topics"`

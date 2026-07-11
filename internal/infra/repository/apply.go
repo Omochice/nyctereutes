@@ -66,6 +66,12 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 			return fmt.Errorf("%w: archived got %T", errUnexpectedValueType, change.NewValue)
 		}
 		return a.setArchived(ctx, change.Name, archived)
+	case fieldCICatalog:
+		enabled, ok := change.NewValue.(bool)
+		if !ok {
+			return fmt.Errorf("%w: ci_catalog got %T", errUnexpectedValueType, change.NewValue)
+		}
+		return a.setCatalogResource(ctx, change.Name, enabled)
 	case fieldTopics:
 		topics, ok := change.NewValue.([]string)
 		if !ok {
@@ -86,6 +92,58 @@ func (a *Applier) setArchived(ctx context.Context, project string, archived bool
 	}
 	_, err := a.writer.Run(ctx, "api", "projects/"+glab.EncodePath(project)+"/"+action, "--method", "POST")
 	return wrapWrite(err, project, fieldArchived)
+}
+
+// The GraphQL mutations that publish a project to the CI/CD Catalog and remove
+// it. Unlike the REST settings, catalog membership is not a field on the
+// project, so it is toggled by these dedicated mutations rather than a PUT.
+const (
+	catalogResourceCreateMutation = `mutation($projectPath: ID!) {
+  catalogResourcesCreate(input: { projectPath: $projectPath }) { errors }
+}`
+	catalogResourceDestroyMutation = `mutation($projectPath: ID!) {
+  catalogResourcesDestroy(input: { projectPath: $projectPath }) { errors }
+}`
+)
+
+// Signals a GraphQL mutation that returned a 200 carrying a non-empty errors
+// payload; glab reports success for such a response, so the payload must be
+// inspected rather than the exit status alone.
+var errCatalogMutationFailed = errors.New("catalog mutation failed")
+
+// Publishes a project to the CI/CD Catalog or removes it. The projectPath is
+// the raw namespace-qualified path GraphQL addresses a project by, so unlike
+// the REST endpoints it is not percent-encoded.
+func (a *Applier) setCatalogResource(ctx context.Context, project string, enabled bool) error {
+	query, field := catalogResourceDestroyMutation, "catalogResourcesDestroy"
+	if enabled {
+		query, field = catalogResourceCreateMutation, "catalogResourcesCreate"
+	}
+	out, err := a.writer.Run(ctx, "api", "graphql",
+		"-f", "query="+query,
+		"-f", "projectPath="+project)
+	if err != nil {
+		return wrapWrite(err, project, fieldCICatalog)
+	}
+	return wrapWrite(catalogMutationErrors(out, field), project, fieldCICatalog)
+}
+
+// Reports a mutation whose payload carries errors. A GraphQL mutation answers
+// with HTTP 200 even when it refuses the operation, listing the reasons under
+// the mutation field's errors array, so a green exit is not proof of success.
+func catalogMutationErrors(out []byte, field string) error {
+	var resp struct {
+		Data map[string]struct {
+			Errors []string `json:"errors"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return fmt.Errorf("parse catalog mutation response: %w", err)
+	}
+	if payload, ok := resp.Data[field]; ok && len(payload.Errors) > 0 {
+		return fmt.Errorf("%w: %s", errCatalogMutationFailed, strings.Join(payload.Errors, "; "))
+	}
+	return nil
 }
 
 // Names the field and project on a failed write so the aggregated report says

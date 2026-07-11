@@ -23,6 +23,7 @@ const (
 	fieldDescription                = "description"
 	fieldVisibility                 = "visibility"
 	fieldArchived                   = "archived"
+	fieldCICatalog                  = "ci_catalog"
 	fieldTopics                     = "topics"
 	fieldRepository                 = "repository"
 	fieldRequestAccessEnabled       = "request_access_enabled"
@@ -98,6 +99,10 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	appendChanged(&changes, name, fieldDescription, spec.Description, string(current.Description))
 	appendChanged(&changes, name, fieldVisibility, spec.Visibility, manifest.Visibility(current.Visibility))
 	appendChanged(&changes, name, fieldArchived, spec.Archived, boolValue(current.Archived))
+	// CatalogResource is a plain bool, not a reported pointer: the GraphQL read
+	// always resolves it to true or false, so there is no "unreported" value to
+	// fold to zero the way boolValue does for the REST booleans.
+	appendChanged(&changes, name, fieldCICatalog, spec.CICatalog, current.CatalogResource)
 	appendChanged(&changes, name, fieldRequestAccessEnabled,
 		spec.RequestAccessEnabled, boolValue(current.RequestAccessEnabled))
 	appendChanged(&changes, name, fieldEnforceAuthChecksOnUploads,

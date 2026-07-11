@@ -22,6 +22,9 @@ type CurrentState struct {
 	Owner string
 	Name  string
 	IsNew bool // true when the project does not exist on GitLab
+	// GitLab's isCatalogResource, read over GraphQL because the projects REST
+	// endpoint does not carry the catalog status.
+	CatalogResource bool
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -54,7 +57,56 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 	}
 	state.Owner = owner
 	state.Name = name
+
+	// The catalog status lives only in GraphQL, so it is a second call rather
+	// than a field on the REST response parsed above.
+	catalog, err := c.fetchCatalogResource(ctx, owner, name)
+	if err != nil {
+		return nil, err
+	}
+	state.CatalogResource = catalog
 	return state, nil
+}
+
+// The GraphQL query reading a project's CI/CD Catalog status. isCatalogResource
+// is the only field the projects REST endpoint omits, so it is fetched on its
+// own. fullPath is the namespace-qualified path GraphQL addresses a project by,
+// which unlike the REST endpoint is not percent-encoded.
+const catalogResourceQuery = `query($fullPath: ID!) { project(fullPath: $fullPath) { isCatalogResource } }`
+
+// Signals a GraphQL query that resolved to a null project. glab reports a
+// top-level GraphQL error through a non-zero exit, so the read below only
+// reaches a null project on an otherwise successful response.
+var errCatalogProjectMissing = errors.New("project not visible over GraphQL")
+
+// Reads whether a project is published to the CI/CD Catalog. A null
+// isCatalogResource (the field is Experiment and may be withheld) reads as
+// false, so such a project is exported and diffed as not a catalog resource.
+func (c *Client) fetchCatalogResource(ctx context.Context, owner, name string) (bool, error) {
+	out, err := c.runner.Run(ctx, "api", "graphql",
+		"-f", "query="+catalogResourceQuery,
+		"-f", "fullPath="+owner+"/"+name)
+	if err != nil {
+		return false, fmt.Errorf("fetch catalog status %s/%s: %w", owner, name, err)
+	}
+
+	var resp struct {
+		Data struct {
+			Project *struct {
+				IsCatalogResource *bool `json:"isCatalogResource"`
+			} `json:"project"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return false, fmt.Errorf("parse catalog status %s/%s: %w", owner, name, err)
+	}
+	// GraphQL returns a null project when it cannot see one the REST fetch just
+	// resolved; treating that as not-a-resource would silently emit a wrong
+	// value, so it is surfaced rather than swallowed.
+	if resp.Data.Project == nil {
+		return false, fmt.Errorf("fetch catalog status %s/%s: %w", owner, name, errCatalogProjectMissing)
+	}
+	return resp.Data.Project.IsCatalogResource != nil && *resp.Data.Project.IsCatalogResource, nil
 }
 
 // Free text that GitLab stores verbatim (length-validated only). The web UI
@@ -151,6 +203,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			RequestAccessEnabled:             state.RequestAccessEnabled,
 			EnforceAuthChecksOnUploads:       state.EnforceAuthChecksOnUploads,
 			Archived:                         state.Archived,
+			CICatalog:                        new(state.CatalogResource),
 			Topics:                           state.Topics,
 			DefaultBranch:                    optional[string](state.DefaultBranch),
 			MergeMethod:                      optional[manifest.MergeMethod](state.MergeMethod),
