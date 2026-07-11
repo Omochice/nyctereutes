@@ -26,8 +26,12 @@ func catalogRead(args []string) (fullPath string, ok bool) {
 	if len(args) < 2 || args[0] != "api" || args[1] != "graphql" {
 		return "", false
 	}
-	// Only the read query carries fullPath; a catalog mutation carries
-	// projectPath instead and must fall through to the write path.
+	// The isCatalogResource query is the read; a catalog mutation names its own
+	// field and carries projectPath, so requiring the query name keeps a future
+	// fullPath-carrying graphql call from being misread as the catalog read.
+	if !strings.Contains(strings.Join(args, " "), "isCatalogResource") {
+		return "", false
+	}
 	for _, a := range args {
 		if p, found := strings.CutPrefix(a, "fullPath="); found {
 			return p, true
