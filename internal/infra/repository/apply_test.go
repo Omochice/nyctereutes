@@ -14,8 +14,9 @@ import (
 // A ProjectWriter fake that records every call so a test can assert the exact
 // glab invocation. errAt maps a call index to the error that call returns.
 type recordingWriter struct {
-	calls []writerCall
-	errAt map[int]error
+	calls  []writerCall
+	errAt  map[int]error
+	respAt map[int][]byte // scripted stdout per call index, nil for empty
 }
 
 type writerCall struct {
@@ -27,9 +28,9 @@ type writerCall struct {
 var errBoom = errors.New("boom")
 
 func (w *recordingWriter) Run(_ context.Context, args ...string) ([]byte, error) {
-	err := w.errAt[len(w.calls)]
+	idx := len(w.calls)
 	w.calls = append(w.calls, writerCall{args: args})
-	return nil, err
+	return w.respAt[idx], w.errAt[idx]
 }
 
 func (w *recordingWriter) RunWithStdin(_ context.Context, body []byte, args ...string) ([]byte, error) {
@@ -256,6 +257,68 @@ func TestApplyArchivesThroughDedicatedEndpoint(t *testing.T) {
 				t.Errorf("glab args = %q, want %q", got, want)
 			}
 		})
+	}
+}
+
+// A successful catalog mutation response, listing no errors under the mutation
+// field.
+func catalogMutationOK(field string) []byte {
+	return fmt.Appendf(nil, `{"data":{"%s":{"errors":[]}}}`, field)
+}
+
+// Enabling ci_catalog runs the create mutation, disabling runs destroy, each
+// addressing the project by its raw (unencoded) projectPath rather than the
+// REST endpoint.
+func TestApplyTogglesCatalogThroughGraphQLMutation(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		enabled   bool
+		wantField string
+	}{
+		{"enable", true, "catalogResourcesCreate"},
+		{"disable", false, "catalogResourcesDestroy"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			writer := &recordingWriter{respAt: map[int][]byte{0: catalogMutationOK(testCase.wantField)}}
+			changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldCICatalog, NewValue: testCase.enabled}}
+
+			results := NewApplier(writer).Apply(context.Background(), changes)
+
+			if len(results) != 1 || results[0].Err != nil {
+				t.Fatalf("results = %+v, want one successful result", results)
+			}
+			got := strings.Join(writer.calls[0].args, " ")
+			if !strings.Contains(got, "api graphql") || !strings.Contains(got, testCase.wantField) {
+				t.Errorf("glab args = %q, want the %s mutation", got, testCase.wantField)
+			}
+			if !strings.Contains(got, "projectPath=group/proj") {
+				t.Errorf("glab args = %q, want an unencoded projectPath", got)
+			}
+		})
+	}
+}
+
+// A GraphQL mutation answers 200 even when it refuses the operation, listing
+// the reasons under the mutation field's errors array, so a non-empty errors
+// payload must surface as a failure naming the field and reason.
+func TestApplyReportsCatalogMutationPayloadErrors(t *testing.T) {
+	body := []byte(`{"data":{"catalogResourcesCreate":{"errors":["Project must have a description"]}}}`)
+	writer := &recordingWriter{respAt: map[int][]byte{0: body}}
+	changes := []Change{{Type: ChangeUpdate, Name: "group/proj", Field: fieldCICatalog, NewValue: true}}
+
+	results := NewApplier(writer).Apply(context.Background(), changes)
+
+	if len(results) != 1 || results[0].Err == nil {
+		t.Fatalf("results = %+v, want one failed result", results)
+	}
+	got := results[0].Err.Error()
+	if !errors.Is(results[0].Err, errCatalogMutationFailed) {
+		t.Errorf("error = %v, want it to wrap errCatalogMutationFailed", results[0].Err)
+	}
+	for _, want := range []string{"ci_catalog", "group/proj", "Project must have a description"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("error = %q, want it to contain %q", got, want)
+		}
 	}
 }
 

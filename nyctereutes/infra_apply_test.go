@@ -84,7 +84,10 @@ func (f *fakeApplyGlab) recordWrite(body []byte, args []string) ([]byte, error) 
 			return nil, errInfra404
 		}
 	}
-	return nil, nil
+	// A catalog mutation's success is read from its payload, so the write must
+	// answer with a body an empty errors array decodes from; the empty object
+	// leaves the mutation field absent, which the applier treats as no errors.
+	return []byte("{}"), nil
 }
 
 func TestInfraApplyRequiresPath(t *testing.T) {
@@ -111,6 +114,41 @@ func TestInfraApplyAutoApproveAppliesChanges(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "visibility") {
 		t.Errorf("stdout should show the plan before applying\n%s", stdout)
+	}
+}
+
+// catalogManifest asks to publish the project to the CI/CD Catalog; projJSON's
+// live state is not a catalog resource, so applying it must run the GraphQL
+// mutation rather than a REST PUT.
+const catalogManifest = `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: proj
+  owner: group
+spec:
+  description: a tool
+  ci_catalog: true
+`
+
+// A ci_catalog change is applied through the catalogResourcesCreate GraphQL
+// mutation, not the projects REST endpoint, so the end-to-end apply must issue
+// the mutation addressing the project by its raw projectPath.
+func TestInfraApplyPublishesCatalogThroughMutation(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", catalogManifest)
+	runner := &fakeApplyGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, _, _ := runDep(runner, "infra", "apply", "--auto-approve", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 for an approved apply", exit)
+	}
+	if len(runner.writes) != 1 {
+		t.Fatalf("writes = %v, want exactly one mutation", runner.writes)
+	}
+	for _, want := range []string{"api graphql", "catalogResourcesCreate", "projectPath=group/proj"} {
+		if !strings.Contains(runner.writes[0], want) {
+			t.Errorf("write %q missing %q", runner.writes[0], want)
+		}
 	}
 }
 

@@ -26,12 +26,14 @@ func catalogRead(args []string) (fullPath string, ok bool) {
 	if len(args) < 2 || args[0] != "api" || args[1] != "graphql" {
 		return "", false
 	}
+	// Only the read query carries fullPath; a catalog mutation carries
+	// projectPath instead and must fall through to the write path.
 	for _, a := range args {
 		if p, found := strings.CutPrefix(a, "fullPath="); found {
-			fullPath = p
+			return p, true
 		}
 	}
-	return fullPath, true
+	return "", false
 }
 
 // catalogBody is the GraphQL response body for a project's catalog status.
