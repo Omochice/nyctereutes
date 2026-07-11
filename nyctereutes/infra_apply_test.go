@@ -77,10 +77,15 @@ func runInfraApply(stdin string, runner glab.Runner, args ...string) (exit int, 
 }
 
 func (f *fakeApplyGlab) recordWrite(body []byte, args []string) ([]byte, error) {
-	f.writes = append(f.writes, strings.Join(args, " "))
+	joined := strings.Join(args, " ")
+	f.writes = append(f.writes, joined)
 	f.writeBody = append(f.writeBody, string(body))
 	for project := range f.failWrites {
-		if strings.Contains(args[1], url.PathEscape(project)) {
+		// A REST write carries the project URL-escaped in the endpoint (args[1]),
+		// while a catalog mutation carries it raw in a projectPath form arg, so
+		// both encodings are matched to fail either write path.
+		if strings.Contains(args[1], url.PathEscape(project)) ||
+			strings.Contains(joined, "projectPath="+project) {
 			return nil, errInfra404
 		}
 	}
