@@ -26,9 +26,7 @@ func catalogRead(args []string) (fullPath string, ok bool) {
 	if len(args) < 2 || args[0] != "api" || args[1] != "graphql" {
 		return "", false
 	}
-	// The isCatalogResource query is the read; a catalog mutation names its own
-	// field and carries projectPath, so requiring the query name keeps a future
-	// fullPath-carrying graphql call from being misread as the catalog read.
+	// Require the query name, not just fullPath, to tell the read from other calls.
 	if !strings.Contains(strings.Join(args, " "), "isCatalogResource") {
 		return "", false
 	}
