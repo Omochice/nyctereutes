@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/Omochice/nyctereutes/compare/v0.2.0...v0.3.0) (2026-07-11)
+
+
+### Features
+
+* manage CI/CD Catalog membership in infra manifests ([#55](https://github.com/Omochice/nyctereutes/issues/55)) ([b28fd5a](https://github.com/Omochice/nyctereutes/commit/b28fd5a7ee2f7f27ab60fb028714a2bf37628c5f))
+
+
+### Bug Fixes
+
+* stop mistaking IID digits for an already-approved MR ([#54](https://github.com/Omochice/nyctereutes/issues/54)) ([aa012d0](https://github.com/Omochice/nyctereutes/commit/aa012d062a3a142cac20c89a67c3286c41743b11))
+
 ## [0.2.0](https://github.com/Omochice/nyctereutes/compare/v0.1.1...v0.2.0) (2026-07-10)
 
 
