@@ -80,8 +80,8 @@ const catalogResourceQuery = `query($fullPath: ID!) { project(fullPath: $fullPat
 var errCatalogProjectMissing = errors.New("project not visible over GraphQL")
 
 // Reads whether a project is published to the CI/CD Catalog. A null
-// isCatalogResource (the field is Experiment and may be withheld) counts as
-// not-a-resource so a project that cannot report it is simply left unmanaged.
+// isCatalogResource (the field is Experiment and may be withheld) reads as
+// false, so such a project is exported and diffed as not a catalog resource.
 func (c *Client) fetchCatalogResource(ctx context.Context, owner, name string) (bool, error) {
 	out, err := c.runner.Run(ctx, "api", "graphql",
 		"-f", "query="+catalogResourceQuery,
