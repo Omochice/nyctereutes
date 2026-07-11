@@ -19,6 +19,7 @@ import (
 // in failWrites makes its write fail.
 type fakeApplyGlab struct {
 	projects   map[string]string // "owner/name" -> project JSON, absent means 404
+	catalog    map[string]bool   // "owner/name" -> catalog status, default false
 	writes     []string          // joined args of each write call, in order
 	writeBody  []string          // parallel to writes: stdin body, "" for none
 	failWrites map[string]bool   // "owner/name" whose writes fail
@@ -28,6 +29,11 @@ type fakeApplyGlab struct {
 func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if isProjectRead(args) {
 		return f.readProject(args)
+	}
+	// The catalog query is part of the read, not a write, so it must not be
+	// recorded as one.
+	if path, ok := catalogRead(args); ok {
+		return catalogBody(f.catalog[path]), nil
 	}
 	return f.recordWrite(nil, args)
 }

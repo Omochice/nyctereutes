@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,6 +31,23 @@ const sampleProjectJSON = `{"description":"a tool","visibility":"private","topic
 // mirrors that so the consumer is exercised through errors.Is, not the text.
 var errGlab404 = fmt.Errorf("%w: glab api projects/x: exit status 1\n404 Project Not Found", glab.ErrNotFound)
 
+// The GraphQL response body for the isCatalogResource query FetchRepository
+// makes after the REST fetch.
+func graphqlCatalogJSON(isResource bool) string {
+	return fmt.Sprintf(`{"data":{"project":{"isCatalogResource":%t}}}`, isResource)
+}
+
+// A fake glab that answers both calls FetchRepository makes: the GraphQL
+// catalog query and, for every other argument set, the REST project fetch.
+func fakeRunner(projectJSON string, catalog bool) glab.RunnerFunc {
+	return func(_ context.Context, args ...string) ([]byte, error) {
+		if len(args) > 1 && args[1] == "graphql" {
+			return []byte(graphqlCatalogJSON(catalog)), nil
+		}
+		return []byte(projectJSON), nil
+	}
+}
+
 // wantPtr fails the test unless got points to want.
 func wantPtr[Value ~string](t *testing.T, name string, got *Value, want string) {
 	t.Helper()
@@ -45,6 +63,9 @@ func wantPtr[Value ~string](t *testing.T, name string, got *Value, want string) 
 func TestFetchRepositoryParsesSettings(t *testing.T) {
 	var gotArgs []string
 	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
+		if len(args) > 1 && args[1] == "graphql" {
+			return []byte(graphqlCatalogJSON(false)), nil
+		}
 		gotArgs = args
 		return []byte(sampleProjectJSON), nil
 	})
@@ -78,6 +99,33 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 	}
 }
 
+// The catalog status is not on the REST response, so FetchRepository reads it
+// over GraphQL addressing the project by its raw (unencoded) fullPath and
+// carries the result on CurrentState.
+func TestFetchRepositoryReadsCatalogResource(t *testing.T) {
+	var graphqlArgs []string
+	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
+		if len(args) > 1 && args[1] == "graphql" {
+			graphqlArgs = args
+			return []byte(graphqlCatalogJSON(true)), nil
+		}
+		return []byte(sampleProjectJSON), nil
+	})
+
+	state, err := NewClient(runner).FetchRepository(context.Background(), "group/sub", "proj")
+	if err != nil {
+		t.Fatalf("FetchRepository: %v", err)
+	}
+	if !state.CatalogResource {
+		t.Errorf("CatalogResource = false, want true")
+	}
+	if want := "fullPath=group/sub/proj"; !slices.Contains(graphqlArgs, want) {
+		t.Errorf("graphql args = %v, want an unencoded %q", graphqlArgs, want)
+	}
+}
+
+// A 404 on the REST fetch returns a new project before the catalog query runs,
+// so a missing project makes no GraphQL call.
 func TestFetchRepositoryNotFoundIsNew(t *testing.T) {
 	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
 		return nil, errGlab404
@@ -151,6 +199,22 @@ func TestToManifest(t *testing.T) {
 	}
 }
 
+// isCatalogResource is always reported over GraphQL, so import emits ci_catalog
+// for both states rather than omitting it the way an absent REST boolean is.
+func TestToManifestEmitsCatalogResource(t *testing.T) {
+	for _, want := range []bool{true, false} {
+		doc := ToManifest(&CurrentState{
+			Owner:           ownerGroup,
+			Name:            nameProj,
+			CatalogResource: want,
+			rawProject:      rawProject{Description: sampleDescription},
+		})
+		if doc.Spec.CICatalog == nil || *doc.Spec.CICatalog != want {
+			t.Errorf("spec.ci_catalog = %v, want %v", doc.Spec.CICatalog, want)
+		}
+	}
+}
+
 func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
 	doc := ToManifest(&CurrentState{
 		Owner:      ownerGroup,
@@ -199,11 +263,7 @@ func featureAccessLevels() []featureAccessLevel {
 // projectJSON, and returns the manifest YAML it produces.
 func exportYAML(t *testing.T, projectJSON string) string {
 	t.Helper()
-	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
-		return []byte(projectJSON), nil
-	})
-
-	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	state, err := NewClient(fakeRunner(projectJSON, false)).FetchRepository(context.Background(), ownerGroup, nameProj)
 	if err != nil {
 		t.Fatalf("FetchRepository: %v", err)
 	}
