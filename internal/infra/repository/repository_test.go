@@ -124,6 +124,26 @@ func TestFetchRepositoryReadsCatalogResource(t *testing.T) {
 	}
 }
 
+// A GraphQL response with a null project (HTTP 200, no top-level errors) is not
+// a catalog resource by default; surfacing it as an error keeps a project the
+// REST fetch resolved from silently exporting a wrong ci_catalog value.
+func TestFetchRepositoryErrorsOnNullCatalogProject(t *testing.T) {
+	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
+		if len(args) > 1 && args[1] == "graphql" {
+			return []byte(`{"data":{"project":null}}`), nil
+		}
+		return []byte(sampleProjectJSON), nil
+	})
+
+	_, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	if err == nil {
+		t.Fatal("FetchRepository should error on a null catalog project, got nil")
+	}
+	if !errors.Is(err, errCatalogProjectMissing) {
+		t.Errorf("error = %v, want it to wrap errCatalogProjectMissing", err)
+	}
+}
+
 // A 404 on the REST fetch returns a new project before the catalog query runs,
 // so a missing project makes no GraphQL call.
 func TestFetchRepositoryNotFoundIsNew(t *testing.T) {

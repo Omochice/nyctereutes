@@ -74,6 +74,11 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 // which unlike the REST endpoint is not percent-encoded.
 const catalogResourceQuery = `query($fullPath: ID!) { project(fullPath: $fullPath) { isCatalogResource } }`
 
+// Signals a GraphQL query that resolved to a null project. glab reports a
+// top-level GraphQL error through a non-zero exit, so the read below only
+// reaches a null project on an otherwise successful response.
+var errCatalogProjectMissing = errors.New("project not visible over GraphQL")
+
 // Reads whether a project is published to the CI/CD Catalog. A null
 // isCatalogResource (the field is Experiment and may be withheld) counts as
 // not-a-resource so a project that cannot report it is simply left unmanaged.
@@ -87,13 +92,19 @@ func (c *Client) fetchCatalogResource(ctx context.Context, owner, name string) (
 
 	var resp struct {
 		Data struct {
-			Project struct {
+			Project *struct {
 				IsCatalogResource *bool `json:"isCatalogResource"`
 			} `json:"project"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(out, &resp); err != nil {
 		return false, fmt.Errorf("parse catalog status %s/%s: %w", owner, name, err)
+	}
+	// GraphQL returns a null project when it cannot see one the REST fetch just
+	// resolved; treating that as not-a-resource would silently emit a wrong
+	// value, so it is surfaced rather than swallowed.
+	if resp.Data.Project == nil {
+		return false, fmt.Errorf("fetch catalog status %s/%s: %w", owner, name, errCatalogProjectMissing)
 	}
 	return resp.Data.Project.IsCatalogResource != nil && *resp.Data.Project.IsCatalogResource, nil
 }
