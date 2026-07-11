@@ -84,10 +84,29 @@ func (f *fakeApplyGlab) recordWrite(body []byte, args []string) ([]byte, error) 
 			return nil, errInfra404
 		}
 	}
-	// A catalog mutation's success is read from its payload, so the write must
-	// answer with a body an empty errors array decodes from; the empty object
-	// leaves the mutation field absent, which the applier treats as no errors.
-	return []byte("{}"), nil
+	// A catalog mutation's success is read from its payload, so it must answer
+	// with the realistic GraphQL shape (an empty errors array under the mutation
+	// field). A bare "{}" would decode to the same success while hiding a
+	// payload-parsing regression, so the real shape is returned instead.
+	if field, ok := catalogMutationField(args); ok {
+		return fmt.Appendf(nil, `{"data":{"%s":{"errors":[]}}}`, field), nil
+	}
+	return nil, nil
+}
+
+// catalogMutationField reports which catalog mutation a GraphQL write invokes,
+// so the fake can answer with a payload keyed by that mutation field.
+func catalogMutationField(args []string) (string, bool) {
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "graphql") {
+		return "", false
+	}
+	for _, field := range []string{"catalogResourcesCreate", "catalogResourcesDestroy"} {
+		if strings.Contains(joined, field) {
+			return field, true
+		}
+	}
+	return "", false
 }
 
 func TestInfraApplyRequiresPath(t *testing.T) {
