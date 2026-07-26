@@ -1,4 +1,4 @@
-package nyctereutes
+package dep_test
 
 import (
 	"strings"

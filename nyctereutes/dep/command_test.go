@@ -13,13 +13,13 @@ import (
 
 var detailPath = regexp.MustCompile(`merge_requests/\d+$`)
 
-// fakeGlab answers the config read with defaults and every api call with the
+// Answers the config read with defaults and every api call with the
 // scripted list, which is all the search behind the TUI launch needs.
-type fakeGlab struct {
+type fakeSearchGlab struct {
 	listJSON string
 }
 
-func (fake *fakeGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+func (fake *fakeSearchGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if args[0] != "api" {
 		return nil, nil // unset config -> defaults apply
 	}
@@ -33,7 +33,7 @@ const oneMR = `[{"iid":12,"project_id":7,"title":"Bump lodash from 1.0.0 to 2.0.
 	`"web_url":"https://gitlab.com/g/proj/-/merge_requests/12"}]`
 
 func TestDepNoSubcommandLaunchesTUIWithSearchResults(t *testing.T) {
-	fake := &fakeGlab{listJSON: oneMR}
+	fake := &fakeSearchGlab{listJSON: oneMR}
 	outBuf := &bytes.Buffer{}
 	cmd := New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
 
@@ -55,7 +55,7 @@ func TestDepNoSubcommandLaunchesTUIWithSearchResults(t *testing.T) {
 }
 
 func TestDepNoSubcommandEmptyDoesNotLaunch(t *testing.T) {
-	fake := &fakeGlab{listJSON: `[]`}
+	fake := &fakeSearchGlab{listJSON: `[]`}
 	outBuf := &bytes.Buffer{}
 	cmd := New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
 

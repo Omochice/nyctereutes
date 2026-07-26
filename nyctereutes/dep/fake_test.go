@@ -1,10 +1,16 @@
-package nyctereutes
+package dep_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"sync"
+
+	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/nyctereutes"
 )
 
 var detailPath = regexp.MustCompile(`merge_requests/\d+$`)
@@ -46,6 +52,19 @@ func (fake *fakeGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 		return nil, fake.mergeErr
 	}
 	return nil, nil
+}
+
+// Drives the whole command tree with an injected glab runner, which is how the
+// dep subcommands are exercised end to end: the exit code and the diagnostics
+// these tests assert on are produced by the dispatcher, not by Execute.
+func runWithRunner(runner glab.Runner, args ...string) (exit int, stdout, stderr string) {
+	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
+	exit = nyctereutes.Dispatch(args, &cli.ProcInout{
+		Stdin:  strings.NewReader(""),
+		Stdout: outBuf,
+		Stderr: errBuf,
+	}, runner)
+	return exit, outBuf.String(), errBuf.String()
 }
 
 const oneMR = `[{"iid":12,"project_id":7,"title":"Bump lodash from 1.0.0 to 2.0.0",` +

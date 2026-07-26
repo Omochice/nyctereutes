@@ -2,6 +2,7 @@ package nyctereutes
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -23,6 +24,18 @@ func runOut(args []string) (exit int, stdout, stderr string) {
 		Stderr: errBuf,
 	})
 	return exit, outBuf.String(), errBuf.String()
+}
+
+// Answers an MR search with an empty list. The help tests need a runner only
+// so the tree can be built; reaching it at all would mean help executed the
+// target command, which is exactly what they assert never happens.
+type fakeHelpGlab struct{}
+
+func (fakeHelpGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	if args[0] == "api" {
+		return []byte(`[]`), nil
+	}
+	return nil, nil
 }
 
 // Drives the whole command tree with an injected glab runner, which is how
@@ -112,7 +125,7 @@ func TestHelpMatchesHelpFlag(t *testing.T) {
 }
 
 func TestHelpNeverExecutesTheTargetCommand(t *testing.T) {
-	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
+	fake := fakeHelpGlab{}
 	refExit, wantUsage, _ := runWithRunner(fake, "dep", "list", "--help")
 	if refExit != 0 || wantUsage == "" {
 		t.Fatalf("dep list --help must supply the reference usage text, got exit %d stdout %q", refExit, wantUsage)
