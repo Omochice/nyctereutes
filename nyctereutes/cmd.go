@@ -99,8 +99,7 @@ func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 		if errors.Is(err, errAlreadyReported) {
 			return 1
 		}
-		var flagsErr *flags.Error
-		if errors.As(err, &flagsErr) {
+		if flagsErr, ok := errors.AsType[*flags.Error](err); ok {
 			if flagsErr.Type == flags.ErrHelp {
 				_, _ = fmt.Fprintln(inout.Stdout, flagsErr.Message)
 				return 0
