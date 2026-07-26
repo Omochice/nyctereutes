@@ -1,13 +1,16 @@
-package nyctereutes
+package infra_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/nyctereutes"
 )
 
 var (
@@ -66,6 +69,19 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 		return []byte(body), nil
 	}
 	return nil, errInfra404
+}
+
+// Drives the whole command tree with an injected glab runner, which is how the
+// infra subcommands are exercised end to end: the exit code and the diagnostics
+// these tests assert on are produced by the dispatcher, not by Execute.
+func runWithRunner(runner glab.Runner, args ...string) (exit int, stdout, stderr string) {
+	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
+	exit = nyctereutes.Dispatch(args, &cli.ProcInout{
+		Stdin:  strings.NewReader(""),
+		Stdout: outBuf,
+		Stderr: errBuf,
+	}, runner)
+	return exit, outBuf.String(), errBuf.String()
 }
 
 const targetGroupProj = "group/proj"

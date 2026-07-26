@@ -1,4 +1,4 @@
-package nyctereutes
+package infra_test
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/nyctereutes"
 )
 
 // fakeApplyGlab serves project reads from a map and records every write call so
@@ -68,7 +69,7 @@ var errFetch500 = errors.New("500 Internal Server Error")
 // can be answered.
 func runInfraApply(stdin string, runner glab.Runner, args ...string) (exit int, stdout, stderr string) {
 	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
-	exit = Dispatch(args, &cli.ProcInout{
+	exit = nyctereutes.Dispatch(args, &cli.ProcInout{
 		Stdin:  strings.NewReader(stdin),
 		Stdout: outBuf,
 		Stderr: errBuf,
