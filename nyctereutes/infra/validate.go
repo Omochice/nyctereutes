@@ -1,4 +1,4 @@
-package nyctereutes
+package infra
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ var (
 	errInvalidManifests  = errors.New("validation failed")
 )
 
-type infraValidateCommand struct {
+type validateCommand struct {
 	inout *cli.ProcInout
 }
 
@@ -21,7 +21,7 @@ type infraValidateCommand struct {
 // on stderr with its file and document position before the run fails, so one
 // broken document does not hide the rest; a fully valid run summarizes the
 // documents on stdout.
-func (c *infraValidateCommand) Execute(args []string) error {
+func (c *validateCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errValidateNeedsPath
 	}

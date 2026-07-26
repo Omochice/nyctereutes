@@ -1,4 +1,6 @@
-package nyctereutes
+// The "infra" subcommand tree, which manages GitLab project settings through
+// YAML manifests.
+package infra
 
 import (
 	"errors"
@@ -16,28 +18,31 @@ import (
 
 var errNoManifestsFound = errors.New("no .yaml/.yml files in directory")
 
-type infraCommand struct {
+// The command tree go-flags parses "infra" and its subcommands into.
+type Command struct {
 	inout  *cli.ProcInout
 	runner glab.Runner
 
-	Import   *infraImportCommand   `command:"import" description:"export GitLab project settings as YAML"`
-	Validate *infraValidateCommand `command:"validate" description:"validate manifest YAML files against the schema"`
-	Plan     *infraPlanCommand     `command:"plan" description:"show drift between manifests and live GitLab state"`
-	Apply    *infraApplyCommand    `command:"apply" description:"apply manifests to live GitLab state"`
+	Import   *importCommand   `command:"import" description:"export GitLab project settings as YAML"`
+	Validate *validateCommand `command:"validate" description:"validate manifest YAML files against the schema"`
+	Plan     *planCommand     `command:"plan" description:"show drift between manifests and live GitLab state"`
+	Apply    *applyCommand    `command:"apply" description:"apply manifests to live GitLab state"`
 }
 
-func newInfraCommand(inout *cli.ProcInout, runner glab.Runner) *infraCommand {
+// Builds the tree with every subcommand wired to the given streams and glab
+// runner, so a caller can inject a fake runner instead of the real CLI.
+func New(inout *cli.ProcInout, runner glab.Runner) *Command {
 	// apply needs to stream a request body for topics, which only the
 	// stdin-capable runner provides; a runner without it leaves writer nil and
 	// apply reports that it cannot write.
 	writer, _ := runner.(repository.ProjectWriter)
-	return &infraCommand{
+	return &Command{
 		inout:    inout,
 		runner:   runner,
-		Import:   &infraImportCommand{inout: inout, runner: runner},
-		Validate: &infraValidateCommand{inout: inout},
-		Plan:     &infraPlanCommand{inout: inout, runner: runner},
-		Apply:    &infraApplyCommand{inout: inout, writer: writer},
+		Import:   &importCommand{inout: inout, runner: runner},
+		Validate: &validateCommand{inout: inout},
+		Plan:     &planCommand{inout: inout, runner: runner},
+		Apply:    &applyCommand{inout: inout, writer: writer},
 	}
 }
 

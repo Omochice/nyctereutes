@@ -1,4 +1,4 @@
-package nyctereutes
+package infra
 
 import (
 	"bytes"

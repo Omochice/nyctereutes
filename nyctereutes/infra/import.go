@@ -1,4 +1,4 @@
-package nyctereutes
+package infra
 
 import (
 	"context"
@@ -17,7 +17,7 @@ var (
 	errSomeImportsFailed = errors.New("some projects could not be imported")
 )
 
-type infraImportCommand struct {
+type importCommand struct {
 	inout  *cli.ProcInout
 	runner glab.Runner
 }
@@ -25,7 +25,7 @@ type infraImportCommand struct {
 // Fetches each named project's basic settings from GitLab and writes them as
 // YAML manifests to stdout, separated by "---". Missing projects are reported on
 // stderr and skipped; the run exits non-zero when any project failed.
-func (c *infraImportCommand) Execute(args []string) error {
+func (c *importCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errImportNeedsTarget
 	}

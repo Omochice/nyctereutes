@@ -1,4 +1,4 @@
-package nyctereutes
+package infra
 
 import (
 	"context"
@@ -17,7 +17,7 @@ var (
 	errPlanFailed    = errors.New("plan failed")
 )
 
-type infraPlanCommand struct {
+type planCommand struct {
 	inout  *cli.ProcInout
 	runner glab.Runner
 
@@ -25,7 +25,7 @@ type infraPlanCommand struct {
 }
 
 // Shows how each declared manifest differs from its live GitLab project.
-func (c *infraPlanCommand) Execute(args []string) error {
+func (c *planCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errPlanNeedsPath
 	}
@@ -66,7 +66,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 // Plans each document in one file against its live project. Problems are
 // reported and counted rather than fatal, so one bad document or project never
 // hides the rest.
-func (c *infraPlanCommand) planFile(
+func (c *planCommand) planFile(
 	ctx context.Context, client *repository.Client, file string, colorize bool,
 ) (changed, failures int) {
 	repos, failures := readManifestFile(c.inout.Stderr, file)

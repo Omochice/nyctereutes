@@ -1,4 +1,4 @@
-package nyctereutes
+package infra
 
 import (
 	"bufio"
@@ -18,7 +18,7 @@ var (
 	errApplyFailed    = errors.New("apply failed")
 )
 
-type infraApplyCommand struct {
+type applyCommand struct {
 	inout  *cli.ProcInout
 	writer repository.ProjectWriter
 
@@ -36,7 +36,7 @@ type repoPlan struct {
 // plan is shown first; unless --auto-approve is given the user must confirm
 // before any write. Read, parse and fetch problems are reported and counted
 // rather than fatal, and a non-zero exit follows any failure.
-func (c *infraApplyCommand) Execute(args []string) error {
+func (c *applyCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errApplyNeedsPath
 	}
@@ -64,7 +64,7 @@ func (c *infraApplyCommand) Execute(args []string) error {
 }
 
 // Turns an aggregated failure count into the command's exit outcome.
-func (c *infraApplyCommand) result(failures int) error {
+func (c *applyCommand) result(failures int) error {
 	if failures > 0 {
 		return fmt.Errorf("%w: %d problem(s)", errApplyFailed, failures)
 	}
@@ -73,7 +73,7 @@ func (c *infraApplyCommand) result(failures int) error {
 
 // Diffs every declared project against its live state, returning the projects
 // that drift together with the count of read/parse/fetch problems.
-func (c *infraApplyCommand) buildPlans(
+func (c *applyCommand) buildPlans(
 	ctx context.Context, client *repository.Client, args []string,
 ) (plans []repoPlan, failures int) {
 	for _, path := range args {
@@ -108,7 +108,7 @@ func (c *infraApplyCommand) buildPlans(
 }
 
 // Prints the pending changes in the same layout as infra plan.
-func (c *infraApplyCommand) printPlans(plans []repoPlan, colorize bool) {
+func (c *applyCommand) printPlans(plans []repoPlan, colorize bool) {
 	for _, plan := range plans {
 		printChanges(c.inout.Stdout, plan.name, plan.changes, colorize)
 	}
@@ -117,7 +117,7 @@ func (c *infraApplyCommand) printPlans(plans []repoPlan, colorize bool) {
 // Prints the plan, asks once for confirmation, and reports whether the user
 // approved. A non-yes answer, EOF or unreadable input all count as a decline so
 // a non-interactive run without --auto-approve never writes by accident.
-func (c *infraApplyCommand) confirm() bool {
+func (c *applyCommand) confirm() bool {
 	_, _ = fmt.Fprint(c.inout.Stdout, "Apply these changes? [y/N] ")
 	scanner := bufio.NewScanner(c.inout.Stdin)
 	if !scanner.Scan() {
@@ -129,7 +129,7 @@ func (c *infraApplyCommand) confirm() bool {
 
 // Applies every plan, reporting each failed change and returning how many
 // changes could not be applied.
-func (c *infraApplyCommand) applyPlans(ctx context.Context, plans []repoPlan) (failures int) {
+func (c *applyCommand) applyPlans(ctx context.Context, plans []repoPlan) (failures int) {
 	applier := repository.NewApplier(c.writer)
 	for _, plan := range plans {
 		for _, result := range applier.Apply(ctx, plan.changes) {

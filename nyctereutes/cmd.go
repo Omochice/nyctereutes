@@ -10,6 +10,7 @@ import (
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
 // Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
@@ -55,7 +56,7 @@ func (c *helpCommand) Execute(args []string) error {
 type options struct {
 	Version    bool            `short:"v" long:"version" description:"show version"`
 	Dep        *depCommand     `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
-	Infra      *infraCommand   `command:"infra" description:"manage infrastructure"`
+	Infra      *infra.Command  `command:"infra" description:"manage infrastructure"`
 	Help       *helpCommand    `command:"help" description:"show help"`
 	VersionCmd *versionCommand `command:"version" description:"show version"`
 }
@@ -70,7 +71,7 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:        newDepCommand(inout, runner),
-		Infra:      newInfraCommand(inout, runner),
+		Infra:      infra.New(inout, runner),
 		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
 	}
