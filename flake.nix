@@ -183,6 +183,38 @@
             runHook postInstall
           '';
         });
+        # x/tools keeps some modernizers unexported and reachable only through
+        # internal/goplsexport, so golangci-lint's modernize suite cannot run
+        # them and only gopls reports them. Kept out of `nix flake check` and
+        # the git hooks because this is a stopgap until those analyzers are
+        # published to modernize.Suite, at which point golangci-lint picks them
+        # up with no configuration.
+        gopls-check = pkgs.writeShellApplication {
+          name = "gopls-check";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.go
+            pkgs.gopls
+          ];
+          text = ''
+            # A GOROOT inherited from another Go installation makes gopls load a
+            # compiler that disagrees with the `go` on PATH.
+            export GOROOT="${pkgs.go}/share/go"
+            # gopls takes file names rather than package patterns; listing them
+            # through git keeps ignored trees such as scratch worktrees out.
+            mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.go')
+            if [ ''${#files[@]} -eq 0 ]; then
+              exit 0
+            fi
+            # `gopls check` exits 0 even when it reports diagnostics, so failure
+            # has to be derived from the output being non-empty.
+            diagnostics="$(gopls check -severity=hint "''${files[@]}" 2>&1)"
+            if [ -n "$diagnostics" ]; then
+              printf '%s\n' "$diagnostics" >&2
+              exit 1
+            fi
+          '';
+        };
         gitHooks = git-hooks.lib.${system}.run {
           src = self;
           hooks = {
@@ -218,6 +250,7 @@
       in
       {
         # keep-sorted start block=yes
+        apps.gopls-check = flake-utils.lib.mkApp { drv = gopls-check; };
         checks = {
           git-hooks = gitHooks;
           godoclint = godoclint-check;
