@@ -183,12 +183,6 @@
             runHook postInstall
           '';
         });
-        # x/tools keeps some modernizers unexported and reachable only through
-        # internal/goplsexport, so golangci-lint's modernize suite cannot run
-        # them and only gopls reports them. Kept out of `nix flake check` and
-        # the git hooks because this is a stopgap until those analyzers are
-        # published to modernize.Suite, at which point golangci-lint picks them
-        # up with no configuration.
         gopls-check = pkgs.writeShellApplication {
           name = "gopls-check";
           runtimeInputs = [
