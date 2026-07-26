@@ -1,4 +1,5 @@
-package nyctereutes
+// The "dep" subcommand tree, which manages dependency-update merge requests.
+package dep
 
 import (
 	"context"
@@ -16,9 +17,8 @@ import (
 )
 
 var (
-	errInvalidMergeMethod = errors.New("invalid merge method")
-	errGroupNotFound      = errors.New("group not found")
-	errSomeActionsFailed  = errors.New("some operations failed")
+	errGroupNotFound     = errors.New("group not found")
+	errSomeActionsFailed = errors.New("some operations failed")
 )
 
 // The search-scope flags shared by list, approve and merge.
@@ -47,7 +47,8 @@ func (s scopeFlags) resolve(ctx context.Context, runner glab.Runner) (gitlab.Sea
 	}, cfg.Patterns
 }
 
-type depCommand struct {
+// The command tree go-flags parses "dep" and its subcommands into.
+type Command struct {
 	scopeFlags
 
 	inout  *cli.ProcInout
@@ -56,28 +57,30 @@ type depCommand struct {
 	// instead of driving a real terminal program.
 	launch func(tui.Model) error
 
-	List    *depListCommand    `command:"list" description:"list dependency MRs"`
-	Approve *depApproveCommand `command:"approve" description:"bulk approve a group of MRs"`
-	Merge   *depMergeCommand   `command:"merge" description:"bulk merge a group of MRs"`
+	List    *listCommand    `command:"list" description:"list dependency MRs"`
+	Approve *approveCommand `command:"approve" description:"bulk approve a group of MRs"`
+	Merge   *mergeCommand   `command:"merge" description:"bulk merge a group of MRs"`
 }
 
-func newDepCommand(inout *cli.ProcInout, runner glab.Runner) *depCommand {
-	return &depCommand{
+// Builds the tree with every subcommand wired to the given streams and glab
+// runner, so a caller can inject a fake runner instead of the real CLI.
+func New(inout *cli.ProcInout, runner glab.Runner) *Command {
+	return &Command{
 		inout:  inout,
 		runner: runner,
 		launch: func(model tui.Model) error {
 			return tui.Run(model, inout.Stdin, inout.Stdout)
 		},
-		List:    &depListCommand{inout: inout, runner: runner},
-		Approve: &depApproveCommand{inout: inout, runner: runner},
-		Merge:   &depMergeCommand{inout: inout, runner: runner},
+		List:    &listCommand{inout: inout, runner: runner},
+		Approve: &approveCommand{inout: inout, runner: runner},
+		Merge:   &mergeCommand{inout: inout, runner: runner},
 	}
 }
 
 // Runs when "dep" is invoked with no subcommand: it searches the configured
 // scope and opens the interactive TUI, or prints the empty message and exits
 // without launching when nothing matches.
-func (c *depCommand) Execute(_ []string) error {
+func (c *Command) Execute(_ []string) error {
 	ctx := context.Background()
 	params, patterns := c.resolve(ctx, c.runner)
 
@@ -109,109 +112,6 @@ func (c *depCommand) Execute(_ []string) error {
 		}),
 	)
 	return c.launch(model)
-}
-
-type depListCommand struct {
-	scopeFlags
-
-	inout  *cli.ProcInout
-	runner glab.Runner
-
-	Group bool `long:"group" description:"Group MRs by package@version"`
-	JSON  bool `long:"json" description:"Output as JSON"`
-}
-
-func (c *depListCommand) Execute(_ []string) error {
-	ctx := context.Background()
-	params, patterns := c.resolve(ctx, c.runner)
-
-	mrs, err := gitlab.NewClient(c.runner).SearchMRs(ctx, params)
-	if err != nil {
-		return fmt.Errorf("search MRs: %w", err)
-	}
-	// In JSON mode an empty result still has to be valid JSON for machine
-	// consumers, so only the human-readable path prints a message here.
-	if len(mrs) == 0 && !c.JSON {
-		_, _ = fmt.Fprintln(c.inout.Stdout, "No dependency MRs found")
-		return nil
-	}
-
-	if c.Group {
-		groups := gitlab.GroupMRs(mrs, patterns)
-		if err := ui.NewFromGroups(c.inout.Stdout, groups, c.JSON).DisplayGroups(groups); err != nil {
-			return fmt.Errorf("display groups: %w", err)
-		}
-		return nil
-	}
-	if err := ui.New(c.inout.Stdout, mrs, c.JSON).DisplayList(mrs); err != nil {
-		return fmt.Errorf("display list: %w", err)
-	}
-	return nil
-}
-
-type depApproveCommand struct {
-	scopeFlags
-
-	inout  *cli.ProcInout
-	runner glab.Runner
-
-	Group  string `long:"group" required:"true" description:"Group key (package@version)"`
-	DryRun bool   `long:"dry-run" description:"Print actions without executing"`
-}
-
-func (c *depApproveCommand) Execute(_ []string) error {
-	ctx := context.Background()
-	mrs, err := selectGroup(ctx, c.runner, c.scopeFlags, c.Group)
-	if err != nil {
-		return err
-	}
-
-	client := gitlab.NewClient(c.runner)
-	view := ui.New(c.inout.Stdout, mrs, false)
-	return applyAction(view, mrs, c.DryRun, "approve", func(mr types.MR) error {
-		return client.ApproveMR(ctx, mr.Project, mr.IID)
-	})
-}
-
-type depMergeCommand struct {
-	scopeFlags
-
-	inout  *cli.ProcInout
-	runner glab.Runner
-
-	Group  string `long:"group" required:"true" description:"Group key (package@version)"`
-	DryRun bool   `long:"dry-run" description:"Print actions without executing"`
-	Method string `long:"method" default:"squash" description:"Merge method: merge, squash, or rebase"`
-	// RequireChecks is a pointer because go-flags bool flags cannot default to
-	// true; nil means unset, which this command treats as enabled.
-	RequireChecks *bool `long:"require-checks" description:"Auto-merge when the pipeline succeeds (default true)"`
-}
-
-func (c *depMergeCommand) Execute(_ []string) error {
-	if c.Method != "merge" && c.Method != "squash" && c.Method != "rebase" {
-		return fmt.Errorf("%w %q (must be 'merge', 'squash', or 'rebase')", errInvalidMergeMethod, c.Method)
-	}
-
-	requireChecks := c.RequireChecks == nil || *c.RequireChecks
-
-	ctx := context.Background()
-	mrs, err := selectGroup(ctx, c.runner, c.scopeFlags, c.Group)
-	if err != nil {
-		return err
-	}
-
-	// With --require-checks, GitLab merges each MR once its pipeline succeeds
-	// (native auto-merge) rather than this tool gating it.
-	var successDetails []string
-	if requireChecks {
-		successDetails = []string{"auto-merge when pipeline succeeds"}
-	}
-
-	client := gitlab.NewClient(c.runner)
-	view := ui.New(c.inout.Stdout, mrs, false)
-	return applyAction(view, mrs, c.DryRun, "merge", func(mr types.MR) error {
-		return client.MergeMR(ctx, mr.Project, mr.IID, c.Method, requireChecks)
-	}, successDetails...)
 }
 
 // Runs action against each MR, printing a consistent dry-run, success, or
