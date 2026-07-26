@@ -29,7 +29,7 @@ func runOut(args []string) (exit int, stdout, stderr string) {
 // every subcommand is exercised without touching the real CLI.
 func runWithRunner(runner glab.Runner, args ...string) (exit int, stdout, stderr string) {
 	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
-	exit = dispatch(args, &cli.ProcInout{
+	exit = Dispatch(args, &cli.ProcInout{
 		Stdin:  strings.NewReader(""),
 		Stdout: outBuf,
 		Stderr: errBuf,
