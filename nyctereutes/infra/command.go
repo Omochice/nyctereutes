@@ -18,11 +18,10 @@ import (
 
 var errNoManifestsFound = errors.New("no .yaml/.yml files in directory")
 
-// The command tree go-flags parses "infra" and its subcommands into.
+// The command tree go-flags parses "infra" and its subcommands into. It has no
+// Execute of its own: "infra" alone is a usage error, so the streams and the
+// runner are held by the subcommands rather than here.
 type Command struct {
-	inout  *cli.ProcInout
-	runner glab.Runner
-
 	Import   *importCommand   `command:"import" description:"export GitLab project settings as YAML"`
 	Validate *validateCommand `command:"validate" description:"validate manifest YAML files against the schema"`
 	Plan     *planCommand     `command:"plan" description:"show drift between manifests and live GitLab state"`
@@ -37,8 +36,6 @@ func New(inout *cli.ProcInout, runner glab.Runner) *Command {
 	// apply reports that it cannot write.
 	writer, _ := runner.(repository.ProjectWriter)
 	return &Command{
-		inout:    inout,
-		runner:   runner,
 		Import:   &importCommand{inout: inout, runner: runner},
 		Validate: &validateCommand{inout: inout},
 		Plan:     &planCommand{inout: inout, runner: runner},
