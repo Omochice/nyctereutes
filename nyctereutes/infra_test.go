@@ -75,7 +75,7 @@ const projJSON = `{"description":"a tool","visibility":"private","topics":["go"]
 
 func TestInfraImportEmitsYAML(t *testing.T) {
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
-	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
+	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -92,7 +92,7 @@ func TestInfraImportEmitsFeatureAccessLevels(t *testing.T) {
 		`"issues_access_level":"enabled","wiki_access_level":"disabled","snippets_access_level":"private",` +
 		`"builds_access_level":"enabled","merge_requests_access_level":"private","container_registry_access_level":"enabled"}`
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: withFeatures}}
-	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
+	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -117,7 +117,7 @@ func TestInfraImportEmitsFeatureAccessLevels(t *testing.T) {
 func TestInfraImportOmitsEmptyFeatures(t *testing.T) {
 	noFeatures := `{"description":"d","visibility":"private","topics":[],"archived":false}`
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: noFeatures}}
-	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
+	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -130,7 +130,7 @@ func TestInfraImportOmitsEmptyFeatures(t *testing.T) {
 func TestInfraImportKeepsEmptyTopics(t *testing.T) {
 	noTopics := `{"description":"d","visibility":"private","topics":[],"archived":false}`
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: noTopics}}
-	exit, stdout, _ := runDep(runner, "infra", "import", targetGroupProj)
+	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -145,7 +145,7 @@ func TestInfraImportSeparatesMultipleDocs(t *testing.T) {
 		"group/a": projJSON,
 		"group/b": projJSON,
 	}}
-	exit, stdout, _ := runDep(runner, "infra", "import", "group/a", "group/b")
+	exit, stdout, _ := runWithRunner(runner, "infra", "import", "group/a", "group/b")
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -156,7 +156,7 @@ func TestInfraImportSeparatesMultipleDocs(t *testing.T) {
 }
 
 func TestInfraImportRequiresTarget(t *testing.T) {
-	exit, _, _ := runDep(&fakeInfraGlab{}, "infra", "import")
+	exit, _, _ := runWithRunner(&fakeInfraGlab{}, "infra", "import")
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when no project is given", exit)
 	}
@@ -164,7 +164,7 @@ func TestInfraImportRequiresTarget(t *testing.T) {
 
 func TestInfraImportContinuesPastMissing(t *testing.T) {
 	runner := &fakeInfraGlab{projects: map[string]string{"group/ok": projJSON}}
-	exit, stdout, stderr := runDep(runner, "infra", "import", "group/missing", "group/ok")
+	exit, stdout, stderr := runWithRunner(runner, "infra", "import", "group/missing", "group/ok")
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when a project is missing", exit)
@@ -180,7 +180,7 @@ func TestInfraImportContinuesPastMissing(t *testing.T) {
 func TestInfraImportRejectsMalformedTarget(t *testing.T) {
 	for _, target := range []string{"/group/proj", "group//proj"} {
 		t.Run(target, func(t *testing.T) {
-			exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "import", target)
+			exit, _, stderr := runWithRunner(&fakeInfraGlab{}, "infra", "import", target)
 			if exit != 1 {
 				t.Errorf("exit = %d, want 1 for a malformed target", exit)
 			}

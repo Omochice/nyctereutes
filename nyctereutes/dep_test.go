@@ -12,7 +12,6 @@ import (
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/dep/tui"
-	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
 var detailPath = regexp.MustCompile(`merge_requests/\d+$`)
@@ -54,16 +53,6 @@ func (fake *fakeGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 		return nil, fake.mergeErr
 	}
 	return nil, nil
-}
-
-func runDep(runner glab.Runner, args ...string) (exit int, stdout, stderr string) {
-	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
-	exit = dispatch(args, &cli.ProcInout{
-		Stdin:  strings.NewReader(""),
-		Stdout: outBuf,
-		Stderr: errBuf,
-	}, runner)
-	return exit, outBuf.String(), errBuf.String()
 }
 
 const oneMR = `[{"iid":12,"project_id":7,"title":"Bump lodash from 1.0.0 to 2.0.0",` +
@@ -121,7 +110,7 @@ func TestDepNoSubcommandEmptyDoesNotLaunch(t *testing.T) {
 
 func TestDepListRendersTable(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "list")
+	exit, stdout, _ := runWithRunner(fake, "dep", "list")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -134,7 +123,7 @@ func TestDepListRendersTable(t *testing.T) {
 
 func TestDepListGroup(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "list", "--group")
+	exit, stdout, _ := runWithRunner(fake, "dep", "list", "--group")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -145,7 +134,7 @@ func TestDepListGroup(t *testing.T) {
 
 func TestDepListJSON(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "list", "--json")
+	exit, stdout, _ := runWithRunner(fake, "dep", "list", "--json")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -157,7 +146,7 @@ func TestDepListJSON(t *testing.T) {
 
 func TestDepListEmpty(t *testing.T) {
 	fake := &fakeGlab{listJSON: `[]`, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "list")
+	exit, stdout, _ := runWithRunner(fake, "dep", "list")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -168,7 +157,7 @@ func TestDepListEmpty(t *testing.T) {
 
 func TestDepListEmptyJSON(t *testing.T) {
 	fake := &fakeGlab{listJSON: `[]`, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "list", "--json")
+	exit, stdout, _ := runWithRunner(fake, "dep", "list", "--json")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -183,7 +172,7 @@ func TestDepListEmptyJSON(t *testing.T) {
 
 func TestDepApproveRequiresGroup(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, _, stderr := runDep(fake, "dep", "approve")
+	exit, _, stderr := runWithRunner(fake, "dep", "approve")
 	if exit != 1 {
 		t.Fatalf("exit = %d, want 1", exit)
 	}
@@ -194,7 +183,7 @@ func TestDepApproveRequiresGroup(t *testing.T) {
 
 func TestDepApproveApprovesGroup(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "approve", "--group", "lodash@2.0.0")
+	exit, stdout, _ := runWithRunner(fake, "dep", "approve", "--group", "lodash@2.0.0")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -208,7 +197,7 @@ func TestDepApproveApprovesGroup(t *testing.T) {
 
 func TestDepApproveDryRun(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "approve", "--group", "lodash@2.0.0", "--dry-run")
+	exit, stdout, _ := runWithRunner(fake, "dep", "approve", "--group", "lodash@2.0.0", "--dry-run")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -222,7 +211,7 @@ func TestDepApproveDryRun(t *testing.T) {
 
 func TestDepApproveGroupNotFound(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, _, stderr := runDep(fake, "dep", "approve", "--group", "missing@9.9.9")
+	exit, _, stderr := runWithRunner(fake, "dep", "approve", "--group", "missing@9.9.9")
 	if exit != 1 {
 		t.Fatalf("exit = %d, want 1", exit)
 	}
@@ -236,7 +225,7 @@ func TestDepApproveGroupNotFound(t *testing.T) {
 
 func TestDepApproveContinuesOnError(t *testing.T) {
 	fake := &fakeGlab{listJSON: twoMRsSameGroup, detailJSON: `{}`, approveErr: errStub500}
-	exit, stdout, _ := runDep(fake, "dep", "approve", "--group", "lodash@2.0.0")
+	exit, stdout, _ := runWithRunner(fake, "dep", "approve", "--group", "lodash@2.0.0")
 	if exit != 1 {
 		t.Fatalf("exit = %d, want 1 (failures must be non-zero exit)", exit)
 	}
@@ -250,7 +239,7 @@ func TestDepApproveContinuesOnError(t *testing.T) {
 
 func TestDepMergeRequiresGroup(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, _, stderr := runDep(fake, "dep", "merge")
+	exit, _, stderr := runWithRunner(fake, "dep", "merge")
 	if exit != 1 {
 		t.Fatalf("exit = %d, want 1", exit)
 	}
@@ -261,7 +250,7 @@ func TestDepMergeRequiresGroup(t *testing.T) {
 
 func TestDepMergeInvalidMethod(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, _, stderr := runDep(fake, "dep", "merge", "--group", "lodash@2.0.0", "--method", "bogus")
+	exit, _, stderr := runWithRunner(fake, "dep", "merge", "--group", "lodash@2.0.0", "--method", "bogus")
 	if exit != 1 {
 		t.Fatalf("exit = %d, want 1", exit)
 	}
@@ -275,7 +264,7 @@ func TestDepMergeInvalidMethod(t *testing.T) {
 
 func TestDepMergeAutoMergeByDefault(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "merge", "--group", "lodash@2.0.0")
+	exit, stdout, _ := runWithRunner(fake, "dep", "merge", "--group", "lodash@2.0.0")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -293,7 +282,7 @@ func TestDepMergeAutoMergeByDefault(t *testing.T) {
 
 func TestDepMergeImmediate(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "merge", "--group", "lodash@2.0.0", "--require-checks=false")
+	exit, stdout, _ := runWithRunner(fake, "dep", "merge", "--group", "lodash@2.0.0", "--require-checks=false")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}
@@ -311,7 +300,7 @@ func TestDepMergeImmediate(t *testing.T) {
 
 func TestDepMergeContinuesOnError(t *testing.T) {
 	fake := &fakeGlab{listJSON: twoMRsSameGroup, detailJSON: `{}`, mergeErr: errStub409}
-	exit, stdout, _ := runDep(fake, "dep", "merge", "--group", "lodash@2.0.0")
+	exit, stdout, _ := runWithRunner(fake, "dep", "merge", "--group", "lodash@2.0.0")
 	if exit != 1 {
 		t.Fatalf("exit = %d, want 1 (failures must be non-zero exit)", exit)
 	}
@@ -325,7 +314,7 @@ func TestDepMergeContinuesOnError(t *testing.T) {
 
 func TestDepMergeDryRun(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	exit, stdout, _ := runDep(fake, "dep", "merge", "--group", "lodash@2.0.0", "--dry-run")
+	exit, stdout, _ := runWithRunner(fake, "dep", "merge", "--group", "lodash@2.0.0", "--dry-run")
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
 	}

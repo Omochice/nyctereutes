@@ -44,7 +44,7 @@ spec:
 `
 
 func TestInfraPlanRequiresPath(t *testing.T) {
-	exit, _, _ := runDep(&fakeInfraGlab{}, "infra", "plan")
+	exit, _, _ := runWithRunner(&fakeInfraGlab{}, "infra", "plan")
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when no path is given", exit)
 	}
@@ -54,7 +54,7 @@ func TestInfraPlanShowsChanges(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest)
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
 
-	exit, stdout, _ := runDep(runner, "infra", "plan", path)
+	exit, stdout, _ := runWithRunner(runner, "infra", "plan", path)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 for a plan with drift", exit)
@@ -83,7 +83,7 @@ func TestInfraPlanReportsNoChanges(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", matchingManifest)
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
 
-	exit, stdout, _ := runDep(runner, "infra", "plan", path)
+	exit, stdout, _ := runWithRunner(runner, "infra", "plan", path)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -107,7 +107,7 @@ spec:
 	path := writeManifest(t, t.TempDir(), "a.yaml", create)
 	runner := &fakeInfraGlab{projects: map[string]string{}}
 
-	exit, stdout, _ := runDep(runner, "infra", "plan", path)
+	exit, stdout, _ := runWithRunner(runner, "infra", "plan", path)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -134,7 +134,7 @@ spec:
 	path := writeManifest(t, t.TempDir(), "a.yaml", stream)
 	runner := &planFetchErrGlab{okPath: targetGroupProj, okBody: projJSON}
 
-	exit, stdout, stderr := runDep(runner, "infra", "plan", path)
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when a fetch fails", exit)
@@ -155,7 +155,7 @@ func TestInfraPlanContinuesPastParseError(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", stream)
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
 
-	exit, stdout, stderr := runDep(runner, "infra", "plan", path)
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when a document is invalid", exit)
@@ -181,7 +181,7 @@ func TestInfraPlanWalksDirectory(t *testing.T) {
 		"group/other": projJSON,
 	}}
 
-	exit, stdout, _ := runDep(runner, "infra", "plan", dir)
+	exit, stdout, _ := runWithRunner(runner, "infra", "plan", dir)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0", exit)
@@ -200,7 +200,7 @@ func TestInfraPlanContinuesPastMissingPath(t *testing.T) {
 	good := writeManifest(t, dir, "a.yaml", planManifest)
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
 
-	exit, stdout, stderr := runDep(runner, "infra", "plan", filepath.Join(dir, "nope.yaml"), good)
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", filepath.Join(dir, "nope.yaml"), good)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when a path does not exist", exit)
@@ -220,14 +220,14 @@ func TestInfraPlanCIExitCode(t *testing.T) {
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
 
 	t.Run("drift exits non-zero", func(t *testing.T) {
-		exit, _, _ := runDep(runner, "infra", "plan", "--ci", drift)
+		exit, _, _ := runWithRunner(runner, "infra", "plan", "--ci", drift)
 		if exit != 1 {
 			t.Errorf("exit = %d, want 1 with --ci and drift", exit)
 		}
 	})
 
 	t.Run("no drift exits zero", func(t *testing.T) {
-		exit, _, _ := runDep(runner, "infra", "plan", "--ci", match)
+		exit, _, _ := runWithRunner(runner, "infra", "plan", "--ci", match)
 		if exit != 0 {
 			t.Errorf("exit = %d, want 0 with --ci and no drift", exit)
 		}

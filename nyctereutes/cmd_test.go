@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
 func run(args []string) (exit int, stderr string) {
@@ -21,6 +22,18 @@ func runOut(args []string) (exit int, stdout, stderr string) {
 		Stdout: outBuf,
 		Stderr: errBuf,
 	})
+	return exit, outBuf.String(), errBuf.String()
+}
+
+// Drives the whole command tree with an injected glab runner, which is how
+// every subcommand is exercised without touching the real CLI.
+func runWithRunner(runner glab.Runner, args ...string) (exit int, stdout, stderr string) {
+	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
+	exit = dispatch(args, &cli.ProcInout{
+		Stdin:  strings.NewReader(""),
+		Stdout: outBuf,
+		Stderr: errBuf,
+	}, runner)
 	return exit, outBuf.String(), errBuf.String()
 }
 
@@ -100,14 +113,14 @@ func TestHelpMatchesHelpFlag(t *testing.T) {
 
 func TestHelpNeverExecutesTheTargetCommand(t *testing.T) {
 	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	refExit, wantUsage, _ := runDep(fake, "dep", "list", "--help")
+	refExit, wantUsage, _ := runWithRunner(fake, "dep", "list", "--help")
 	if refExit != 0 || wantUsage == "" {
 		t.Fatalf("dep list --help must supply the reference usage text, got exit %d stdout %q", refExit, wantUsage)
 	}
 
 	// The outer parser consumes the first "--", so one terminator survives
 	// into the help command's arguments.
-	exit, stdout, stderr := runDep(fake, "help", "dep", "list", "--", "--")
+	exit, stdout, stderr := runWithRunner(fake, "help", "dep", "list", "--", "--")
 
 	if exit != 0 {
 		t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
