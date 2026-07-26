@@ -1,47 +1,25 @@
-package dep
+package dep_test
 
 import (
 	"bytes"
-	"context"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/dep/tui"
+	"github.com/Omochice/nyctereutes/nyctereutes/dep"
 )
 
-var detailPath = regexp.MustCompile(`merge_requests/\d+$`)
-
-// Answers the config read with defaults and every api call with the
-// scripted list, which is all the search behind the TUI launch needs.
-type fakeSearchGlab struct {
-	listJSON string
-}
-
-func (fake *fakeSearchGlab) Run(_ context.Context, args ...string) ([]byte, error) {
-	if args[0] != "api" {
-		return nil, nil // unset config -> defaults apply
-	}
-	if detailPath.MatchString(args[len(args)-1]) {
-		return []byte(`{}`), nil
-	}
-	return []byte(fake.listJSON), nil
-}
-
-const oneMR = `[{"iid":12,"project_id":7,"title":"Bump lodash from 1.0.0 to 2.0.0",` +
-	`"web_url":"https://gitlab.com/g/proj/-/merge_requests/12"}]`
-
 func TestDepNoSubcommandLaunchesTUIWithSearchResults(t *testing.T) {
-	fake := &fakeSearchGlab{listJSON: oneMR}
+	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
 	outBuf := &bytes.Buffer{}
-	cmd := New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
+	cmd := dep.New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
 
 	var launched *tui.Model
-	cmd.launch = func(m tui.Model) error {
+	dep.SetLaunch(cmd, func(m tui.Model) error {
 		launched = &m
 		return nil
-	}
+	})
 
 	if err := cmd.Execute(nil); err != nil {
 		t.Fatalf("Execute returned %v", err)
@@ -55,15 +33,15 @@ func TestDepNoSubcommandLaunchesTUIWithSearchResults(t *testing.T) {
 }
 
 func TestDepNoSubcommandEmptyDoesNotLaunch(t *testing.T) {
-	fake := &fakeSearchGlab{listJSON: `[]`}
+	fake := &fakeGlab{listJSON: `[]`, detailJSON: `{}`}
 	outBuf := &bytes.Buffer{}
-	cmd := New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
+	cmd := dep.New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: outBuf}, fake)
 
 	launched := false
-	cmd.launch = func(tui.Model) error {
+	dep.SetLaunch(cmd, func(tui.Model) error {
 		launched = true
 		return nil
-	}
+	})
 
 	if err := cmd.Execute(nil); err != nil {
 		t.Fatalf("Execute returned %v", err)
