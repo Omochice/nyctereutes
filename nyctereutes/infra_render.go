@@ -3,21 +3,12 @@ package nyctereutes
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/term"
 
+	"github.com/Omochice/nyctereutes/internal/color"
 	"github.com/Omochice/nyctereutes/internal/infra/repository"
-)
-
-// ANSI 256-color codes, matching the palette the dep TUI uses so both surfaces
-// read alike.
-const (
-	colorGreen  = "42"
-	colorYellow = "226"
-	colorRed    = "196"
 )
 
 // printChanges writes one project's header followed by its change lines, each
@@ -39,11 +30,11 @@ func styleLine(line string, colorize bool) string {
 	if !colorize {
 		return line
 	}
-	color := markerColor(line)
-	if color == "" {
+	code := markerColor(line)
+	if code == "" {
 		return line
 	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(line)
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(code)).Render(line)
 }
 
 // markerColor returns the color for line's leading diff marker, ignoring the
@@ -55,29 +46,12 @@ func markerColor(line string) string {
 	}
 	switch trimmed[0] {
 	case '+':
-		return colorGreen
+		return color.Green
 	case '-':
-		return colorRed
+		return color.Red
 	case '~':
-		return colorYellow
+		return color.Yellow
 	default:
 		return ""
 	}
-}
-
-// wantsColor reports whether ANSI color should be written to w: only when w is a
-// real terminal and NO_COLOR is absent, so piped or captured output stays plain.
-func wantsColor(w io.Writer) bool {
-	if noColor() {
-		return false
-	}
-	file, ok := w.(*os.File)
-	return ok && term.IsTerminal(file.Fd())
-}
-
-// noColor reports whether the NO_COLOR convention forbids color: the variable is
-// present, regardless of its value, even an empty one.
-func noColor() bool {
-	_, ok := os.LookupEnv("NO_COLOR")
-	return ok
 }

@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/Omochice/nyctereutes/internal/color"
 	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
@@ -724,15 +725,6 @@ const (
 	ciStatusPending = "pending"
 )
 
-// ANSI 256-color indices used to tint the status column and warning marker,
-// matching the upstream glab-dep palette.
-const (
-	colorGreen  = "42"
-	colorRed    = "196"
-	colorYellow = "226"
-	colorGray   = "240"
-)
-
 // The marker shown for an MR that cannot be merged.
 const warnGlyph = "⚠"
 
@@ -743,19 +735,19 @@ func styledCISymbol(status string) string {
 	glyph := ciSymbol(status)
 	switch status {
 	case ciStatusSuccess:
-		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorGreen)).Render(glyph)
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(color.Green)).Render(glyph)
 	case ciStatusFailure:
-		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorRed)).Render(glyph)
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(color.Red)).Render(glyph)
 	case ciStatusPending:
-		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorYellow)).Render(glyph)
+		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(color.Yellow)).Render(glyph)
 	default:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorGray)).Render(glyph)
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(color.Gray)).Render(glyph)
 	}
 }
 
 // Renders the unmergeable warning marker in bold red.
 func styledWarn() string {
-	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorRed)).Render(warnGlyph)
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(color.Red)).Render(warnGlyph)
 }
 
 // Maps a normalized pipeline status to a single-column glyph, matching the

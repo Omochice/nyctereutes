@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/internal/color"
 	"github.com/Omochice/nyctereutes/internal/infra/repository"
 )
 
@@ -53,7 +54,7 @@ func (c *infraApplyCommand) Execute(args []string) error {
 		return c.result(failures)
 	}
 
-	c.printPlans(plans, wantsColor(c.inout.Stdout))
+	c.printPlans(plans, color.Enabled(c.inout.Stdout))
 	if c.AutoApprove || c.confirm() {
 		failures += c.applyPlans(ctx, plans)
 	} else {

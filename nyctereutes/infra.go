@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/internal/color"
 	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 	"github.com/Omochice/nyctereutes/internal/infra/repository"
@@ -228,7 +229,7 @@ func (c *infraPlanCommand) Execute(args []string) error {
 
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
-	colorize := wantsColor(c.inout.Stdout)
+	colorize := color.Enabled(c.inout.Stdout)
 	changed := 0
 	failures := 0
 	for _, path := range args {
