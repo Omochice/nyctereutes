@@ -35,10 +35,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests with coverage
-        # -coverpkg credits every package, not just the one under test, because
-        # the command packages are driven through the CLI tests that live beside
-        # the dispatcher rather than from inside those packages.
-        run: nix develop --command go test -coverpkg=./... -coverprofile=coverage.out ./...
+        run: nix develop --command go test -coverprofile=coverage.out ./...
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage
