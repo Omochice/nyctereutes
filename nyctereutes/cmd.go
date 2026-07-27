@@ -10,6 +10,8 @@ import (
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/nyctereutes/dep"
+	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
 // Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
@@ -34,7 +36,7 @@ type helpCommand struct {
 }
 
 // Signals that an Execute has already written its own diagnostics to stderr,
-// so dispatch must only translate the failure into a non-zero exit instead of
+// so Dispatch must only translate the failure into a non-zero exit instead of
 // reporting it a second time.
 var errAlreadyReported = errors.New("failure already reported")
 
@@ -46,7 +48,7 @@ func (c *helpCommand) Execute(args []string) error {
 		terminator = len(args)
 	}
 	helpArgs := slices.Insert(slices.Clone(args), terminator, "--help")
-	if dispatch(helpArgs, c.inout, c.runner) != 0 {
+	if Dispatch(helpArgs, c.inout, c.runner) != 0 {
 		return errAlreadyReported
 	}
 	return nil
@@ -54,23 +56,25 @@ func (c *helpCommand) Execute(args []string) error {
 
 type options struct {
 	Version    bool            `short:"v" long:"version" description:"show version"`
-	Dep        *depCommand     `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
-	Infra      *infraCommand   `command:"infra" description:"manage infrastructure"`
+	Dep        *dep.Command    `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
+	Infra      *infra.Command  `command:"infra" description:"manage infrastructure"`
 	Help       *helpCommand    `command:"help" description:"show help"`
 	VersionCmd *versionCommand `command:"version" description:"show version"`
 }
 
 // The production entry point; it drives the real glab CLI.
 func MainCommand(args []string, inout *cli.ProcInout) int {
-	return dispatch(args, inout, glab.ExecRunner{})
+	return Dispatch(args, inout, glab.ExecRunner{})
 }
 
-// Parses args and runs the selected subcommand. The runner is injected
-// so tests can drive the commands with a fake glab instead of the real CLI.
-func dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
+// Parses args, runs the selected subcommand, and returns the process exit
+// code. The glab runner is a parameter because it is the whole command tree's
+// only external dependency: production passes the real CLI, and each command
+// package's tests pass a fake to drive the tree from the outside.
+func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
-		Dep:        newDepCommand(inout, runner),
-		Infra:      newInfraCommand(inout, runner),
+		Dep:        dep.New(inout, runner),
+		Infra:      infra.New(inout, runner),
 		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
 	}

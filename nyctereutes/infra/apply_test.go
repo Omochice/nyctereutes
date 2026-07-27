@@ -1,4 +1,4 @@
-package nyctereutes
+package infra_test
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/nyctereutes"
 )
 
 // fakeApplyGlab serves project reads from a map and records every write call so
@@ -68,7 +69,7 @@ var errFetch500 = errors.New("500 Internal Server Error")
 // can be answered.
 func runInfraApply(stdin string, runner glab.Runner, args ...string) (exit int, stdout, stderr string) {
 	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
-	exit = dispatch(args, &cli.ProcInout{
+	exit = nyctereutes.Dispatch(args, &cli.ProcInout{
 		Stdin:  strings.NewReader(stdin),
 		Stdout: outBuf,
 		Stderr: errBuf,
@@ -115,7 +116,7 @@ func catalogMutationField(args []string) (string, bool) {
 }
 
 func TestInfraApplyRequiresPath(t *testing.T) {
-	exit, _, _ := runDep(&fakeApplyGlab{}, "infra", "apply")
+	exit, _, _ := runWithRunner(&fakeApplyGlab{}, "infra", "apply")
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when no path is given", exit)
 	}
@@ -125,7 +126,7 @@ func TestInfraApplyAutoApproveAppliesChanges(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest)
 	runner := &fakeApplyGlab{projects: map[string]string{targetGroupProj: projJSON}}
 
-	exit, stdout, _ := runDep(runner, "infra", "apply", "--auto-approve", path)
+	exit, stdout, _ := runWithRunner(runner, "infra", "apply", "--auto-approve", path)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 for an approved apply", exit)
@@ -161,7 +162,7 @@ func TestInfraApplyPublishesCatalogThroughMutation(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", catalogManifest)
 	runner := &fakeApplyGlab{projects: map[string]string{targetGroupProj: projJSON}}
 
-	exit, _, _ := runDep(runner, "infra", "apply", "--auto-approve", path)
+	exit, _, _ := runWithRunner(runner, "infra", "apply", "--auto-approve", path)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 for an approved apply", exit)

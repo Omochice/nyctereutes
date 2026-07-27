@@ -1,4 +1,4 @@
-package nyctereutes
+package infra_test
 
 import (
 	"os"
@@ -32,7 +32,7 @@ func brokenManifest() string {
 }
 
 func TestInfraValidateRequiresPath(t *testing.T) {
-	exit, _, _ := runDep(&fakeInfraGlab{}, "infra", "validate")
+	exit, _, _ := runWithRunner(&fakeInfraGlab{}, "infra", "validate")
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when no path is given", exit)
 	}
@@ -42,7 +42,7 @@ func TestInfraValidateSummarizesValidManifests(t *testing.T) {
 	stream := validManifest + "---\n" + strings.ReplaceAll(validManifest, "name: proj", "name: other")
 	path := writeManifest(t, t.TempDir(), "a.yaml", stream)
 
-	exit, stdout, _ := runDep(&fakeInfraGlab{}, "infra", "validate", path)
+	exit, stdout, _ := runWithRunner(&fakeInfraGlab{}, "infra", "validate", path)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 for a valid manifest", exit)
@@ -57,7 +57,7 @@ func TestInfraValidateSummarizesValidManifests(t *testing.T) {
 func TestInfraValidateReportsDocumentPosition(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", validManifest+"---\n"+brokenManifest())
 
-	exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", path)
+	exit, _, stderr := runWithRunner(&fakeInfraGlab{}, "infra", "validate", path)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when a document is invalid", exit)
@@ -76,7 +76,7 @@ func TestInfraValidateContinuesPastBrokenFile(t *testing.T) {
 	first := writeManifest(t, dir, "a.yaml", brokenManifest())
 	second := writeManifest(t, dir, "b.yaml", brokenManifest())
 
-	exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", first, second)
+	exit, _, stderr := runWithRunner(&fakeInfraGlab{}, "infra", "validate", first, second)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when documents are invalid", exit)
@@ -101,7 +101,7 @@ func TestInfraValidateWalksDirectoryNonRecursively(t *testing.T) {
 	}
 	writeManifest(t, sub, "d.yaml", brokenManifest())
 
-	exit, stdout, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", dir)
+	exit, stdout, stderr := runWithRunner(&fakeInfraGlab{}, "infra", "validate", dir)
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0: c.txt and sub/d.yaml are not targets\n%s", exit, stderr)
@@ -117,7 +117,7 @@ func TestInfraValidateMatchesExtensionsCaseInsensitively(t *testing.T) {
 	dir := t.TempDir()
 	writeManifest(t, dir, "A.YAML", brokenManifest())
 
-	exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", dir)
+	exit, _, stderr := runWithRunner(&fakeInfraGlab{}, "infra", "validate", dir)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1: A.YAML must be validated despite its case", exit)
@@ -131,7 +131,7 @@ func TestInfraValidateReportsMissingPath(t *testing.T) {
 	dir := t.TempDir()
 	good := writeManifest(t, dir, "a.yaml", validManifest)
 
-	exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", filepath.Join(dir, "nope.yaml"), good)
+	exit, _, stderr := runWithRunner(&fakeInfraGlab{}, "infra", "validate", filepath.Join(dir, "nope.yaml"), good)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 when a path does not exist", exit)
@@ -148,7 +148,7 @@ func TestInfraValidateRejectsDirectoryWithoutManifests(t *testing.T) {
 	dir := t.TempDir()
 	writeManifest(t, dir, "readme.txt", "not a manifest")
 
-	exit, _, stderr := runDep(&fakeInfraGlab{}, "infra", "validate", dir)
+	exit, _, stderr := runWithRunner(&fakeInfraGlab{}, "infra", "validate", dir)
 
 	if exit != 1 {
 		t.Errorf("exit = %d, want 1 for a directory without manifest files", exit)
@@ -161,7 +161,7 @@ func TestInfraValidateRejectsDirectoryWithoutManifests(t *testing.T) {
 func TestInfraValidateAcceptsEmptyFile(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "empty.yaml", "")
 
-	exit, stdout, _ := runDep(&fakeInfraGlab{}, "infra", "validate", path)
+	exit, stdout, _ := runWithRunner(&fakeInfraGlab{}, "infra", "validate", path)
 
 	if exit != 0 {
 		t.Errorf("exit = %d, want 0 for an empty file", exit)

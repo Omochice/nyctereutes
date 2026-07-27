@@ -2,6 +2,7 @@ package nyctereutes
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -22,6 +23,18 @@ func runOut(args []string) (exit int, stdout, stderr string) {
 		Stderr: errBuf,
 	})
 	return exit, outBuf.String(), errBuf.String()
+}
+
+// Answers an MR search with an empty list. The help tests need a runner only
+// so the tree can be built; reaching it at all would mean help executed the
+// target command, which is exactly what they assert never happens.
+type fakeHelpGlab struct{}
+
+func (fakeHelpGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	if args[0] == "api" {
+		return []byte(`[]`), nil
+	}
+	return nil, nil
 }
 
 func TestVersionReportsVersion(t *testing.T) {
@@ -99,15 +112,27 @@ func TestHelpMatchesHelpFlag(t *testing.T) {
 }
 
 func TestHelpNeverExecutesTheTargetCommand(t *testing.T) {
-	fake := &fakeGlab{listJSON: oneMR, detailJSON: `{}`}
-	refExit, wantUsage, _ := runDep(fake, "dep", "list", "--help")
+	// The fake runner is local to this test: the command packages have their
+	// own harness for driving the tree, and only the help path needs an
+	// injected runner here.
+	runFake := func(args ...string) (exit int, stdout, stderr string) {
+		outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
+		exit = Dispatch(args, &cli.ProcInout{
+			Stdin:  strings.NewReader(""),
+			Stdout: outBuf,
+			Stderr: errBuf,
+		}, fakeHelpGlab{})
+		return exit, outBuf.String(), errBuf.String()
+	}
+
+	refExit, wantUsage, _ := runFake("dep", "list", "--help")
 	if refExit != 0 || wantUsage == "" {
 		t.Fatalf("dep list --help must supply the reference usage text, got exit %d stdout %q", refExit, wantUsage)
 	}
 
 	// The outer parser consumes the first "--", so one terminator survives
 	// into the help command's arguments.
-	exit, stdout, stderr := runDep(fake, "help", "dep", "list", "--", "--")
+	exit, stdout, stderr := runFake("help", "dep", "list", "--", "--")
 
 	if exit != 0 {
 		t.Errorf("want exit status 0, got %d (stderr=%q)", exit, stderr)
