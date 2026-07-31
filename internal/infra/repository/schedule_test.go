@@ -153,6 +153,28 @@ func TestFetchRepositoryListsSchedulesAcrossPages(t *testing.T) {
 	}
 }
 
+// In --paginate mode glab writes one JSON array per page back to back, so the
+// whole output is not a single JSON value. A reader that decoded once would
+// keep the first page and drop the rest without reporting anything.
+func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
+	const twoPages = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]
+[{"id":2,"description":"weekly","ref":"refs/heads/main","cron":"0 9 * * 1"}]`
+
+	schedules, err := NewClient(scheduleRunner(twoPages, nil)).
+		FetchSchedules(context.Background(), ownerGroup, nameProj)
+	if err != nil {
+		t.Fatalf("FetchSchedules: %v", err)
+	}
+
+	descriptions := make([]string, 0, len(schedules))
+	for _, schedule := range schedules {
+		descriptions = append(descriptions, schedule.Description)
+	}
+	if want := []string{"nightly", "weekly"}; !slices.Equal(descriptions, want) {
+		t.Errorf("descriptions = %v, want %v from both pages", descriptions, want)
+	}
+}
+
 func TestFetchRepositoryParsesSchedules(t *testing.T) {
 	schedules, err := NewClient(scheduleRunner(scheduleListJSON, nil)).
 		FetchSchedules(context.Background(), "group", "proj")
