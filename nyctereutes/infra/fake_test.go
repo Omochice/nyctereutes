@@ -21,9 +21,9 @@ var (
 	errUnexpectedGlab = errors.New("unexpected glab call")
 )
 
-// catalogRead reports whether args is the GraphQL isCatalogResource query
-// FetchRepository issues after the REST fetch, returning the fullPath it
-// targets. The fakes answer it so a project read completes both calls.
+// Reports whether args is the GraphQL isCatalogResource query FetchRepository
+// issues after the REST fetch, returning the fullPath it targets. The fakes
+// answer it so a project read completes both calls.
 func catalogRead(args []string) (fullPath string, ok bool) {
 	if len(args) < 2 || args[0] != "api" || args[1] != "graphql" {
 		return "", false
@@ -40,7 +40,7 @@ func catalogRead(args []string) (fullPath string, ok bool) {
 	return "", false
 }
 
-// catalogBody is the GraphQL response body for a project's catalog status.
+// The GraphQL response body for a project's catalog status.
 func catalogBody(isResource bool) []byte {
 	return fmt.Appendf(nil, `{"data":{"project":{"isCatalogResource":%t}}}`, isResource)
 }

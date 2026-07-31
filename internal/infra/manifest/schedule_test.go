@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// scheduleDoc declares one fully spelled-out schedule, so a decode test can
-// assert every attribute without relying on a default.
+// One fully spelled-out schedule, so a decode test can assert every attribute
+// without a default standing in for a declared one.
 const scheduleDoc = `apiVersion: nyctereutes/v1
 kind: Repository
 metadata:
@@ -24,7 +24,8 @@ spec:
       active: false
 `
 
-// scheduleDocWithRef builds a document whose single schedule targets ref.
+// Varies only the ref, so a test about ref shapes states the shape it means and
+// nothing else.
 func scheduleDocWithRef(ref string) []byte {
 	return []byte(`apiVersion: nyctereutes/v1
 kind: Repository
@@ -147,9 +148,8 @@ func TestParseRejectsUnknownKeyInsideASchedule(t *testing.T) {
 	}
 }
 
-// GitLab requires all three on create and rejects a blank description, so a
-// schedule missing one could never apply. Catching it here turns a remote
-// rejection into a local validation error naming the field.
+// A schedule omitting description, ref or cron is rejected at parse time, and
+// the error names the omitted field and the schedule's position.
 func TestParseRequiresScheduleFields(t *testing.T) {
 	for _, testCase := range []struct {
 		name  string
@@ -333,9 +333,8 @@ func TestParseReadsPipelineSchedules(t *testing.T) {
 	}
 }
 
-// Decoding expands a bare ref, so a document holding one would not decode back
-// to itself and Marshal's round-trip check would reject it with an error naming
-// no field. Emitting the canonical form keeps the two sides agreeing.
+// A document whose schedule holds a bare ref still marshals, and the emitted
+// ref is the expanded form.
 func TestMarshalSurvivesABareRef(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.PipelineSchedules[0].Ref = "main"

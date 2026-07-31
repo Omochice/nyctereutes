@@ -202,8 +202,9 @@ func enumValue(data []byte, kind string, allowed ...string) (string, error) {
 	return value, nil
 }
 
-// The GitLab project basic settings. Pointer fields distinguish "unset" (omitted
-// from YAML) from a zero value that is an intentional setting.
+// What a document declares about a GitLab project: its basic settings, then the
+// child resources it owns. Pointer fields distinguish "unset" (omitted from
+// YAML) from a zero value that is an intentional setting.
 type RepositorySpec struct {
 	Description *string     `yaml:"description,omitempty"`
 	Visibility  *Visibility `yaml:"visibility,omitempty"`

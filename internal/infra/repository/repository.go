@@ -196,8 +196,12 @@ func parseProject(out []byte) (*CurrentState, error) {
 	return &CurrentState{rawProject: raw}, nil
 }
 
-// Converts current state into a Repository manifest document, emitting only the
-// GitLab basic settings.
+// Converts current state into a Repository manifest document: the GitLab basic
+// settings and the pipeline schedules the state carries.
+//
+// A state whose schedules were never read emits an empty list, which declares
+// that the project should own none, so only a caller that has read them may
+// emit the result.
 func ToManifest(state *CurrentState) *manifest.Repository {
 	return &manifest.Repository{
 		APIVersion: manifest.APIVersion,

@@ -169,8 +169,9 @@ func parseDocument(frag documentFragment) (*Repository, error) {
 	return &repo, nil
 }
 
-// The required-field checks the schema types cannot express themselves:
-// metadata must address a GitLab project.
+// The checks the schema types cannot express themselves: metadata must address
+// a GitLab project, the catalog needs a description, and the schedules must be
+// individually valid and distinctly described.
 func (repo *Repository) validate() error {
 	if repo.Metadata.Name == "" {
 		return fmt.Errorf("%w: metadata.name", errRequiredField)

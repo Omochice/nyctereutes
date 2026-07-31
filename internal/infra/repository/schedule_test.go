@@ -20,17 +20,17 @@ const scheduleListJSON = `[
    "cron_timezone":"Asia/Tokyo","active":false,"next_run_at":null}
 ]`
 
-// isScheduleCall reports whether args address the pipeline schedules endpoint,
-// so a runner can tell that read apart from the project fetch.
+// Reports whether args address the pipeline schedules endpoint, so a runner can
+// tell that read apart from the project fetch.
 func isScheduleCall(args []string) bool {
 	return slices.ContainsFunc(args, func(arg string) bool {
 		return strings.Contains(arg, "pipeline_schedules")
 	})
 }
 
-// scheduleRunner answers the calls a fetch makes: the GraphQL catalog query,
-// the schedule list, one variables read per schedule, and the project itself.
-// Schedules answer with no variables; a test about variables builds its own.
+// Answers the calls a fetch makes: the GraphQL catalog query, the schedule list
+// from listJSON, and the project itself. The args of the schedule call go to
+// record when one is given, which is what the tests about paging assert on.
 func scheduleRunner(listJSON string, record *[]string) glab.RunnerFunc {
 	return func(_ context.Context, args ...string) ([]byte, error) {
 		switch {
@@ -47,10 +47,9 @@ func scheduleRunner(listJSON string, record *[]string) glab.RunnerFunc {
 	}
 }
 
-// GitLab accepts two schedules described alike on one project, but a manifest
-// pairs a declared schedule with a live one by description, so such a project
-// cannot be described at all. Reporting it names both ids because renaming one
-// of them in the UI is what the reader has to do.
+// A project whose live schedules repeat a description is rejected, and the
+// error names the description and both ids, which is what the reader needs to
+// find the pair and rename one.
 func TestFetchRepositoryRejectsDuplicateLiveDescriptions(t *testing.T) {
 	const duplicateJSON = `[
 	  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC","active":true},
@@ -72,9 +71,8 @@ func TestFetchRepositoryRejectsDuplicateLiveDescriptions(t *testing.T) {
 	}
 }
 
-// A schedule read can fail or be ambiguous on its own terms, so folding it into
-// the project read would let a schedule problem hide every other setting the
-// project drifts in. A project read therefore asks for no schedule at all.
+// A project read asks for no schedule at all and leaves the field unset, which
+// is the separation [Client.FetchRepository] documents.
 func TestFetchRepositoryDoesNotReadSchedules(t *testing.T) {
 	var scheduleCalls int
 	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
@@ -101,10 +99,9 @@ func TestFetchRepositoryDoesNotReadSchedules(t *testing.T) {
 	}
 }
 
-// GitLab lists schedules in id order, which is creation order, so a schedule
-// deleted and recreated moves. A manifest is a file under version control, so
-// the same live state has to produce the same bytes; ordering by description,
-// which the schema already forces to be unique, does that.
+// Schedules reach the manifest ordered by description rather than in the id
+// order GitLab lists them in, and each one's live attributes are carried
+// through unchanged.
 func TestToManifestSortsSchedulesByDescription(t *testing.T) {
 	state := &CurrentState{
 		Owner: ownerGroup,
@@ -133,9 +130,8 @@ func TestToManifestSortsSchedulesByDescription(t *testing.T) {
 	}
 }
 
-// The list endpoint pages at 20 while an instance can raise the schedule limit
-// above that, so the read asks glab to follow every page rather than silently
-// describing a project by its first page alone.
+// The read asks glab for --paginate against the encoded schedules endpoint, so
+// a project is not described by its first page alone.
 func TestFetchRepositoryListsSchedulesAcrossPages(t *testing.T) {
 	var args []string
 	_, err := NewClient(scheduleRunner(scheduleListJSON, &args)).
