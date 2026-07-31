@@ -175,6 +175,38 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 	}
 }
 
+// An empty list is a declaration in the manifest, so a response that carries no
+// list at all must not be read as one. Exporting it would say every schedule the
+// project owns should be removed.
+func TestFetchSchedulesRefusesAResponseWithoutAList(t *testing.T) {
+	for name, body := range map[string]string{
+		"empty":      "",
+		"whitespace": "  \n",
+		"null":       "null",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewClient(scheduleRunner(body, nil)).
+				FetchSchedules(context.Background(), ownerGroup, nameProj)
+			if !errors.Is(err, errNoSchedulePage) {
+				t.Errorf("error = %v, want it to wrap errNoSchedulePage", err)
+			}
+		})
+	}
+}
+
+// A project that genuinely owns no schedule answers with an empty list, which
+// stays a successful read of zero schedules.
+func TestFetchSchedulesReadsAnEmptyListAsNoSchedules(t *testing.T) {
+	schedules, err := NewClient(scheduleRunner("[]", nil)).
+		FetchSchedules(context.Background(), ownerGroup, nameProj)
+	if err != nil {
+		t.Fatalf("FetchSchedules: %v", err)
+	}
+	if len(schedules) != 0 {
+		t.Errorf("schedules = %+v, want none", schedules)
+	}
+}
+
 func TestFetchRepositoryParsesSchedules(t *testing.T) {
 	schedules, err := NewClient(scheduleRunner(scheduleListJSON, nil)).
 		FetchSchedules(context.Background(), "group", "proj")
