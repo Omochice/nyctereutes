@@ -37,21 +37,14 @@ func graphqlCatalogJSON(isResource bool) string {
 	return fmt.Sprintf(`{"data":{"project":{"isCatalogResource":%t}}}`, isResource)
 }
 
-// A fake glab that answers the calls FetchRepository makes: the GraphQL catalog
-// query, the pipeline schedule list, and for every other argument set the REST
-// project fetch. Tests about schedules build their own runner.
+// A fake glab that answers both calls FetchRepository makes: the GraphQL
+// catalog query and, for every other argument set, the REST project fetch.
 func fakeRunner(projectJSON string, catalog bool) glab.RunnerFunc {
 	return func(_ context.Context, args ...string) ([]byte, error) {
-		switch {
-		case len(args) > 1 && args[1] == "graphql":
+		if len(args) > 1 && args[1] == "graphql" {
 			return []byte(graphqlCatalogJSON(catalog)), nil
-		case slices.ContainsFunc(args, func(arg string) bool {
-			return strings.Contains(arg, "pipeline_schedules")
-		}):
-			return []byte("[]"), nil
-		default:
-			return []byte(projectJSON), nil
 		}
+		return []byte(projectJSON), nil
 	}
 }
 
@@ -67,19 +60,15 @@ func wantPtr[Value ~string](t *testing.T, name string, got *Value, want string) 
 	}
 }
 
-// projectRecordingRunner answers every call a fetch makes while recording the
-// args of the project request alone, which is the one these tests assert on.
+// Records the args of the project request alone, which is the one these tests
+// assert on; the catalog query is answered but not recorded.
 func projectRecordingRunner(gotArgs *[]string) glab.RunnerFunc {
 	return func(_ context.Context, args ...string) ([]byte, error) {
-		switch {
-		case len(args) > 1 && args[1] == "graphql":
+		if len(args) > 1 && args[1] == "graphql" {
 			return []byte(graphqlCatalogJSON(false)), nil
-		case isScheduleCall(args):
-			return []byte("[]"), nil
-		default:
-			*gotArgs = args
-			return []byte(sampleProjectJSON), nil
 		}
+		*gotArgs = args
+		return []byte(sampleProjectJSON), nil
 	}
 }
 
@@ -125,9 +114,6 @@ func TestFetchRepositoryReadsCatalogResource(t *testing.T) {
 		if len(args) > 1 && args[1] == "graphql" {
 			graphqlArgs = args
 			return []byte(graphqlCatalogJSON(true)), nil
-		}
-		if isScheduleCall(args) {
-			return []byte("[]"), nil
 		}
 		return []byte(sampleProjectJSON), nil
 	})
