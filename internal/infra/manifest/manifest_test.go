@@ -54,6 +54,13 @@ func fullRepository() *Repository {
 				Infrastructure:        new(levelEnabled),
 				Releases:              new(levelEnabled),
 			},
+			PipelineSchedules: []PipelineSchedule{{
+				Description:  "nightly",
+				Ref:          "refs/heads/main",
+				Cron:         "0 3 * * *",
+				CronTimezone: "UTC",
+				Active:       true,
+			}},
 		},
 	}
 }
@@ -74,6 +81,8 @@ func settingsUIKeyOrder() []string {
 		"wiki", "snippets", "package_registry", "model_experiments", "model_registry",
 		"pages", "monitor", "environments", "feature_flags", "infrastructure",
 		"releases",
+		"pipeline_schedules",
+		"description", "ref", "cron", "cron_timezone", "active",
 	}
 }
 

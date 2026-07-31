@@ -25,6 +25,9 @@ type CurrentState struct {
 	// GitLab's isCatalogResource, read over GraphQL because the projects REST
 	// endpoint does not carry the catalog status.
 	CatalogResource bool
+	// The schedules the project owns, read from their own endpoint because the
+	// projects response does not carry them.
+	PipelineSchedules []LiveSchedule
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -39,6 +42,12 @@ func NewClient(runner glab.Runner) *Client {
 
 // Fetches one GitLab project's basic settings. A missing project (404) is not an
 // error: it yields a CurrentState with IsNew set, so the caller can report it.
+//
+// The schedules are not read here. They live behind endpoints of their own,
+// which can fail or be ambiguous on their own terms, and a manifest that
+// declares none has no use for them; folding that read in would let a schedule
+// problem hide every other setting the project drifts in. [Client.FetchSchedules]
+// is called separately by the commands that need them.
 func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*CurrentState, error) {
 	out, err := c.runner.Run(ctx, "api", "projects/"+glab.EncodePath(owner+"/"+name))
 	if err != nil {
@@ -214,6 +223,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			SquashCommitTemplate:                      (*string)(state.SquashCommitTemplate),
 			MergeRequestsTemplate:                     (*string)(state.MergeRequestsTemplate),
 			Features:                                  toFeatures(state),
+			PipelineSchedules:                         toManifestSchedules(state.PipelineSchedules),
 		},
 	}
 }

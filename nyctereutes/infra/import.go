@@ -53,6 +53,14 @@ func (c *importCommand) Execute(args []string) error {
 			fail("project %s not found on GitLab\n", target)
 			continue
 		}
+		// An exported document describes the whole project, so its schedules are
+		// always read; a command that only reconciles some settings need not.
+		schedules, err := client.FetchSchedules(ctx, owner, name)
+		if err != nil {
+			fail("%v\n", err)
+			continue
+		}
+		state.PipelineSchedules = schedules
 		data, err := manifest.Marshal(repository.ToManifest(state))
 		if err != nil {
 			fail("marshal %s: %v\n", target, err)

@@ -45,18 +45,53 @@ func catalogBody(isResource bool) []byte {
 	return fmt.Appendf(nil, `{"data":{"project":{"isCatalogResource":%t}}}`, isResource)
 }
 
+// scheduleRead reports whether args is the paginated pipeline schedule list
+// FetchRepository issues, returning the project it targets. The fakes answer it
+// so a project read completes, and the apply fake needs it to tell the call
+// apart from a write.
+func scheduleRead(args []string) (project string, ok bool) {
+	if len(args) != 3 || args[0] != "api" || args[1] != "--paginate" {
+		return "", false
+	}
+	endpoint, found := strings.CutPrefix(args[2], "projects/")
+	if !found {
+		return "", false
+	}
+	encoded, found := strings.CutSuffix(endpoint, "/pipeline_schedules")
+	if !found {
+		return "", false
+	}
+	path, err := url.PathUnescape(encoded)
+	if err != nil {
+		return "", false
+	}
+	return path, true
+}
+
+// scheduleBody is the list response for a project, defaulting to no schedules.
+func scheduleBody(schedules map[string]string, project string) []byte {
+	if body, ok := schedules[project]; ok {
+		return []byte(body)
+	}
+	return []byte("[]")
+}
+
 // fakeInfraGlab answers `glab api projects/<enc>` from a project map and the
 // catalog GraphQL query from a catalog map; an absent project yields a 404
 // error so the importer treats it as missing. Any other glab invocation is an
 // error so unexpected calls fail the test loudly.
 type fakeInfraGlab struct {
-	projects map[string]string // "owner/name" -> project JSON
-	catalog  map[string]bool   // "owner/name" -> catalog status, default false
+	projects  map[string]string // "owner/name" -> project JSON
+	catalog   map[string]bool   // "owner/name" -> catalog status, default false
+	schedules map[string]string // "owner/name" -> schedule list JSON, default none
 }
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if path, ok := catalogRead(args); ok {
 		return catalogBody(f.catalog[path]), nil
+	}
+	if path, ok := scheduleRead(args); ok {
+		return scheduleBody(f.schedules, path), nil
 	}
 	if len(args) != 2 || args[0] != "api" || !strings.HasPrefix(args[1], "projects/") {
 		return nil, fmt.Errorf("%w: %v", errUnexpectedGlab, args)

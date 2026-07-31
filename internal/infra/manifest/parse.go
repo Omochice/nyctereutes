@@ -187,5 +187,25 @@ func (repo *Repository) validate() error {
 			return fmt.Errorf("%w: spec.description is required when spec.ci_catalog is true", errRequiredField)
 		}
 	}
+	return validateSchedules(repo.Spec.PipelineSchedules)
+}
+
+// Signals two schedules in one document sharing a description.
+var errDuplicateSchedule = errors.New("duplicate pipeline schedule description")
+
+// Checks each schedule and rejects a repeated description. The description is
+// what pairs a declared schedule with a live one, and GitLab does not enforce
+// uniqueness, so a repeat would leave that pairing undecidable.
+func validateSchedules(schedules []PipelineSchedule) error {
+	seen := make(map[string]struct{}, len(schedules))
+	for index, schedule := range schedules {
+		if err := schedule.validate(index); err != nil {
+			return err
+		}
+		if _, repeated := seen[schedule.Description]; repeated {
+			return fmt.Errorf("%w: %q", errDuplicateSchedule, schedule.Description)
+		}
+		seen[schedule.Description] = struct{}{}
+	}
 	return nil
 }

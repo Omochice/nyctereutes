@@ -122,3 +122,64 @@ func TestInfraImportRejectsMalformedTarget(t *testing.T) {
 		})
 	}
 }
+
+// A project's schedules belong in its manifest, so the emitted document has to
+// carry them rather than the empty list that would describe every one of them
+// as a schedule to remove.
+func TestInfraImportEmitsPipelineSchedules(t *testing.T) {
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: `[
+		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *",
+		   "cron_timezone":"UTC","active":true},
+		  {"id":2,"description":"full ref","ref":"refs/tags/v1.0.0","cron":"0 5 * * *",
+		   "cron_timezone":"Asia/Tokyo","active":false}]`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0\n%s", exit, stderr)
+	}
+	for _, want := range []string{
+		"pipeline_schedules:",
+		"description: full ref",
+		"ref: refs/tags/v1.0.0",
+		`cron: 0 5 * * *`,
+		"cron_timezone: Asia/Tokyo",
+		"active: false",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+	// Sorted by description, so "full ref" precedes "nightly" despite its id.
+	if strings.Index(stdout, "full ref") > strings.Index(stdout, "description: nightly") {
+		t.Errorf("schedules are not sorted by description\n%s", stdout)
+	}
+}
+
+// A project whose live schedules repeat a description cannot be described by a
+// manifest at all, so it is reported and skipped while the other projects in
+// the same run are still emitted.
+func TestInfraImportReportsDuplicateSchedulesAndContinues(t *testing.T) {
+	const otherProject = "group/other"
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON, otherProject: projJSON},
+		schedules: map[string]string{targetGroupProj: `[
+		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"},
+		  {"id":5,"description":"nightly","ref":"refs/heads/main","cron":"0 8 * * *"}]`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj, otherProject)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a project cannot be described", exit)
+	}
+	if !strings.Contains(stderr, "nightly") {
+		t.Errorf("stderr missing the repeated description\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "name: other") {
+		t.Errorf("stdout missing the healthy project, later projects must still be emitted\n%s", stdout)
+	}
+}

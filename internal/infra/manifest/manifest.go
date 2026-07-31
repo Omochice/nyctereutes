@@ -33,14 +33,7 @@ var errInvalidValue = errors.New("invalid value")
 // back as empty. The attempts run from prettiest to safest; JSON escaping
 // represents every string.
 func Marshal(doc *Repository) ([]byte, error) {
-	// topics carries no omitempty, so nil and empty emit identically as [] and
-	// the document cannot express the difference; canonicalizing nil up front
-	// keeps the round-trip comparison free of field-specific carve-outs.
-	if doc.Spec.Topics == nil {
-		canonical := *doc
-		canonical.Spec.Topics = []string{}
-		doc = &canonical
-	}
+	doc = canonicalizeLists(doc)
 
 	attempts := [][]goyaml.EncodeOption{
 		{goyaml.UseLiteralStyleIfMultiline(true)},
@@ -60,6 +53,26 @@ func Marshal(doc *Repository) ([]byte, error) {
 		return out, nil
 	}
 	return nil, fmt.Errorf("%w: %w", errNotRoundTrippable, lastErr)
+}
+
+// Puts a document into the form decoding it back would produce, so the
+// round-trip comparison below is not tripped by a value the schema itself
+// rewrites. Two rewrites exist: a list field that carries no omitempty emits as
+// [] whether it is nil or empty, and a bare ref decodes as a branch ref.
+func canonicalizeLists(doc *Repository) *Repository {
+	canonical := *doc
+	if canonical.Spec.Topics == nil {
+		canonical.Spec.Topics = []string{}
+	}
+	if canonical.Spec.PipelineSchedules == nil {
+		canonical.Spec.PipelineSchedules = []PipelineSchedule{}
+	}
+	canonical.Spec.PipelineSchedules = slices.Clone(canonical.Spec.PipelineSchedules)
+	for index := range canonical.Spec.PipelineSchedules {
+		schedule := &canonical.Spec.PipelineSchedules[index]
+		schedule.Ref = CanonicalRef(schedule.Ref)
+	}
+	return &canonical
 }
 
 // Reports why out does not decode back into a document equal to doc, or nil
@@ -223,6 +236,11 @@ type RepositorySpec struct {
 	SquashCommitTemplate  *string             `yaml:"squash_commit_template,omitempty"`
 	MergeRequestsTemplate *string             `yaml:"merge_requests_template,omitempty"`
 	Features              *RepositoryFeatures `yaml:"features,omitempty"`
+	// Placed after the project's own settings because a schedule is a child
+	// resource rather than a setting. No omitempty, for the reason topics
+	// carries none: an explicit empty list declares that no schedule should
+	// exist and must survive export.
+	PipelineSchedules []PipelineSchedule `yaml:"pipeline_schedules"`
 }
 
 // The per-feature access levels of a GitLab project; an unset feature is
