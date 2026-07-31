@@ -85,15 +85,15 @@ func (ref *Ref) UnmarshalYAML(unmarshal func(any) error) error {
 	if err := unmarshal(&value); err != nil {
 		return fmt.Errorf("decode ref: %w", err)
 	}
-	*ref = CanonicalRef(Ref(value))
+	*ref = canonicalRef(Ref(value))
 	return nil
 }
 
-// Expands a bare name to a branch ref, which is what decoding does. Emitters
-// share this so a document they produce decodes back to itself; a bare ref that
-// only decoding expanded would fail Marshal's round-trip check with an error
+// Expands a bare name to a branch ref, which is what decoding does. Marshal
+// applies it too, because a document built in memory never decodes; a bare ref
+// that only decoding expanded would fail the round-trip check with an error
 // naming no field.
-func CanonicalRef(ref Ref) Ref {
+func canonicalRef(ref Ref) Ref {
 	if ref == "" || strings.HasPrefix(string(ref), "refs/") {
 		return ref
 	}

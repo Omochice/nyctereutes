@@ -75,7 +75,7 @@ func toManifestSchedules(live []LiveSchedule) []manifest.PipelineSchedule {
 	for _, schedule := range live {
 		schedules = append(schedules, manifest.PipelineSchedule{
 			Description:  schedule.Description,
-			Ref:          manifest.CanonicalRef(manifest.Ref(schedule.Ref)),
+			Ref:          manifest.Ref(schedule.Ref),
 			Cron:         schedule.Cron,
 			CronTimezone: schedule.CronTimezone,
 			Active:       schedule.Active,

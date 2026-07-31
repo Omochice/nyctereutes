@@ -70,7 +70,7 @@ func canonicalizeLists(doc *Repository) *Repository {
 	canonical.Spec.PipelineSchedules = slices.Clone(canonical.Spec.PipelineSchedules)
 	for index := range canonical.Spec.PipelineSchedules {
 		schedule := &canonical.Spec.PipelineSchedules[index]
-		schedule.Ref = CanonicalRef(schedule.Ref)
+		schedule.Ref = canonicalRef(schedule.Ref)
 	}
 	return &canonical
 }
