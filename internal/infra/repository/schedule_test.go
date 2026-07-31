@@ -50,7 +50,7 @@ func scheduleRunner(listJSON string, record *[]string) glab.RunnerFunc {
 // A project whose live schedules repeat a description is rejected, and the
 // error names the description and both ids, which is what the reader needs to
 // find the pair and rename one.
-func TestFetchRepositoryRejectsDuplicateLiveDescriptions(t *testing.T) {
+func TestFetchSchedulesRejectsDuplicateDescriptions(t *testing.T) {
 	const duplicateJSON = `[
 	  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC","active":true},
 	  {"id":5,"description":"nightly","ref":"refs/heads/main","cron":"0 8 * * *","cron_timezone":"UTC","active":true}
@@ -132,7 +132,7 @@ func TestToManifestSortsSchedulesByDescription(t *testing.T) {
 
 // The read asks glab for --paginate against the encoded schedules endpoint, so
 // a project is not described by its first page alone.
-func TestFetchRepositoryListsSchedulesAcrossPages(t *testing.T) {
+func TestFetchSchedulesAsksGlabToPaginate(t *testing.T) {
 	var args []string
 	_, err := NewClient(scheduleRunner(scheduleListJSON, &args)).
 		FetchSchedules(context.Background(), "group/sub", "proj")
@@ -203,7 +203,7 @@ func TestFetchSchedulesReadsAnEmptyListAsNoSchedules(t *testing.T) {
 	}
 }
 
-func TestFetchRepositoryParsesSchedules(t *testing.T) {
+func TestFetchSchedulesParsesEveryAttribute(t *testing.T) {
 	schedules, err := NewClient(scheduleRunner(scheduleListJSON, nil)).
 		FetchSchedules(context.Background(), "group", "proj")
 	if err != nil {
