@@ -6,7 +6,7 @@ import (
 )
 
 func TestInfraImportEmitsYAML(t *testing.T) {
-	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+	runner := importFake(map[string]string{targetGroupProj: projJSON})
 	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
@@ -23,7 +23,7 @@ func TestInfraImportEmitsFeatureAccessLevels(t *testing.T) {
 	withFeatures := `{"description":"d","visibility":"private","topics":[],"archived":false,` +
 		`"issues_access_level":"enabled","wiki_access_level":"disabled","snippets_access_level":"private",` +
 		`"builds_access_level":"enabled","merge_requests_access_level":"private","container_registry_access_level":"enabled"}`
-	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: withFeatures}}
+	runner := importFake(map[string]string{targetGroupProj: withFeatures})
 	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
@@ -48,7 +48,7 @@ func TestInfraImportEmitsFeatureAccessLevels(t *testing.T) {
 
 func TestInfraImportOmitsEmptyFeatures(t *testing.T) {
 	noFeatures := `{"description":"d","visibility":"private","topics":[],"archived":false}`
-	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: noFeatures}}
+	runner := importFake(map[string]string{targetGroupProj: noFeatures})
 	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
@@ -61,7 +61,7 @@ func TestInfraImportOmitsEmptyFeatures(t *testing.T) {
 
 func TestInfraImportKeepsEmptyTopics(t *testing.T) {
 	noTopics := `{"description":"d","visibility":"private","topics":[],"archived":false}`
-	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: noTopics}}
+	runner := importFake(map[string]string{targetGroupProj: noTopics})
 	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
 
 	if exit != 0 {
@@ -73,10 +73,10 @@ func TestInfraImportKeepsEmptyTopics(t *testing.T) {
 }
 
 func TestInfraImportSeparatesMultipleDocs(t *testing.T) {
-	runner := &fakeInfraGlab{projects: map[string]string{
+	runner := importFake(map[string]string{
 		"group/a": projJSON,
 		"group/b": projJSON,
-	}}
+	})
 	exit, stdout, _ := runWithRunner(runner, "infra", "import", "group/a", "group/b")
 
 	if exit != 0 {
@@ -95,7 +95,7 @@ func TestInfraImportRequiresTarget(t *testing.T) {
 }
 
 func TestInfraImportContinuesPastMissing(t *testing.T) {
-	runner := &fakeInfraGlab{projects: map[string]string{"group/ok": projJSON}}
+	runner := importFake(map[string]string{"group/ok": projJSON})
 	exit, stdout, stderr := runWithRunner(runner, "infra", "import", "group/missing", "group/ok")
 
 	if exit != 1 {

@@ -45,10 +45,9 @@ func catalogBody(isResource bool) []byte {
 	return fmt.Appendf(nil, `{"data":{"project":{"isCatalogResource":%t}}}`, isResource)
 }
 
-// scheduleRead reports whether args is the paginated pipeline schedule list
-// FetchRepository issues, returning the project it targets. The fakes answer it
-// so a project read completes, and the apply fake needs it to tell the call
-// apart from a write.
+// Reports whether args is the paginated pipeline schedule list FetchSchedules
+// issues, returning the project it targets. Only import calls it; the fake uses
+// this to tell that read apart from the project fetch it must still guard.
 func scheduleRead(args []string) (project string, ok bool) {
 	if len(args) != 3 || args[0] != "api" || args[1] != "--paginate" {
 		return "", false
@@ -68,7 +67,8 @@ func scheduleRead(args []string) (project string, ok bool) {
 	return path, true
 }
 
-// scheduleBody is the list response for a project, defaulting to no schedules.
+// The list response for a project. A project absent from the map owns no
+// schedule, which is the answer GitLab gives for most of them.
 func scheduleBody(schedules map[string]string, project string) []byte {
 	if body, ok := schedules[project]; ok {
 		return []byte(body)
@@ -80,17 +80,22 @@ func scheduleBody(schedules map[string]string, project string) []byte {
 // catalog GraphQL query from a catalog map; an absent project yields a 404
 // error so the importer treats it as missing. Any other glab invocation is an
 // error so unexpected calls fail the test loudly.
+//
+// A nil schedules map keeps a schedule read inside that guard, so only a test
+// that declares the command reads schedules can make one. Answering it for
+// every command would let plan or apply grow a schedule read unnoticed, which
+// is the read FetchRepository is documented to keep out of them.
 type fakeInfraGlab struct {
 	projects  map[string]string // "owner/name" -> project JSON
 	catalog   map[string]bool   // "owner/name" -> catalog status, default false
-	schedules map[string]string // "owner/name" -> schedule list JSON, default none
+	schedules map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
 }
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if path, ok := catalogRead(args); ok {
 		return catalogBody(f.catalog[path]), nil
 	}
-	if path, ok := scheduleRead(args); ok {
+	if path, ok := scheduleRead(args); ok && f.schedules != nil {
 		return scheduleBody(f.schedules, path), nil
 	}
 	if len(args) != 2 || args[0] != "api" || !strings.HasPrefix(args[1], "projects/") {
@@ -104,6 +109,13 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 		return []byte(body), nil
 	}
 	return nil, errInfra404
+}
+
+// A fake for the import command, whose export reads schedules. The empty map
+// declares that read expected while leaving every project owning none, which is
+// what the tests that are not about schedules want.
+func importFake(projects map[string]string) *fakeInfraGlab {
+	return &fakeInfraGlab{projects: projects, schedules: map[string]string{}}
 }
 
 // Drives the whole command tree with an injected glab runner, which is how the
