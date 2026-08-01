@@ -32,38 +32,11 @@ func (c *importCommand) Execute(args []string) error {
 
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
-	fail := func(format string, msgArgs ...any) {
-		_, _ = fmt.Fprintf(c.inout.Stderr, format, msgArgs...)
-	}
 
 	emitted := 0
 	for _, target := range args {
-		owner, name, ok := splitTarget(target)
-		if !ok {
-			fail("skip %q: not in <owner/project> form\n", target)
-			continue
-		}
-		state, err := client.FetchRepository(ctx, owner, name)
-		if err != nil {
-			// The error already carries "fetch project <owner>/<name>" context.
-			fail("%v\n", err)
-			continue
-		}
-		if state.IsNew {
-			fail("project %s not found on GitLab\n", target)
-			continue
-		}
-		// An exported document describes the whole project, so its schedules are
-		// always read; a command that only reconciles some settings need not.
-		schedules, err := client.FetchSchedules(ctx, owner, name)
-		if err != nil {
-			fail("%v\n", err)
-			continue
-		}
-		state.PipelineSchedules = schedules
-		data, err := manifest.Marshal(repository.ToManifest(state))
-		if err != nil {
-			fail("marshal %s: %v\n", target, err)
+		data := c.document(ctx, client, target)
+		if data == nil {
 			continue
 		}
 		if emitted > 0 {
@@ -78,6 +51,47 @@ func (c *importCommand) Execute(args []string) error {
 		return fmt.Errorf("%w: %d of %d", errSomeImportsFailed, len(args)-emitted, len(args))
 	}
 	return nil
+}
+
+// Builds one target's manifest document, or nil when it cannot be described.
+// Each way of failing is reported here and answered with no document, which is
+// what keeps one target's failure from ending the run.
+func (c *importCommand) document(ctx context.Context, client *repository.Client, target string) []byte {
+	owner, name, ok := splitTarget(target)
+	if !ok {
+		c.failf("skip %q: not in <owner/project> form\n", target)
+		return nil
+	}
+	state, err := client.FetchRepository(ctx, owner, name)
+	if err != nil {
+		// The error already carries "fetch project <owner>/<name>" context.
+		c.failf("%v\n", err)
+		return nil
+	}
+	if state.IsNew {
+		c.failf("project %s not found on GitLab\n", target)
+		return nil
+	}
+	// An exported document describes the whole project, so its schedules are
+	// always read; a command that only reconciles some settings need not.
+	schedules, err := client.FetchSchedules(ctx, owner, name)
+	if err != nil {
+		c.failf("%v\n", err)
+		return nil
+	}
+	state.PipelineSchedules = schedules
+	data, err := manifest.Marshal(repository.ToManifest(state))
+	if err != nil {
+		c.failf("marshal %s: %v\n", target, err)
+		return nil
+	}
+	return data
+}
+
+// Reports a diagnostic on stderr, where a write failure is nothing the command
+// can act on: the stream it would use to say so is the one that just failed.
+func (c *importCommand) failf(format string, msgArgs ...any) {
+	_, _ = fmt.Fprintf(c.inout.Stderr, format, msgArgs...)
 }
 
 // Splits an "<owner>/<project>" target into its owner (which may itself be a
