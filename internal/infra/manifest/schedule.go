@@ -97,5 +97,5 @@ func canonicalRef(ref Ref) Ref {
 	if ref == "" || strings.HasPrefix(string(ref), "refs/") {
 		return ref
 	}
-	return Ref(branchRefPrefix + string(ref))
+	return branchRefPrefix + ref
 }
