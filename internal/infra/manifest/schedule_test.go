@@ -231,6 +231,44 @@ func TestMarshalKeepsAnEmptyScheduleList(t *testing.T) {
 	}
 }
 
+// A document that says nothing about the schedules must emit nothing about
+// them. Writing the empty list instead would turn silence into the declaration
+// that the project should own none, and Marshal's round-trip check would not
+// catch it because the emitted list decodes back into the same empty list.
+func TestMarshalOmitsUndeclaredSchedules(t *testing.T) {
+	doc := fullRepository()
+	doc.Spec.PipelineSchedules = nil
+
+	out, err := Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(out), "pipeline_schedules") {
+		t.Errorf("emitted document declares schedules the state never described:\n%s", out)
+	}
+
+	repos, errs := Parse(out)
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want none", errs)
+	}
+	if schedules := repos[0].Spec.PipelineSchedules; schedules != nil {
+		t.Errorf("schedules = %v after a round trip, want nil", schedules)
+	}
+}
+
+// The existing schema reads an explicit null as "unset", so the schedules read
+// it that way too: a document is not made to declare a deletion by a key whose
+// value the writer left empty.
+func TestParseReadsNullSchedulesAsUndeclared(t *testing.T) {
+	repos, errs := Parse([]byte(validDoc + "  pipeline_schedules: null\n"))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want none", errs)
+	}
+	if schedules := repos[0].Spec.PipelineSchedules; schedules != nil {
+		t.Errorf("null = %v, want nil (unmanaged), the way an omitted key reads", schedules)
+	}
+}
+
 // An omitted active decodes as true, so a paused schedule survives an export
 // only if the false is actually written. Were it dropped as an empty value, the
 // export would silently turn the schedule back on.

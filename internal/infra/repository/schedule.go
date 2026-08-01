@@ -70,7 +70,14 @@ func rejectDuplicateDescriptions(schedules []LiveSchedule) error {
 // and recreated would move; a manifest is a file under version control, so the
 // same live state has to produce the same bytes. The description is already
 // unique across a document, which makes the order total.
+//
+// State whose schedules were never read yields nil, which the document emits as
+// an omitted key. Producing the empty list instead would declare that a project
+// nobody asked about should own no schedule at all.
 func toManifestSchedules(live []LiveSchedule) []manifest.PipelineSchedule {
+	if live == nil {
+		return nil
+	}
 	schedules := make([]manifest.PipelineSchedule, 0, len(live))
 	for _, schedule := range live {
 		schedules = append(schedules, manifest.PipelineSchedule{

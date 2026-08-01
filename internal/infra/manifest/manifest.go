@@ -57,20 +57,19 @@ func Marshal(doc *Repository) ([]byte, error) {
 
 // Puts a document into the form decoding it back would produce, so the
 // round-trip comparison below is not tripped by a value the schema itself
-// rewrites. Two rewrites exist: a list field that carries no omitempty emits as
-// [] whether it is nil or empty, and a bare ref decodes as a branch ref.
+// rewrites. Two rewrites exist: topics carries no omitempty, so nil and empty
+// emit alike as [], and a bare ref decodes as a branch ref.
+//
+// The schedules are cloned because the struct copy above shares the caller's
+// backing array, and canonicalizing a ref writes through it.
 func canonicalizeLists(doc *Repository) *Repository {
 	canonical := *doc
 	if canonical.Spec.Topics == nil {
 		canonical.Spec.Topics = []string{}
 	}
-	if canonical.Spec.PipelineSchedules == nil {
-		canonical.Spec.PipelineSchedules = []PipelineSchedule{}
-	}
 	canonical.Spec.PipelineSchedules = slices.Clone(canonical.Spec.PipelineSchedules)
 	for index := range canonical.Spec.PipelineSchedules {
-		schedule := &canonical.Spec.PipelineSchedules[index]
-		schedule.Ref = canonicalRef(schedule.Ref)
+		canonical.Spec.PipelineSchedules[index].Ref = canonicalRef(canonical.Spec.PipelineSchedules[index].Ref)
 	}
 	return &canonical
 }
@@ -218,7 +217,10 @@ type RepositorySpec struct {
 	// without a description, a prerequisite validate enforces.
 	CICatalog *bool `yaml:"ci_catalog,omitempty"`
 	// No omitempty: an explicit empty topic list must survive export so the YAML
-	// fully represents the project's current state.
+	// fully represents the project's current state. Plain rather than omitzero,
+	// unlike the schedules below, because topics arrive on the same response as
+	// the rest of the project: there is no reading of a project in which they
+	// went unread, so the third state has nothing to describe.
 	Topics        []string `yaml:"topics"`
 	DefaultBranch *string  `yaml:"default_branch,omitempty"`
 	// GitLab's merge_method, from Settings > Merge requests > Merge method:
@@ -238,10 +240,13 @@ type RepositorySpec struct {
 	MergeRequestsTemplate *string             `yaml:"merge_requests_template,omitempty"`
 	Features              *RepositoryFeatures `yaml:"features,omitempty"`
 	// Placed after the project's own settings because a schedule is a child
-	// resource rather than a setting. No omitempty, for the reason topics
-	// carries none: an explicit empty list declares that no schedule should
-	// exist and must survive export.
-	PipelineSchedules []PipelineSchedule `yaml:"pipeline_schedules"`
+	// resource rather than a setting. omitzero, not omitempty, so the three
+	// states stay apart: nil says nothing about the live schedules, an empty
+	// list declares that none should exist, and a populated one declares exactly
+	// those. omitempty would drop the empty list too, leaving silence as the
+	// only thing the document could say and an instruction to delete as the only
+	// thing it could mean.
+	PipelineSchedules []PipelineSchedule `yaml:"pipeline_schedules,omitzero"`
 }
 
 // The per-feature access levels of a GitLab project; an unset feature is
