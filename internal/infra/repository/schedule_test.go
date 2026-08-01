@@ -171,22 +171,22 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 	}
 }
 
-// GitLab skips the ref and cron presence checks for a schedule its own project
-// import carries in, so a project can hold one the manifest schema cannot
-// describe. Exporting it would emit a document Parse rejects, so the read fails
-// here instead and names the schedule to go and look at.
+// Each of the three attributes the schema requires is refused when GitLab
+// reports it blank, and the error names the schedule and the attribute, which is
+// what the reader needs to go and find it.
 func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
-	for name, body := range map[string]string{
-		"no ref":  `[{"id":7,"description":"nightly","ref":"","cron":"0 3 * * *"}]`,
-		"no cron": `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":""}]`,
+	for _, testCase := range []struct{ field, body string }{
+		{field: "description", body: `[{"id":7,"description":"","ref":"refs/heads/main","cron":"0 3 * * *"}]`},
+		{field: "ref", body: `[{"id":7,"description":"nightly","ref":"","cron":"0 3 * * *"}]`},
+		{field: "cron", body: `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":""}]`},
 	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := NewClient(scheduleRunner(body, nil)).
+		t.Run(testCase.field, func(t *testing.T) {
+			_, err := NewClient(scheduleRunner(testCase.body, nil)).
 				FetchSchedules(context.Background(), ownerGroup, nameProj)
 			if !errors.Is(err, errIncompleteLiveSchedule) {
 				t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
 			}
-			for _, want := range []string{"7", "nightly"} {
+			for _, want := range []string{"7", testCase.field} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("error %q does not name %q", err, want)
 				}
@@ -195,10 +195,11 @@ func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
 	}
 }
 
-// GitLab validates the description on every path, project import included, so a
-// blank one cannot reach the export and needs no check of its own.
+// A schedule carrying all three reads without complaint, so the guard refuses
+// only what it is meant to. The timezone is left out because the schema does not
+// require it, which a fixture supplying one could not show.
 func TestFetchSchedulesAcceptsAScheduleGitLabReportsInFull(t *testing.T) {
-	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC"}]`
+	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
 
 	schedules, err := NewClient(scheduleRunner(body, nil)).
 		FetchSchedules(context.Background(), ownerGroup, nameProj)
