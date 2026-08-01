@@ -48,9 +48,8 @@ func (c *Client) FetchSchedules(ctx context.Context, owner, name string) ([]Live
 	return schedules, nil
 }
 
-// The attributes a schedule must carry to be describable, named for the error.
-// They repeat the JSON tags because a tag cannot name a constant; the third,
-// fieldDescription, is declared with the diff fields.
+// The attributes a schedule must carry to be describable. They repeat the JSON
+// tags because a tag cannot name a constant.
 const (
 	fieldRef  = "ref"
 	fieldCron = "cron"
@@ -59,14 +58,11 @@ const (
 // Signals a schedule GitLab reports without an attribute a manifest requires.
 var errIncompleteLiveSchedule = errors.New("incomplete pipeline schedule")
 
-// Rejects a schedule reported without one of the attributes a declared schedule
-// must carry. GitLab skips its own presence checks for a schedule brought in by
-// its project import, so a project can hold one no manifest can describe, and
-// exporting it would emit a document this program's own parser rejects for the
-// missing field. Saying the schedules could not be read is the better answer.
-//
-// The three checked here are the three the schema requires of a declared
-// schedule, so neither side trusts the other to have looked.
+// Rejects a schedule reported without one of the three the schema requires of a
+// declared one, so neither side trusts the other to have looked. The schema's
+// own check runs on parse, which a document built from live state never goes
+// through. GitLab skips its presence checks for a schedule brought in by its
+// project import, so a project can hold one that cannot be described.
 func rejectIncompleteSchedules(schedules []LiveSchedule) error {
 	for _, schedule := range schedules {
 		for _, required := range []struct{ field, value string }{
