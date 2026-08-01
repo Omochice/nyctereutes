@@ -171,33 +171,32 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 	}
 }
 
-// A project can hold a schedule the manifest schema cannot describe, because
-// GitLab skips its own presence checks for one its project import carries in.
-// Exporting it would emit a document Parse rejects, so the read fails here
-// instead, for each of the three attributes the schema requires.
+// Each of the three attributes the schema requires is refused when GitLab
+// reports it blank, and the error names the schedule and the attribute, which is
+// what the reader needs to go and find it.
 func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
-	for name, body := range map[string]string{
-		"no description": `[{"id":7,"description":"","ref":"refs/heads/main","cron":"0 3 * * *"}]`,
-		"no ref":         `[{"id":7,"description":"nightly","ref":"","cron":"0 3 * * *"}]`,
-		"no cron":        `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":""}]`,
+	for _, testCase := range []struct{ field, body string }{
+		{field: "description", body: `[{"id":7,"description":"","ref":"refs/heads/main","cron":"0 3 * * *"}]`},
+		{field: "ref", body: `[{"id":7,"description":"nightly","ref":"","cron":"0 3 * * *"}]`},
+		{field: "cron", body: `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":""}]`},
 	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := NewClient(scheduleRunner(body, nil)).
+		t.Run(testCase.field, func(t *testing.T) {
+			_, err := NewClient(scheduleRunner(testCase.body, nil)).
 				FetchSchedules(context.Background(), ownerGroup, nameProj)
 			if !errors.Is(err, errIncompleteLiveSchedule) {
 				t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
 			}
-			// The id is what every case can be identified by; a schedule missing
-			// its description has no other handle to offer.
-			if !strings.Contains(err.Error(), "7") {
-				t.Errorf("error %q does not name the schedule's id", err)
+			for _, want := range []string{"7", testCase.field} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not name %q", err, want)
+				}
 			}
 		})
 	}
 }
 
-// A schedule carrying all three reads without complaint, so the guard above
-// refuses only what it is meant to.
+// A schedule carrying all three reads without complaint, so the guard refuses
+// only what it is meant to.
 func TestFetchSchedulesAcceptsAScheduleGitLabReportsInFull(t *testing.T) {
 	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC"}]`
 
