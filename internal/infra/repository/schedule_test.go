@@ -171,14 +171,15 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 	}
 }
 
-// GitLab skips the ref and cron presence checks for a schedule its own project
-// import carries in, so a project can hold one the manifest schema cannot
-// describe. Exporting it would emit a document Parse rejects, so the read fails
-// here instead and names the schedule to go and look at.
+// A project can hold a schedule the manifest schema cannot describe, because
+// GitLab skips its own presence checks for one its project import carries in.
+// Exporting it would emit a document Parse rejects, so the read fails here
+// instead, for each of the three attributes the schema requires.
 func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
 	for name, body := range map[string]string{
-		"no ref":  `[{"id":7,"description":"nightly","ref":"","cron":"0 3 * * *"}]`,
-		"no cron": `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":""}]`,
+		"no description": `[{"id":7,"description":"","ref":"refs/heads/main","cron":"0 3 * * *"}]`,
+		"no ref":         `[{"id":7,"description":"nightly","ref":"","cron":"0 3 * * *"}]`,
+		"no cron":        `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":""}]`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewClient(scheduleRunner(body, nil)).
@@ -186,17 +187,17 @@ func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
 			if !errors.Is(err, errIncompleteLiveSchedule) {
 				t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
 			}
-			for _, want := range []string{"7", "nightly"} {
-				if !strings.Contains(err.Error(), want) {
-					t.Errorf("error %q does not name %q", err, want)
-				}
+			// The id is what every case can be identified by; a schedule missing
+			// its description has no other handle to offer.
+			if !strings.Contains(err.Error(), "7") {
+				t.Errorf("error %q does not name the schedule's id", err)
 			}
 		})
 	}
 }
 
-// GitLab validates the description on every path, project import included, so a
-// blank one cannot reach the export and needs no check of its own.
+// A schedule carrying all three reads without complaint, so the guard above
+// refuses only what it is meant to.
 func TestFetchSchedulesAcceptsAScheduleGitLabReportsInFull(t *testing.T) {
 	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC"}]`
 
