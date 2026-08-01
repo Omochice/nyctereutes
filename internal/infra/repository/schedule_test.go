@@ -171,9 +171,8 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 	}
 }
 
-// An empty list is a declaration in the manifest, so a response that carries no
-// list at all must not be read as one. Exporting it would say every schedule the
-// project owns should be removed.
+// A response carrying no list at all is an error rather than a read of zero
+// schedules.
 func TestFetchSchedulesRefusesAResponseWithoutAList(t *testing.T) {
 	for name, body := range map[string]string{
 		"empty":      "",

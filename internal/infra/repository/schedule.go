@@ -71,9 +71,8 @@ func rejectDuplicateDescriptions(schedules []LiveSchedule) error {
 // same live state has to produce the same bytes. The description is already
 // unique across a document, which makes the order total.
 //
-// State whose schedules were never read yields nil, which the document emits as
-// an omitted key. Producing the empty list instead would declare that a project
-// nobody asked about should own no schedule at all.
+// Schedules that were never read pass through as nil, which the field on
+// [manifest.RepositorySpec] keeps distinct from the empty list.
 func toManifestSchedules(live []LiveSchedule) []manifest.PipelineSchedule {
 	if live == nil {
 		return nil
@@ -102,9 +101,8 @@ var errNoSchedulePage = errors.New("response carries no pipeline schedule list")
 // not one JSON value and has to be decoded in sequence.
 //
 // Output holding no page, or a page written as null, is refused rather than
-// read as a project owning no schedule. An empty list is a declaration in the
-// manifest, so reading an under-read that way would export the instruction to
-// delete every schedule the project has.
+// read as a project owning no schedule, which the field on
+// [manifest.RepositorySpec] would carry into a document as a declaration.
 func decodeSchedulePages(out []byte) ([]LiveSchedule, error) {
 	decoder := json.NewDecoder(bytes.NewReader(out))
 	schedules := []LiveSchedule{}

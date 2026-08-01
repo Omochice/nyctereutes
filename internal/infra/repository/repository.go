@@ -200,8 +200,8 @@ func parseProject(out []byte) (*CurrentState, error) {
 // settings and the pipeline schedules the state carries.
 //
 // A state whose schedules were never read leaves the key out of the document,
-// which says nothing about the live schedules rather than declaring that the
-// project should own none.
+// which the field on [manifest.RepositorySpec] defines as saying nothing about
+// them.
 func ToManifest(state *CurrentState) *manifest.Repository {
 	return &manifest.Repository{
 		APIVersion: manifest.APIVersion,

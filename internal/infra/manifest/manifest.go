@@ -243,9 +243,9 @@ type RepositorySpec struct {
 	// resource rather than a setting. omitzero, not omitempty, so the three
 	// states stay apart: nil says nothing about the live schedules, an empty
 	// list declares that none should exist, and a populated one declares exactly
-	// those. omitempty would drop the empty list too, leaving silence as the
-	// only thing the document could say and an instruction to delete as the only
-	// thing it could mean.
+	// those. omitempty would drop the empty list as well, collapsing the first
+	// two states into one and leaving a deletion as the only thing silence could
+	// mean.
 	PipelineSchedules []PipelineSchedule `yaml:"pipeline_schedules,omitzero"`
 }
 

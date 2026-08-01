@@ -214,10 +214,8 @@ func TestParseRejectsDuplicateScheduleDescriptions(t *testing.T) {
 	}
 }
 
-// An omitted block leaves the live schedules alone while an empty list declares
-// that none should exist, so a document that means the latter has to say so.
-// Dropping the key when the list is empty would emit the former instead, and
-// Marshal's own round-trip check rejects such a document as lossy.
+// An empty schedule list survives Marshal as "pipeline_schedules: []" rather
+// than being dropped the way an unset value is.
 func TestMarshalKeepsAnEmptyScheduleList(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.PipelineSchedules = []PipelineSchedule{}
@@ -231,10 +229,8 @@ func TestMarshalKeepsAnEmptyScheduleList(t *testing.T) {
 	}
 }
 
-// A document that says nothing about the schedules must emit nothing about
-// them. Writing the empty list instead would turn silence into the declaration
-// that the project should own none, and Marshal's round-trip check would not
-// catch it because the emitted list decodes back into the same empty list.
+// A document that says nothing about the schedules emits no key, and parsing
+// that output says nothing again.
 func TestMarshalOmitsUndeclaredSchedules(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.PipelineSchedules = nil

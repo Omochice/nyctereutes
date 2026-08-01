@@ -92,12 +92,9 @@ func (c *importCommand) document(
 		return nil, false
 	}
 	// An exported document describes the whole project, so its schedules are
-	// always read; a command that only reconciles some settings need not.
-	//
-	// A read that fails leaves them undescribed rather than ending the project's
-	// export. Dropping the project would throw away every setting already read
-	// over one child resource, and describing it as owning none would export the
-	// instruction to delete whatever it does own.
+	// always read; a command that only reconciles some settings need not. A read
+	// that fails costs them alone, because ending the export here would throw
+	// away every setting already read over one child resource.
 	schedules, err := client.FetchSchedules(ctx, owner, name)
 	if err != nil {
 		c.failf("%v\n", err)

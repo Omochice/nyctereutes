@@ -123,9 +123,8 @@ func TestInfraImportRejectsMalformedTarget(t *testing.T) {
 	}
 }
 
-// A project's schedules belong in its manifest, so the emitted document has to
-// carry them rather than the empty list that would describe every one of them
-// as a schedule to remove.
+// The emitted document carries every schedule the project owns, each attribute
+// as GitLab reports it, ordered by description.
 func TestInfraImportEmitsPipelineSchedules(t *testing.T) {
 	runner := &fakeInfraGlab{
 		projects: map[string]string{targetGroupProj: projJSON},
@@ -159,10 +158,8 @@ func TestInfraImportEmitsPipelineSchedules(t *testing.T) {
 	}
 }
 
-// A schedule read that fails costs the schedules, not the project. The document
-// leaves the key out, which says nothing about the live schedules, where both
-// dropping the project and writing an empty list would lose something the run
-// had already established.
+// A failed schedule read still exports the project's settings, with the
+// schedules key left out and the cause reported on stderr.
 func TestInfraImportExportsAProjectWhoseSchedulesCannotBeRead(t *testing.T) {
 	runner := &fakeInfraGlab{
 		projects:  map[string]string{targetGroupProj: projJSON},
