@@ -91,11 +91,12 @@ func (c *importCommand) document(
 		c.failf("project %s not found on GitLab\n", target)
 		return nil, false
 	}
-	// An exported document describes the whole project, so its schedules are
-	// always read; a command that only reconciles some settings need not. A read
-	// that fails costs them alone, because ending the export here would throw
-	// away every setting already read over one child resource.
-	schedules, err := client.FetchSchedules(ctx, owner, name)
+	// An exported document describes the whole project, so its schedules and
+	// their variables are always read; a command that only reconciles some
+	// settings need not. A read that fails costs them alone, because ending the
+	// export here would throw away every setting already read over one child
+	// resource.
+	schedules, err := client.FetchSchedules(ctx, owner, name, true)
 	if err != nil {
 		c.failf("%v\n", err)
 		undescribed = true

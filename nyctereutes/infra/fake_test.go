@@ -76,6 +76,29 @@ func scheduleBody(schedules map[string]string, project string) []byte {
 	return []byte("[]")
 }
 
+// singleScheduleRead reports whether args address one schedule rather than the
+// list. That call carries the variables, which the fakes answer as empty; a
+// test about variables is a matter for the slice that puts them in a manifest.
+func singleScheduleRead(args []string) (scheduleID string, ok bool) {
+	if len(args) != 2 || args[0] != "api" {
+		return "", false
+	}
+	_, id, found := strings.Cut(args[1], "/pipeline_schedules/")
+	if !found || id == "" {
+		return "", false
+	}
+	return id, true
+}
+
+// singleScheduleBody answers one schedule's read, carrying the variables the
+// test registered for that id and none otherwise.
+func singleScheduleBody(variables map[string]string, scheduleID string) []byte {
+	if body, ok := variables[scheduleID]; ok {
+		return []byte(body)
+	}
+	return []byte(`{"variables":[]}`)
+}
+
 // fakeInfraGlab answers `glab api projects/<enc>` from a project map and the
 // catalog GraphQL query from a catalog map; an absent project yields a 404
 // error so the importer treats it as missing. Any other glab invocation is an
@@ -89,9 +112,13 @@ type fakeInfraGlab struct {
 	projects  map[string]string // "owner/name" -> project JSON
 	catalog   map[string]bool   // "owner/name" -> catalog status, default false
 	schedules map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
+	variables map[string]string // schedule id -> single-schedule JSON, default no variables
 }
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	if id, ok := singleScheduleRead(args); ok {
+		return singleScheduleBody(f.variables, id), nil
+	}
 	if path, ok := catalogRead(args); ok {
 		return catalogBody(f.catalog[path]), nil
 	}
