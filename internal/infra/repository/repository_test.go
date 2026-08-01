@@ -60,17 +60,23 @@ func wantPtr[Value ~string](t *testing.T, name string, got *Value, want string) 
 	}
 }
 
-func TestFetchRepositoryParsesSettings(t *testing.T) {
-	var gotArgs []string
-	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
+// Records the args of the project request alone, which is the one these tests
+// assert on; the catalog query is answered but not recorded.
+func projectRecordingRunner(gotArgs *[]string) glab.RunnerFunc {
+	return func(_ context.Context, args ...string) ([]byte, error) {
 		if len(args) > 1 && args[1] == "graphql" {
 			return []byte(graphqlCatalogJSON(false)), nil
 		}
-		gotArgs = args
+		*gotArgs = args
 		return []byte(sampleProjectJSON), nil
-	})
+	}
+}
 
-	state, err := NewClient(runner).FetchRepository(context.Background(), "group/sub", "proj")
+func TestFetchRepositoryParsesSettings(t *testing.T) {
+	var gotArgs []string
+
+	state, err := NewClient(projectRecordingRunner(&gotArgs)).
+		FetchRepository(context.Background(), "group/sub", "proj")
 	if err != nil {
 		t.Fatalf("FetchRepository: %v", err)
 	}

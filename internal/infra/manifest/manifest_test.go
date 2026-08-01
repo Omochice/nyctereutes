@@ -54,6 +54,13 @@ func fullRepository() *Repository {
 				Infrastructure:        new(levelEnabled),
 				Releases:              new(levelEnabled),
 			},
+			PipelineSchedules: []PipelineSchedule{{
+				Description:  "nightly",
+				Ref:          "refs/heads/main",
+				Cron:         "0 3 * * *",
+				CronTimezone: "UTC",
+				Active:       true,
+			}},
 		},
 	}
 }
@@ -74,7 +81,15 @@ func settingsUIKeyOrder() []string {
 		"wiki", "snippets", "package_registry", "model_experiments", "model_registry",
 		"pages", "monitor", "environments", "feature_flags", "infrastructure",
 		"releases",
+		"pipeline_schedules",
 	}
+}
+
+// A schedule's own attributes in declaration order. They are pinned separately
+// because "description" names one key on the spec and another on a schedule, so
+// a single flat list would scan for the same string at two nesting levels.
+func scheduleKeyOrder() []string {
+	return []string{"description", "ref", "cron", "cron_timezone", "active"}
 }
 
 // goyaml's literal emitter writes no indentation indicator, so a multiline
@@ -139,6 +154,19 @@ func TestRepositoryMarshalsKeysInSettingsUIOrder(t *testing.T) {
 		idx := strings.Index(section, key+":")
 		if idx < 0 {
 			t.Fatalf("%s missing or out of settings-UI order\n%s", key, out)
+		}
+		section = section[idx+len(key):]
+	}
+
+	// The scan below reads what follows pipeline_schedules, so an empty fixture
+	// would let it run on into the spec keys and blame the wrong nesting level.
+	if len(fullRepository().Spec.PipelineSchedules) == 0 {
+		t.Fatal("the fixture must declare a pipeline schedule to pin a schedule's key order")
+	}
+	for _, key := range scheduleKeyOrder() {
+		idx := strings.Index(section, key+":")
+		if idx < 0 {
+			t.Fatalf("schedule attribute %s missing or out of declaration order\n%s", key, out)
 		}
 		section = section[idx+len(key):]
 	}

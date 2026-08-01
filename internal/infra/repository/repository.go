@@ -25,6 +25,9 @@ type CurrentState struct {
 	// GitLab's isCatalogResource, read over GraphQL because the projects REST
 	// endpoint does not carry the catalog status.
 	CatalogResource bool
+	// The schedules the project owns, read from their own endpoint because the
+	// projects response does not carry them.
+	PipelineSchedules []LiveSchedule
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -39,6 +42,10 @@ func NewClient(runner glab.Runner) *Client {
 
 // Fetches one GitLab project's basic settings. A missing project (404) is not an
 // error: it yields a CurrentState with IsNew set, so the caller can report it.
+//
+// The schedules are not read here: [Client.FetchSchedules] reads them from an
+// endpoint of its own, which can fail independently of the settings. A caller
+// that wants both handles the two failures separately.
 func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*CurrentState, error) {
 	out, err := c.runner.Run(ctx, "api", "projects/"+glab.EncodePath(owner+"/"+name))
 	if err != nil {
@@ -59,7 +66,10 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 	state.Name = name
 
 	// The catalog status lives only in GraphQL, so it is a second call rather
-	// than a field on the REST response parsed above.
+	// than a field on the REST response parsed above. The schedules are a second
+	// call too and are deliberately not joined to it: that read can fail or be
+	// ambiguous on its own terms, and answering for it here would let a schedule
+	// problem hide every other setting the project drifts in.
 	catalog, err := c.fetchCatalogResource(ctx, owner, name)
 	if err != nil {
 		return nil, err
@@ -187,8 +197,12 @@ func parseProject(out []byte) (*CurrentState, error) {
 	return &CurrentState{rawProject: raw}, nil
 }
 
-// Converts current state into a Repository manifest document, emitting only the
-// GitLab basic settings.
+// Converts current state into a Repository manifest document: the GitLab basic
+// settings and the pipeline schedules the state carries.
+//
+// A state whose schedules were never read leaves the key out of the document,
+// which the field on [manifest.RepositorySpec] defines as saying nothing about
+// them.
 func ToManifest(state *CurrentState) *manifest.Repository {
 	return &manifest.Repository{
 		APIVersion: manifest.APIVersion,
@@ -214,6 +228,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			SquashCommitTemplate:                      (*string)(state.SquashCommitTemplate),
 			MergeRequestsTemplate:                     (*string)(state.MergeRequestsTemplate),
 			Features:                                  toFeatures(state),
+			PipelineSchedules:                         toManifestSchedules(state.PipelineSchedules),
 		},
 	}
 }

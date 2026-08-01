@@ -33,14 +33,7 @@ var errInvalidValue = errors.New("invalid value")
 // back as empty. The attempts run from prettiest to safest; JSON escaping
 // represents every string.
 func Marshal(doc *Repository) ([]byte, error) {
-	// topics carries no omitempty, so nil and empty emit identically as [] and
-	// the document cannot express the difference; canonicalizing nil up front
-	// keeps the round-trip comparison free of field-specific carve-outs.
-	if doc.Spec.Topics == nil {
-		canonical := *doc
-		canonical.Spec.Topics = []string{}
-		doc = &canonical
-	}
+	doc = canonicalizeLists(doc)
 
 	attempts := [][]goyaml.EncodeOption{
 		{goyaml.UseLiteralStyleIfMultiline(true)},
@@ -60,6 +53,25 @@ func Marshal(doc *Repository) ([]byte, error) {
 		return out, nil
 	}
 	return nil, fmt.Errorf("%w: %w", errNotRoundTrippable, lastErr)
+}
+
+// Puts a document into the form decoding it back would produce, so the
+// round-trip comparison below is not tripped by a value the schema itself
+// rewrites. Two rewrites exist: topics carries no omitempty, so nil and empty
+// emit alike as [], and a bare ref decodes as a branch ref.
+//
+// The schedules are cloned because the struct copy above shares the caller's
+// backing array, and canonicalizing a ref writes through it.
+func canonicalizeLists(doc *Repository) *Repository {
+	canonical := *doc
+	if canonical.Spec.Topics == nil {
+		canonical.Spec.Topics = []string{}
+	}
+	canonical.Spec.PipelineSchedules = slices.Clone(canonical.Spec.PipelineSchedules)
+	for index := range canonical.Spec.PipelineSchedules {
+		canonical.Spec.PipelineSchedules[index].Ref = canonicalRef(canonical.Spec.PipelineSchedules[index].Ref)
+	}
+	return &canonical
 }
 
 // Reports why out does not decode back into a document equal to doc, or nil
@@ -189,8 +201,9 @@ func enumValue(data []byte, kind string, allowed ...string) (string, error) {
 	return value, nil
 }
 
-// The GitLab project basic settings. Pointer fields distinguish "unset" (omitted
-// from YAML) from a zero value that is an intentional setting.
+// What a document declares about a GitLab project: its basic settings, then the
+// child resources it owns. Pointer fields distinguish "unset" (omitted from
+// YAML) from a zero value that is an intentional setting.
 type RepositorySpec struct {
 	Description *string     `yaml:"description,omitempty"`
 	Visibility  *Visibility `yaml:"visibility,omitempty"`
@@ -204,7 +217,10 @@ type RepositorySpec struct {
 	// without a description, a prerequisite validate enforces.
 	CICatalog *bool `yaml:"ci_catalog,omitempty"`
 	// No omitempty: an explicit empty topic list must survive export so the YAML
-	// fully represents the project's current state.
+	// fully represents the project's current state. Plain rather than omitzero,
+	// unlike the schedules below, because topics arrive on the same response as
+	// the rest of the project: there is no reading of a project in which they
+	// went unread, so the third state has nothing to describe.
 	Topics        []string `yaml:"topics"`
 	DefaultBranch *string  `yaml:"default_branch,omitempty"`
 	// GitLab's merge_method, from Settings > Merge requests > Merge method:
@@ -223,6 +239,14 @@ type RepositorySpec struct {
 	SquashCommitTemplate  *string             `yaml:"squash_commit_template,omitempty"`
 	MergeRequestsTemplate *string             `yaml:"merge_requests_template,omitempty"`
 	Features              *RepositoryFeatures `yaml:"features,omitempty"`
+	// Placed after the project's own settings because a schedule is a child
+	// resource rather than a setting. omitzero, not omitempty, so the three
+	// states stay apart: nil says nothing about the live schedules, an empty
+	// list declares that none should exist, and a populated one declares exactly
+	// those. omitempty would drop the empty list as well, collapsing the first
+	// two states into one and leaving a deletion as the only thing silence could
+	// mean.
+	PipelineSchedules []PipelineSchedule `yaml:"pipeline_schedules,omitzero"`
 }
 
 // The per-feature access levels of a GitLab project; an unset feature is
