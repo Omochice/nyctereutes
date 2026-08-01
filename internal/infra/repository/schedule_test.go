@@ -196,9 +196,10 @@ func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
 }
 
 // A schedule carrying all three reads without complaint, so the guard refuses
-// only what it is meant to.
+// only what it is meant to. The timezone is left out because the schema does not
+// require it, which a fixture supplying one could not show.
 func TestFetchSchedulesAcceptsAScheduleGitLabReportsInFull(t *testing.T) {
-	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC"}]`
+	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
 
 	schedules, err := NewClient(scheduleRunner(body, nil)).
 		FetchSchedules(context.Background(), ownerGroup, nameProj)
