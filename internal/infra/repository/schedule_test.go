@@ -171,6 +171,45 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 	}
 }
 
+// GitLab skips the ref and cron presence checks for a schedule its own project
+// import carries in, so a project can hold one the manifest schema cannot
+// describe. Exporting it would emit a document Parse rejects, so the read fails
+// here instead and names the schedule to go and look at.
+func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
+	for name, body := range map[string]string{
+		"no ref":  `[{"id":7,"description":"nightly","ref":"","cron":"0 3 * * *"}]`,
+		"no cron": `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":""}]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewClient(scheduleRunner(body, nil)).
+				FetchSchedules(context.Background(), ownerGroup, nameProj)
+			if !errors.Is(err, errIncompleteLiveSchedule) {
+				t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
+			}
+			for _, want := range []string{"7", "nightly"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not name %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+// GitLab validates the description on every path, project import included, so a
+// blank one cannot reach the export and needs no check of its own.
+func TestFetchSchedulesAcceptsAScheduleGitLabReportsInFull(t *testing.T) {
+	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC"}]`
+
+	schedules, err := NewClient(scheduleRunner(body, nil)).
+		FetchSchedules(context.Background(), ownerGroup, nameProj)
+	if err != nil {
+		t.Fatalf("FetchSchedules: %v", err)
+	}
+	if len(schedules) != 1 {
+		t.Errorf("schedules = %+v, want 1", schedules)
+	}
+}
+
 // A response carrying no list at all is an error rather than a read of zero
 // schedules.
 func TestFetchSchedulesRefusesAResponseWithoutAList(t *testing.T) {

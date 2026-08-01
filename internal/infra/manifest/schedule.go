@@ -48,9 +48,9 @@ func (schedule *PipelineSchedule) UnmarshalYAML(unmarshal func(any) error) error
 }
 
 // Reports the first required attribute the schedule leaves empty, locating it
-// by its position in the document. GitLab requires all three on create and
-// rejects a blank description, so such a schedule could never apply; checking
-// here turns a remote rejection into a local error.
+// by its position in the document. All three are required to create a schedule
+// through the API, so one missing any of them could never apply; checking here
+// turns a remote rejection into a local error.
 func (schedule *PipelineSchedule) validate(index int) error {
 	for _, required := range []struct{ field, value string }{
 		{field: fieldDescription, value: schedule.Description},

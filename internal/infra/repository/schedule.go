@@ -39,10 +39,45 @@ func (c *Client) FetchSchedules(ctx context.Context, owner, name string) ([]Live
 	if err != nil {
 		return nil, fmt.Errorf("parse pipeline schedules %s/%s: %w", owner, name, err)
 	}
+	if err := rejectIncompleteSchedules(schedules); err != nil {
+		return nil, fmt.Errorf("read pipeline schedules %s/%s: %w", owner, name, err)
+	}
 	if err := rejectDuplicateDescriptions(schedules); err != nil {
 		return nil, fmt.Errorf("read pipeline schedules %s/%s: %w", owner, name, err)
 	}
 	return schedules, nil
+}
+
+// The attributes a schedule must carry to be describable, named for the error.
+// They repeat the JSON tags because a tag cannot name a constant.
+const (
+	fieldRef  = "ref"
+	fieldCron = "cron"
+)
+
+// Signals a schedule GitLab reports without an attribute a manifest requires.
+var errIncompleteLiveSchedule = errors.New("incomplete pipeline schedule")
+
+// Rejects a schedule reported without a ref or a cron. Creating one through the
+// API requires both, but GitLab skips those presence checks for a schedule
+// carried in by its own project import, so a project can hold one that no
+// manifest can describe. Exporting it would emit a document this program's own
+// parser rejects for the missing field, which is a worse answer than saying the
+// schedules could not be read. A blank description needs no such check: GitLab
+// validates it on every path, import included.
+func rejectIncompleteSchedules(schedules []LiveSchedule) error {
+	for _, schedule := range schedules {
+		for _, required := range []struct{ field, value string }{
+			{field: fieldRef, value: schedule.Ref},
+			{field: fieldCron, value: schedule.Cron},
+		} {
+			if required.value == "" {
+				return fmt.Errorf("%w: schedule %d (%q) reports no %s",
+					errIncompleteLiveSchedule, schedule.ID, schedule.Description, required.field)
+			}
+		}
+	}
+	return nil
 }
 
 // Signals a project carrying two schedules described alike.
