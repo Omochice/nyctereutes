@@ -43,11 +43,9 @@ func NewClient(runner glab.Runner) *Client {
 // Fetches one GitLab project's basic settings. A missing project (404) is not an
 // error: it yields a CurrentState with IsNew set, so the caller can report it.
 //
-// The schedules are not read here. They live behind endpoints of their own,
-// which can fail or be ambiguous on their own terms, and a manifest that
-// declares none has no use for them; folding that read in would let a schedule
-// problem hide every other setting the project drifts in. [Client.FetchSchedules]
-// is called separately by the commands that need them.
+// The schedules are not read here: [Client.FetchSchedules] reads them from an
+// endpoint of its own, which can fail independently of the settings. A caller
+// that wants both handles the two failures separately.
 func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*CurrentState, error) {
 	out, err := c.runner.Run(ctx, "api", "projects/"+glab.EncodePath(owner+"/"+name))
 	if err != nil {
@@ -68,7 +66,10 @@ func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*Curr
 	state.Name = name
 
 	// The catalog status lives only in GraphQL, so it is a second call rather
-	// than a field on the REST response parsed above.
+	// than a field on the REST response parsed above. The schedules are a second
+	// call too and are deliberately not joined to it: that read can fail or be
+	// ambiguous on its own terms, and answering for it here would let a schedule
+	// problem hide every other setting the project drifts in.
 	catalog, err := c.fetchCatalogResource(ctx, owner, name)
 	if err != nil {
 		return nil, err
