@@ -159,9 +159,56 @@ func TestInfraImportEmitsPipelineSchedules(t *testing.T) {
 	}
 }
 
-// A project whose live schedules repeat a description cannot be described by a
-// manifest at all, so it is reported and skipped while the other projects in
-// the same run are still emitted.
+// A schedule read that fails costs the schedules, not the project. The document
+// leaves the key out, which says nothing about the live schedules, where both
+// dropping the project and writing an empty list would lose something the run
+// had already established.
+func TestInfraImportExportsAProjectWhoseSchedulesCannotBeRead(t *testing.T) {
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: "not json"},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a project is exported without its schedules", exit)
+	}
+	if !strings.Contains(stdout, "name: proj") {
+		t.Errorf("the project's settings should still be exported\n%s", stdout)
+	}
+	if strings.Contains(stdout, "pipeline_schedules") {
+		t.Errorf("an unread schedule list must not be declared in the document\n%s", stdout)
+	}
+	if !strings.Contains(stderr, "pipeline schedules") {
+		t.Errorf("the failed schedule read should be reported on stderr\n%s", stderr)
+	}
+}
+
+// The two ways a run falls short name different things to go and look at, so a
+// run that hits both has to report both. Reporting only the missing project
+// would leave the reader believing the emitted document is complete.
+func TestInfraImportReportsBothAMissingProjectAndAnUnreadScheduleList(t *testing.T) {
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: "not json"},
+	}
+
+	exit, _, stderr := runWithRunner(runner, "infra", "import", "group/missing", targetGroupProj)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1", exit)
+	}
+	for _, want := range []string{"could not be imported", "without their pipeline schedules"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr missing %q, both shortfalls must be reported\n%s", want, stderr)
+		}
+	}
+}
+
+// A repeated description leaves the schedules undescribable, not the project.
+// The repeat is reported so the reader can go and rename one, and both projects
+// in the run are still exported.
 func TestInfraImportReportsDuplicateSchedulesAndContinues(t *testing.T) {
 	const otherProject = "group/other"
 	runner := &fakeInfraGlab{
@@ -181,5 +228,8 @@ func TestInfraImportReportsDuplicateSchedulesAndContinues(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "name: other") {
 		t.Errorf("stdout missing the healthy project, later projects must still be emitted\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "name: proj") {
+		t.Errorf("the settings of the project with the repeated description are still describable\n%s", stdout)
 	}
 }
