@@ -117,10 +117,10 @@ func TestFetchRepositoryReadsScheduleVariables(t *testing.T) {
 }
 
 // GitLab omits the variables field for a token below Maintainer that does not
-// own the schedule. Reading that as a schedule carrying none would export a
-// document declaring a deletion the run never verified, so the read fails and
-// the caller reports the schedules as undescribed.
-func TestFetchSchedulesRefusesVariablesGitLabDoesNotReport(t *testing.T) {
+// own the schedule. The schedule itself is readable, so it survives the read
+// with its variables left unset, and the omission is named rather than turned
+// into a failure that would cost the schedule too.
+func TestFetchSchedulesKeepsAScheduleWhoseVariablesAreHidden(t *testing.T) {
 	const listJSON = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
 	for name, single := range map[string]string{
 		"field omitted": `{"id":1,"description":"nightly"}`,
@@ -128,12 +128,35 @@ func TestFetchSchedulesRefusesVariablesGitLabDoesNotReport(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			var calls []string
-			_, err := NewClient(variableRunner(listJSON, map[string]string{"1": single}, &calls)).
+			schedules, err := NewClient(variableRunner(listJSON, map[string]string{"1": single}, &calls)).
 				FetchSchedules(context.Background(), ownerGroup, nameProj, true)
-			if !errors.Is(err, errVariablesNotReported) {
-				t.Errorf("error = %v, want it to wrap errVariablesNotReported", err)
+			if err != nil {
+				t.Fatalf("FetchSchedules: %v", err)
+			}
+			if len(schedules) != 1 {
+				t.Fatalf("schedules = %+v, want the schedule itself to survive", schedules)
+			}
+			if schedules[0].Variables != nil {
+				t.Errorf("variables = %v, want nil (hidden, not described)", schedules[0].Variables)
+			}
+			if got := SchedulesMissingVariables(schedules); !slices.Equal(got, []string{"nightly"}) {
+				t.Errorf("missing = %v, want the schedule named", got)
 			}
 		})
+	}
+}
+
+// A schedule the token can read reports its variables, so it is not named as
+// missing them; an empty list is a description rather than a silence.
+func TestSchedulesMissingVariablesNamesOnlyTheHidden(t *testing.T) {
+	schedules := []LiveSchedule{
+		{ID: 1, Description: "read none", Variables: []ScheduleVariable{}},
+		{ID: 2, Description: "hidden"},
+		{ID: 3, Description: "read some", Variables: []ScheduleVariable{{Key: "A"}}},
+	}
+
+	if got := SchedulesMissingVariables(schedules); !slices.Equal(got, []string{"hidden"}) {
+		t.Errorf("missing = %v, want only the hidden one", got)
 	}
 }
 

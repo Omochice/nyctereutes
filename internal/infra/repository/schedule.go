@@ -49,6 +49,11 @@ type ScheduleVariable struct {
 // withVariables asks for them: a caller that manages no variable cannot use
 // them, and paying for them regardless turns one project read into as many
 // requests as the project has schedules.
+//
+// A schedule whose variables the token may not see keeps them nil even when
+// withVariables asked, so having asked is what makes nil mean "not permitted"
+// rather than "not requested". [SchedulesMissingVariables] names those for a
+// caller that wants to say so.
 func (c *Client) FetchSchedules(
 	ctx context.Context, owner, name string, withVariables bool,
 ) ([]LiveSchedule, error) {
@@ -111,16 +116,14 @@ func rejectIncompleteSchedules(schedules []LiveSchedule) error {
 	return nil
 }
 
-// Signals a response that carries no variables field to read.
-var errVariablesNotReported = errors.New("pipeline schedule reports no variables field")
-
 // Reads one schedule's variables. The list response omits them entirely, so
 // knowing whether a schedule carries any costs a request per schedule.
 //
-// GitLab includes the field only for a Maintainer, an Owner, or the schedule's
-// own creator, and omits it entirely otherwise. A pointer tells that omission
-// apart from an empty list, so a token that cannot see the variables is refused
-// rather than read as a schedule carrying none.
+// GitLab answers a reader who is neither Maintainer, Owner, nor the schedule's
+// creator with the field left out rather than with an error, so nil is returned
+// for it and the schedule stays undescribed on that one attribute. A pointer is
+// what tells that omission apart from the empty list a permitted reader gets
+// for a schedule carrying none, which is a description rather than a silence.
 func (c *Client) fetchScheduleVariables(
 	ctx context.Context, owner, name string, scheduleID int,
 ) ([]ScheduleVariable, error) {
@@ -136,10 +139,23 @@ func (c *Client) fetchScheduleVariables(
 		return nil, fmt.Errorf("parse pipeline schedule %d on %s/%s: %w", scheduleID, owner, name, err)
 	}
 	if schedule.Variables == nil {
-		return nil, fmt.Errorf("read pipeline schedule %d on %s/%s: %w",
-			scheduleID, owner, name, errVariablesNotReported)
+		return nil, nil
 	}
 	return *schedule.Variables, nil
+}
+
+// Names the schedules whose variables were asked for and not answered, which is
+// how GitLab replies to a reader below Maintainer who does not own them. Only a
+// caller that passed withVariables may read the result: without that, every
+// schedule is missing its variables and the answer means nothing.
+func SchedulesMissingVariables(schedules []LiveSchedule) []string {
+	var missing []string
+	for _, schedule := range schedules {
+		if schedule.Variables == nil {
+			missing = append(missing, schedule.Description)
+		}
+	}
+	return missing
 }
 
 // Signals a project carrying two schedules described alike.

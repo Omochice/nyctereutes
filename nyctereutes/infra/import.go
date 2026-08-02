@@ -102,6 +102,15 @@ func (c *importCommand) document(
 		undescribed = true
 	} else {
 		state.PipelineSchedules = schedules
+		// GitLab hides a schedule's variables from a reader below Maintainer who
+		// does not own it. The document leaves them out, which says nothing about
+		// them rather than declaring a deletion, so the export is smaller but not
+		// wrong: the run says so and still succeeds. Failing here would cost a
+		// Developer every schedule over an attribute their role cannot read.
+		if missing := repository.SchedulesMissingVariables(schedules); len(missing) > 0 {
+			c.reportf("%s: variables not described for %s; the token cannot read them\n",
+				target, strings.Join(missing, ", "))
+		}
 	}
 	data, err = manifest.Marshal(repository.ToManifest(state))
 	if err != nil {
