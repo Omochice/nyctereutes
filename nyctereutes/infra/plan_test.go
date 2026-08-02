@@ -280,11 +280,29 @@ func TestInfraPlanShowsScheduleDrift(t *testing.T) {
 	}
 }
 
+// The declared schedule carries an empty variables block so the run reads the
+// live variables: without it the read is skipped and a value could not leak
+// whatever the renderer did, which would leave this test proving nothing.
+const scheduleWithVariablesManifest = `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: proj
+  owner: group
+spec:
+  visibility: internal
+  pipeline_schedules:
+    - description: weekly
+      ref: main
+      cron: "0 9 * * 1"
+      variables: []
+`
+
 // The schema now expresses a schedule's variables, so removing one is an
 // ordinary deletion rather than something to refuse, and the plan names the
-// keys that go with it.
+// keys that go with it. The value stays out: a plan is read aloud and pasted
+// into issues, and a schedule variable can hold a credential.
 func TestInfraPlanDeletesAScheduleWithVariables(t *testing.T) {
-	path := writeManifest(t, t.TempDir(), "a.yaml", scheduleManifest)
+	path := writeManifest(t, t.TempDir(), "a.yaml", scheduleWithVariablesManifest)
 	runner := &fakeInfraGlab{
 		projects: map[string]string{targetGroupProj: projJSON},
 		schedules: map[string]string{targetGroupProj: `[
