@@ -78,17 +78,17 @@ func (c *importCommand) document(
 ) (data []byte, undescribed bool) {
 	owner, name, ok := splitTarget(target)
 	if !ok {
-		c.failf("skip %q: not in <owner/project> form\n", target)
+		c.reportf("skip %q: not in <owner/project> form\n", target)
 		return nil, false
 	}
 	state, err := client.FetchRepository(ctx, owner, name)
 	if err != nil {
 		// The error already carries "fetch project <owner>/<name>" context.
-		c.failf("%v\n", err)
+		c.reportf("%v\n", err)
 		return nil, false
 	}
 	if state.IsNew {
-		c.failf("project %s not found on GitLab\n", target)
+		c.reportf("project %s not found on GitLab\n", target)
 		return nil, false
 	}
 	// An exported document describes the whole project, so its schedules and
@@ -98,22 +98,23 @@ func (c *importCommand) document(
 	// resource.
 	schedules, err := client.FetchSchedules(ctx, owner, name, true)
 	if err != nil {
-		c.failf("%v\n", err)
+		c.reportf("%v\n", err)
 		undescribed = true
 	} else {
 		state.PipelineSchedules = schedules
 	}
 	data, err = manifest.Marshal(repository.ToManifest(state))
 	if err != nil {
-		c.failf("marshal %s: %v\n", target, err)
+		c.reportf("marshal %s: %v\n", target, err)
 		return nil, false
 	}
 	return data, undescribed
 }
 
-// Reports a diagnostic on stderr, where a write failure is nothing the command
-// can act on: the stream it would use to say so is the one that just failed.
-func (c *importCommand) failf(format string, msgArgs ...any) {
+// Writes a diagnostic to stderr, whether it reports a failure or a limit on
+// what could be described. A write failure there is nothing the command can act
+// on: the stream it would use to say so is the one that just failed.
+func (c *importCommand) reportf(format string, msgArgs ...any) {
 	_, _ = fmt.Fprintf(c.inout.Stderr, format, msgArgs...)
 }
 
