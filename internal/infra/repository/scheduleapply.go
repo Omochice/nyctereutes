@@ -106,6 +106,9 @@ func (a *Applier) runSchedule(ctx context.Context, args ...string) error {
 	return nil
 }
 
+// Signals a create whose response carried no id to address the new schedule by.
+var errCreatedScheduleHasNoID = errors.New("created pipeline schedule has no id")
+
 // Creates a schedule and then adds its variables, which need the id GitLab
 // assigns and so cannot travel with the create.
 func (a *Applier) createSchedule(ctx context.Context, endpoint string, desired manifest.PipelineSchedule) error {
@@ -122,6 +125,14 @@ func (a *Applier) createSchedule(ctx context.Context, endpoint string, desired m
 	}
 	if err := json.Unmarshal(out, &created); err != nil {
 		return fmt.Errorf("parse created schedule: %w", err)
+	}
+	// Unmarshal accepts any object, so a response without an id leaves it zero
+	// and the variables would be posted to pipeline_schedules/0. The schedule
+	// itself exists by now, so the report has to say the variables are what is
+	// missing rather than name a schedule nobody can look up.
+	if created.ID == 0 {
+		return fmt.Errorf("%w: %q was created without one, so its variables were not written",
+			errCreatedScheduleHasNoID, desired.Description)
 	}
 	return a.applyVariables(ctx, fmt.Sprintf("%s/%d", endpoint, created.ID),
 		planVariables(desired.Variables, nil))

@@ -246,3 +246,23 @@ func TestApplyKeepsGoingPastAFailedDeleteForChangesNeedingNoSlot(t *testing.T) {
 		t.Errorf("calls = %d, want the later delete and the update to have run", len(writer.calls))
 	}
 }
+
+// json.Unmarshal accepts any object, so a create answered without an id would
+// leave it zero and post the variables to pipeline_schedules/0. The schedule
+// exists by then, so the report has to name the variables as what went missing.
+func TestApplyRefusesToWriteVariablesWithoutTheCreatedID(t *testing.T) {
+	writer := &recordingWriter{respAt: map[int][]byte{0: []byte(`{"description":"weekly"}`)}}
+	changes := []Change{scheduleCreate(manifest.PipelineSchedule{
+		Description: "weekly", Ref: "refs/heads/main", Cron: "0 9 * * 1",
+		Variables: []manifest.ScheduleVariable{{Key: "APP", Value: "a", VariableType: "env_var"}},
+	})}
+
+	results := NewApplier(writer).Apply(context.Background(), changes)
+
+	if !errors.Is(results[0].Err, errCreatedScheduleHasNoID) {
+		t.Fatalf("error = %v, want it to wrap errCreatedScheduleHasNoID", results[0].Err)
+	}
+	if len(writer.calls) != 1 {
+		t.Errorf("calls = %d, want no variable write against an unknown schedule", len(writer.calls))
+	}
+}
