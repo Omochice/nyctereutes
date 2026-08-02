@@ -39,14 +39,15 @@ type ApplyResult struct {
 // rather than stop at the first problem.
 func (a *Applier) Apply(ctx context.Context, changes []Change) []ApplyResult {
 	results := make([]ApplyResult, 0, len(changes))
-	// A failed delete strands what follows it: deletes run first to make room
-	// under the per-project limit, so the later changes were planned against a
-	// state that no longer holds. A failed create or update strands nothing,
-	// since no other schedule was waiting on it.
+	// GitLab caps how many schedules a project may hold, so the plan puts the
+	// deletes first and a create can be relying on one of them for its slot. A
+	// failed delete therefore strands the creates that follow, and only those:
+	// an update addresses a schedule that already exists and needs no slot, and
+	// a later delete frees one rather than consuming it.
 	deleteFailed := false
 	for _, change := range changes {
 		isSchedule := change.Field == fieldPipelineSchedule
-		if isSchedule && deleteFailed {
+		if isSchedule && change.Type == ChangeCreate && deleteFailed {
 			results = append(results, ApplyResult{
 				Change: change,
 				Err:    fmt.Errorf("pipeline schedule %q on %s: %w", scheduleName(change), change.Name, errScheduleChangeSkipped),

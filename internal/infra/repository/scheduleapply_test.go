@@ -24,6 +24,13 @@ func scheduleDelete(live LiveSchedule) Change {
 	}
 }
 
+func scheduleUpdate(desired manifest.PipelineSchedule, live LiveSchedule) Change {
+	return Change{
+		Type: ChangeUpdate, Name: "group/proj", Field: fieldPipelineSchedule,
+		OldValue: live, NewValue: desired,
+	}
+}
+
 // A schedule is created through its own endpoint rather than the projects PUT,
 // and every attribute goes with it because nothing exists to merge into.
 func TestApplyCreatesASchedule(t *testing.T) {
@@ -96,11 +103,10 @@ func TestApplyDeletesAScheduleByItsLiveID(t *testing.T) {
 	}
 }
 
-// Deletes run first to make room under the per-project schedule limit, so a
-// failed one leaves the project in a state the remaining changes were planned
-// against. They are reported rather than dropped, so the report accounts for
-// every change the plan showed.
-func TestApplyAbandonsRemainingScheduleChangesAfterAFailure(t *testing.T) {
+// A create can be relying on a delete for its slot under the per-project
+// schedule limit, so a failed delete strands it. It is reported rather than
+// dropped, so the report accounts for every change the plan showed.
+func TestApplySkipsAScheduleCreateAfterAFailedDelete(t *testing.T) {
 	writer := &recordingWriter{errAt: map[int]error{0: errBoom}}
 	changes := []Change{
 		scheduleDelete(LiveSchedule{ID: 5, Description: "old"}),
@@ -206,5 +212,37 @@ func TestApplyEncodesVariableKeysInThePath(t *testing.T) {
 	}
 	if want := "/variables/A%20B"; !strings.Contains(strings.Join(writer.calls[0].args, " "), want) {
 		t.Errorf("args = %v, want the key encoded as %q", writer.calls[0].args, want)
+	}
+}
+
+// Only a create needs the slot a delete frees. An update addresses a schedule
+// that already exists, and a later delete frees a slot rather than taking one,
+// so neither is abandoned because an earlier delete failed.
+func TestApplyKeepsGoingPastAFailedDeleteForChangesNeedingNoSlot(t *testing.T) {
+	writer := &recordingWriter{errAt: map[int]error{0: errBoom}}
+	changes := []Change{
+		scheduleDelete(LiveSchedule{ID: 5, Description: "old"}),
+		scheduleDelete(LiveSchedule{ID: 6, Description: "older"}),
+		scheduleUpdate(
+			manifest.PipelineSchedule{Description: "nightly", Ref: "refs/heads/main", Cron: "0 4 * * *"},
+			LiveSchedule{ID: 7, Description: "nightly", Ref: "refs/heads/main", Cron: "0 3 * * *"},
+		),
+	}
+
+	results := NewApplier(writer).Apply(context.Background(), changes)
+
+	if len(results) != 3 {
+		t.Fatalf("results = %+v, want one per planned change", results)
+	}
+	if results[0].Err == nil {
+		t.Error("first result should carry the failure")
+	}
+	for _, index := range []int{1, 2} {
+		if errors.Is(results[index].Err, errScheduleChangeSkipped) {
+			t.Errorf("result %d was skipped, want it attempted: %v", index, results[index].Err)
+		}
+	}
+	if len(writer.calls) != 3 {
+		t.Errorf("calls = %d, want the later delete and the update to have run", len(writer.calls))
 	}
 }
