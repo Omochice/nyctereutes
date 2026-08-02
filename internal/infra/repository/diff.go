@@ -15,6 +15,8 @@ const (
 	ChangeCreate ChangeType = "create"
 	// Marks a field whose live value differs from the declared one.
 	ChangeUpdate ChangeType = "update"
+	// Marks a schedule the manifest does not declare but GitLab has.
+	ChangeDelete ChangeType = "delete"
 )
 
 // Field names shared with the manifest struct tags, kept as constants so the
@@ -38,6 +40,11 @@ const (
 	fieldMergeCommitTemplate   = "merge_commit_template"
 	fieldSquashCommitTemplate  = "squash_commit_template"
 	fieldMergeRequestsTemplate = "merge_requests_template"
+
+	fieldRef          = "ref"
+	fieldCron         = "cron"
+	fieldCronTimezone = "cron_timezone"
+	fieldActive       = "active"
 )
 
 // One planned difference between a declared manifest and the live project: a
@@ -53,9 +60,15 @@ type Change struct {
 // Renders one plan line. The project header already carries the name, so
 // neither a create nor an update line repeats it.
 func (c Change) String() string {
+	if c.Field == fieldPipelineSchedule {
+		return renderScheduleChange(c)
+	}
 	switch c.Type {
 	case ChangeCreate:
 		return "+ new repository"
+	case ChangeDelete:
+		// Only a schedule is ever deleted, and that is rendered above.
+		return ""
 	case ChangeUpdate:
 		old := fmt.Sprintf("%v", c.OldValue)
 		next := fmt.Sprintf("%v", c.NewValue)
@@ -135,6 +148,7 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	if spec.Features != nil {
 		diffFeatures(&changes, name, spec.Features, current)
 	}
+	diffSchedules(&changes, name, spec.PipelineSchedules, current.PipelineSchedules)
 	return changes
 }
 

@@ -85,13 +85,6 @@ func (c *Client) FetchSchedules(
 	return schedules, nil
 }
 
-// The attributes a schedule must carry to be describable. They repeat the JSON
-// tags because a tag cannot name a constant.
-const (
-	fieldRef  = "ref"
-	fieldCron = "cron"
-)
-
 // Signals a schedule GitLab reports without an attribute a manifest requires.
 var errIncompleteLiveSchedule = errors.New("incomplete pipeline schedule")
 

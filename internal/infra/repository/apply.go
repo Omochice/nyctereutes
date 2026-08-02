@@ -52,10 +52,18 @@ var errUnexpectedValueType = errors.New("change value has unexpected type")
 // only updates, so a create is reported rather than performed.
 var errCreateUnsupported = errors.New("creating a project is not supported yet")
 
+// Signals a pipeline schedule difference this slice can describe but not write.
+// The plan reports it so drift is visible; writing one goes through endpoints of
+// its own and arrives with the next slice.
+var errScheduleWriteUnsupported = errors.New("writing a pipeline schedule is not supported yet")
+
 // Translates one change into its glab call. A create is reported unsupported;
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
+	if change.Field == fieldPipelineSchedule {
+		return fmt.Errorf("%w: %q on %s", errScheduleWriteUnsupported, change.NewValue, change.Name)
+	}
 	if change.Type == ChangeCreate {
 		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
 	}

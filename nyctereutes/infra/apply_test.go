@@ -21,6 +21,8 @@ import (
 type fakeApplyGlab struct {
 	projects   map[string]string // "owner/name" -> project JSON, absent means 404
 	catalog    map[string]bool   // "owner/name" -> catalog status, default false
+	schedules  map[string]string // "owner/name" -> schedule list JSON, default none
+	variables  map[string]string // schedule id -> single-schedule JSON, default no variables
 	writes     []string          // joined args of each write call, in order
 	writeBody  []string          // parallel to writes: stdin body, "" for none
 	failWrites map[string]bool   // "owner/name" whose writes fail
@@ -28,13 +30,20 @@ type fakeApplyGlab struct {
 }
 
 func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	// Checked before isProjectRead, whose shape a single-schedule read also has.
+	if id, ok := singleScheduleRead(args); ok {
+		return singleScheduleBody(f.variables, id), nil
+	}
 	if isProjectRead(args) {
 		return f.readProject(args)
 	}
-	// The catalog query is part of the read, not a write, so it must not be
-	// recorded as one.
+	// The catalog query and the schedule list are part of the read, not a
+	// write, so they must not be recorded as one.
 	if path, ok := catalogRead(args); ok {
 		return catalogBody(f.catalog[path]), nil
+	}
+	if path, ok := scheduleRead(args); ok {
+		return scheduleBody(f.schedules, path), nil
 	}
 	return f.recordWrite(nil, args)
 }
@@ -327,5 +336,47 @@ func TestInfraApplyExpandsDirectory(t *testing.T) {
 	}
 	if len(runner.writes) != 2 {
 		t.Errorf("writes = %v, want one per manifest in the directory", runner.writes)
+	}
+}
+
+// scheduleApplyManifest keeps the live visibility so only the schedules drift,
+// declaring one the project lacks while leaving out the one it has.
+const scheduleApplyManifest = `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: proj
+  owner: group
+spec:
+  visibility: private
+  pipeline_schedules:
+    - description: weekly
+      ref: main
+      cron: "0 9 * * 1"
+      active: false
+`
+
+const liveNightlyJSON = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *",
+  "cron_timezone":"UTC","active":true}]`
+
+// The plan reports a schedule difference so drift is visible, but writing one
+// goes through endpoints this slice does not use. Applying it says so rather
+// than sending the change down the scalar PUT path every other field takes.
+func TestInfraApplyReportsScheduleWritesUnsupported(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", scheduleApplyManifest)
+	runner := &fakeApplyGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: liveNightlyJSON},
+	}
+
+	exit, _, stderr := runWithRunner(runner, "infra", "apply", "--auto-approve", path)
+
+	if exit == 0 {
+		t.Errorf("exit = 0, want non-zero when a planned change cannot be written")
+	}
+	if len(runner.writes) != 0 {
+		t.Errorf("writes = %v, want none: no endpoint here can write a schedule", runner.writes)
+	}
+	if !strings.Contains(stderr, "not supported yet") {
+		t.Errorf("stderr should say the schedule write is unsupported\n%s", stderr)
 	}
 }

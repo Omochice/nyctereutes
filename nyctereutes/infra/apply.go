@@ -93,6 +93,11 @@ func (c *applyCommand) buildPlans(
 					failures++
 					continue
 				}
+				if err := loadSchedules(ctx, client, repo, state); err != nil {
+					_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
+					failures++
+					continue
+				}
 				changes := repository.Diff(repo, state)
 				if len(changes) == 0 {
 					continue
