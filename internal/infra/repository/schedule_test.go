@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
 // Two schedules as the list endpoint reports them, trimmed to the attributes
@@ -28,6 +29,13 @@ func isScheduleCall(args []string) bool {
 	})
 }
 
+// isSingleScheduleCall reports whether args address one schedule rather than
+// the list, which is the call that carries the variables.
+func isSingleScheduleCall(args []string) bool {
+	_, id, found := strings.Cut(args[len(args)-1], "/pipeline_schedules/")
+	return found && id != ""
+}
+
 // Answers the calls a fetch makes: the GraphQL catalog query, the schedule list
 // from listJSON, and the project itself. The args of the schedule call go to
 // record when one is given, which is what the tests about paging assert on.
@@ -36,6 +44,8 @@ func scheduleRunner(listJSON string, record *[]string) glab.RunnerFunc {
 		switch {
 		case len(args) > 1 && args[1] == "graphql":
 			return []byte(graphqlCatalogJSON(false)), nil
+		case isSingleScheduleCall(args):
+			return []byte(`{"variables":[]}`), nil
 		case isScheduleCall(args):
 			if record != nil {
 				*record = args
@@ -44,6 +54,109 @@ func scheduleRunner(listJSON string, record *[]string) glab.RunnerFunc {
 		default:
 			return []byte(sampleProjectJSON), nil
 		}
+	}
+}
+
+// variableRunner answers a fetch where each schedule has its own single-schedule
+// body, keyed by id, and records which of those bodies were requested.
+func variableRunner(listJSON string, single map[string]string, calls *[]string) glab.RunnerFunc {
+	return func(_ context.Context, args ...string) ([]byte, error) {
+		endpoint := args[len(args)-1]
+		switch {
+		case len(args) > 1 && args[1] == "graphql":
+			return []byte(graphqlCatalogJSON(false)), nil
+		case isSingleScheduleCall(args):
+			_, id, _ := strings.Cut(endpoint, "/pipeline_schedules/")
+			*calls = append(*calls, endpoint)
+			return []byte(single[id]), nil
+		case isScheduleCall(args):
+			return []byte(listJSON), nil
+		default:
+			return []byte(sampleProjectJSON), nil
+		}
+	}
+}
+
+// The list response carries no variables at all, so the only way to know
+// whether a schedule has any is to fetch it on its own. A later slice refuses
+// to delete a schedule carrying variables the schema cannot express, which is
+// what makes this read necessary before variables reach the manifest.
+func TestFetchRepositoryReadsScheduleVariables(t *testing.T) {
+	const listJSON = `[
+	  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC","active":true},
+	  {"id":2,"description":"weekly","ref":"refs/heads/main","cron":"0 9 * * 1","cron_timezone":"UTC","active":true}
+	]`
+	single := map[string]string{
+		"1": `{"id":1,"description":"nightly","variables":[
+		  {"variable_type":"env_var","key":"DEPLOY_ENV","value":"staging","raw":false},
+		  {"variable_type":"file","key":"CONFIG","value":"line one\nline two","raw":false}]}`,
+		"2": `{"id":2,"description":"weekly","variables":[]}`,
+	}
+	var singleCalls []string
+
+	schedules, err := NewClient(variableRunner(listJSON, single, &singleCalls)).
+		FetchSchedules(context.Background(), ownerGroup, nameProj, true)
+	if err != nil {
+		t.Fatalf("FetchSchedules: %v", err)
+	}
+
+	if len(singleCalls) != 2 {
+		t.Fatalf("single-schedule calls = %v, want one per schedule", singleCalls)
+	}
+	nightly := schedules[0]
+	if len(nightly.Variables) != 2 {
+		t.Fatalf("nightly variables = %+v, want 2", nightly.Variables)
+	}
+	want := ScheduleVariable{Key: "DEPLOY_ENV", Value: "staging", VariableType: "env_var"}
+	if nightly.Variables[0] != want {
+		t.Errorf("variable = %+v, want %+v", nightly.Variables[0], want)
+	}
+	if got := schedules[1].Variables; len(got) != 0 {
+		t.Errorf("weekly variables = %+v, want none", got)
+	}
+}
+
+// GitLab omits the variables field for a token below Maintainer that does not
+// own the schedule. The schedule itself is readable, so it survives the read
+// with its variables left unset, and the omission is named rather than turned
+// into a failure that would cost the schedule too.
+func TestFetchSchedulesKeepsAScheduleWhoseVariablesAreHidden(t *testing.T) {
+	const listJSON = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
+	for name, single := range map[string]string{
+		"field omitted": `{"id":1,"description":"nightly"}`,
+		"field null":    `{"id":1,"description":"nightly","variables":null}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			schedules, err := NewClient(variableRunner(listJSON, map[string]string{"1": single}, &calls)).
+				FetchSchedules(context.Background(), ownerGroup, nameProj, true)
+			if err != nil {
+				t.Fatalf("FetchSchedules: %v", err)
+			}
+			if len(schedules) != 1 {
+				t.Fatalf("schedules = %+v, want the schedule itself to survive", schedules)
+			}
+			if schedules[0].Variables != nil {
+				t.Errorf("variables = %v, want nil (hidden, not described)", schedules[0].Variables)
+			}
+			if got := SchedulesMissingVariables(schedules); !slices.Equal(got, []string{"nightly"}) {
+				t.Errorf("missing = %v, want the schedule named", got)
+			}
+		})
+	}
+}
+
+// A schedule the token can read reports its variables, so it is not named as
+// missing them; an empty list is a description rather than a silence.
+func TestSchedulesMissingVariablesNamesOnlyTheHidden(t *testing.T) {
+	schedules := []LiveSchedule{
+		{ID: 1, Description: "read none", Variables: []ScheduleVariable{}},
+		{ID: 2, Description: "hidden"},
+		{ID: 3, Description: "read some", Variables: []ScheduleVariable{{Key: "A"}}},
+	}
+
+	if got := SchedulesMissingVariables(schedules); !slices.Equal(got, []string{"hidden"}) {
+		t.Errorf("missing = %v, want only the hidden one", got)
 	}
 }
 
@@ -57,7 +170,7 @@ func TestFetchSchedulesRejectsDuplicateDescriptions(t *testing.T) {
 	]`
 
 	_, err := NewClient(scheduleRunner(duplicateJSON, nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), ownerGroup, nameProj, false)
 	if err == nil {
 		t.Fatal("FetchSchedules should reject duplicate live descriptions, got nil")
 	}
@@ -99,6 +212,34 @@ func TestFetchRepositoryDoesNotReadSchedules(t *testing.T) {
 	}
 }
 
+// The variables cost a request per schedule, so a caller that manages none must
+// not pay for them.
+func TestFetchSchedulesSkipsVariablesWhenNotAsked(t *testing.T) {
+	var singleCalls int
+	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
+		switch {
+		case isSingleScheduleCall(args):
+			singleCalls++
+			return []byte(`{"variables":[]}`), nil
+		case isScheduleCall(args):
+			return []byte(scheduleListJSON), nil
+		default:
+			return []byte(sampleProjectJSON), nil
+		}
+	})
+
+	schedules, err := NewClient(runner).FetchSchedules(context.Background(), ownerGroup, nameProj, false)
+	if err != nil {
+		t.Fatalf("FetchSchedules: %v", err)
+	}
+	if len(schedules) != 2 {
+		t.Fatalf("schedules = %+v, want 2", schedules)
+	}
+	if singleCalls != 0 {
+		t.Errorf("single-schedule calls = %d, want 0 when variables are not asked for", singleCalls)
+	}
+}
+
 // Schedules reach the manifest ordered by description rather than in the id
 // order GitLab lists them in, and each one's live attributes are carried
 // through unchanged.
@@ -135,7 +276,7 @@ func TestToManifestSortsSchedulesByDescription(t *testing.T) {
 func TestFetchSchedulesAsksGlabToPaginate(t *testing.T) {
 	var args []string
 	_, err := NewClient(scheduleRunner(scheduleListJSON, &args)).
-		FetchSchedules(context.Background(), "group/sub", "proj")
+		FetchSchedules(context.Background(), "group/sub", "proj", false)
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -157,7 +298,7 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 [{"id":2,"description":"weekly","ref":"refs/heads/main","cron":"0 9 * * 1"}]`
 
 	schedules, err := NewClient(scheduleRunner(twoPages, nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), ownerGroup, nameProj, false)
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -182,7 +323,7 @@ func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
 	} {
 		t.Run(testCase.field, func(t *testing.T) {
 			_, err := NewClient(scheduleRunner(testCase.body, nil)).
-				FetchSchedules(context.Background(), ownerGroup, nameProj)
+				FetchSchedules(context.Background(), ownerGroup, nameProj, false)
 			if !errors.Is(err, errIncompleteLiveSchedule) {
 				t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
 			}
@@ -202,7 +343,7 @@ func TestFetchSchedulesAcceptsAScheduleGitLabReportsInFull(t *testing.T) {
 	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
 
 	schedules, err := NewClient(scheduleRunner(body, nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), ownerGroup, nameProj, false)
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -221,7 +362,7 @@ func TestFetchSchedulesRefusesAResponseWithoutAList(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewClient(scheduleRunner(body, nil)).
-				FetchSchedules(context.Background(), ownerGroup, nameProj)
+				FetchSchedules(context.Background(), ownerGroup, nameProj, false)
 			if !errors.Is(err, errNoSchedulePage) {
 				t.Errorf("error = %v, want it to wrap errNoSchedulePage", err)
 			}
@@ -233,7 +374,7 @@ func TestFetchSchedulesRefusesAResponseWithoutAList(t *testing.T) {
 // stays a successful read of zero schedules.
 func TestFetchSchedulesReadsAnEmptyListAsNoSchedules(t *testing.T) {
 	schedules, err := NewClient(scheduleRunner("[]", nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), ownerGroup, nameProj, false)
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -244,7 +385,7 @@ func TestFetchSchedulesReadsAnEmptyListAsNoSchedules(t *testing.T) {
 
 func TestFetchSchedulesParsesEveryAttribute(t *testing.T) {
 	schedules, err := NewClient(scheduleRunner(scheduleListJSON, nil)).
-		FetchSchedules(context.Background(), "group", "proj")
+		FetchSchedules(context.Background(), "group", "proj", false)
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -264,5 +405,82 @@ func TestFetchSchedulesParsesEveryAttribute(t *testing.T) {
 	if got.ID != want.ID || got.Description != want.Description || got.Ref != want.Ref ||
 		got.Cron != want.Cron || got.CronTimezone != want.CronTimezone || got.Active != want.Active {
 		t.Errorf("schedule = %+v, want %+v", got, want)
+	}
+}
+
+// A manifest is a file under version control, so the same live state has to
+// produce the same bytes; GitLab returns a schedule's variables in no
+// guaranteed order, and the key is unique within a schedule.
+func TestToManifestSortsVariablesByKey(t *testing.T) {
+	state := &CurrentState{
+		Owner: ownerGroup,
+		Name:  nameProj,
+		PipelineSchedules: []LiveSchedule{{
+			ID: 1, Description: "nightly", Ref: "refs/heads/main", Cron: "0 3 * * *",
+			CronTimezone: "UTC", Active: true,
+			Variables: []ScheduleVariable{
+				{Key: "ZONE", Value: "b", VariableType: "env_var"},
+				{Key: "APP", Value: "a", VariableType: "file"},
+			},
+		}, {
+			ID: 2, Description: "weekly", Ref: "refs/heads/main", Cron: "0 9 * * 1",
+			CronTimezone: "UTC", Active: true,
+		}},
+	}
+
+	schedules := ToManifest(state).Spec.PipelineSchedules
+	got := schedules[0].Variables
+	if len(got) != 2 || got[0].Key != "APP" || got[1].Key != "ZONE" {
+		t.Fatalf("variables = %+v, want APP before ZONE", got)
+	}
+	want := manifest.ScheduleVariable{Key: "APP", Value: "a", VariableType: "file"}
+	if got[0] != want {
+		t.Errorf("variable = %+v, want %+v", got[0], want)
+	}
+	// The weekly schedule's variables were never read, so the document says
+	// nothing about them rather than declaring that it carries none.
+	if weekly := schedules[1].Variables; weekly != nil {
+		t.Errorf("weekly variables = %v, want nil (unread)", weekly)
+	}
+}
+
+// GitLab answers a schedule that carries no variable with an empty list, which
+// is a read rather than an absence, so the document declares the empty list.
+func TestToManifestDeclaresAReadEmptyVariableList(t *testing.T) {
+	state := &CurrentState{
+		Owner: ownerGroup,
+		Name:  nameProj,
+		PipelineSchedules: []LiveSchedule{{
+			ID: 1, Description: "nightly", Ref: "refs/heads/main", Cron: "0 3 * * *",
+			CronTimezone: "UTC", Active: true,
+			Variables: []ScheduleVariable{},
+		}},
+	}
+
+	got := ToManifest(state).Spec.PipelineSchedules[0].Variables
+	if got == nil || len(got) != 0 {
+		t.Errorf("variables = %v, want an empty list that declares none", got)
+	}
+}
+
+// GitLab's web UI saves CRLF, and a YAML literal block cannot carry a bare CR,
+// so a variable value arrives normalized the way a description or a template
+// does. Without it Marshal would fall back to quoting the whole value.
+func TestFetchSchedulesNormalizesVariableLineEndings(t *testing.T) {
+	const listJSON = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
+	single := map[string]string{
+		"1": `{"id":1,"variables":[{"key":"CONFIG","value":"one\r\ntwo\rthree","variable_type":"file"}]}`,
+	}
+	var calls []string
+
+	schedules, err := NewClient(variableRunner(listJSON, single, &calls)).
+		FetchSchedules(context.Background(), ownerGroup, nameProj, true)
+	if err != nil {
+		t.Fatalf("FetchSchedules: %v", err)
+	}
+
+	got := string(schedules[0].Variables[0].Value)
+	if want := "one\ntwo\nthree"; got != want {
+		t.Errorf("value = %q, want %q", got, want)
 	}
 }
