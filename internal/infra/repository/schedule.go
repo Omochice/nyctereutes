@@ -31,11 +31,14 @@ type LiveSchedule struct {
 	Variables []ScheduleVariable `json:"variables"`
 }
 
-// One variable attached to a pipeline schedule.
+// One variable attached to a pipeline schedule. The value is free text the same
+// way a description or a template is, and a file-typed one is routinely
+// multiline, so it carries the type that normalizes line endings: a bare CR
+// reaching the manifest would cost Marshal its literal block.
 type ScheduleVariable struct {
-	Key          string `json:"key"`
-	Value        string `json:"value"`
-	VariableType string `json:"variable_type"`
+	Key          string   `json:"key"`
+	Value        freeText `json:"value"`
+	VariableType string   `json:"variable_type"`
 }
 
 // Reads every pipeline schedule a project owns. The endpoint pages at 20 while
@@ -236,7 +239,7 @@ func toManifestVariables(live []ScheduleVariable) []manifest.ScheduleVariable {
 	for _, variable := range live {
 		variables = append(variables, manifest.ScheduleVariable{
 			Key:          variable.Key,
-			Value:        variable.Value,
+			Value:        string(variable.Value),
 			VariableType: manifest.VariableType(variable.VariableType),
 		})
 	}

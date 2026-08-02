@@ -439,3 +439,25 @@ func TestToManifestDeclaresAReadEmptyVariableList(t *testing.T) {
 		t.Errorf("variables = %v, want an empty list that declares none", got)
 	}
 }
+
+// GitLab's web UI saves CRLF, and a YAML literal block cannot carry a bare CR,
+// so a variable value arrives normalized the way a description or a template
+// does. Without it Marshal would fall back to quoting the whole value.
+func TestFetchSchedulesNormalizesVariableLineEndings(t *testing.T) {
+	const listJSON = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
+	single := map[string]string{
+		"1": `{"id":1,"variables":[{"key":"CONFIG","value":"one\r\ntwo\rthree","variable_type":"file"}]}`,
+	}
+	var calls []string
+
+	schedules, err := NewClient(variableRunner(listJSON, single, &calls)).
+		FetchSchedules(context.Background(), ownerGroup, nameProj, true)
+	if err != nil {
+		t.Fatalf("FetchSchedules: %v", err)
+	}
+
+	got := string(schedules[0].Variables[0].Value)
+	if want := "one\ntwo\nthree"; got != want {
+		t.Errorf("value = %q, want %q", got, want)
+	}
+}
