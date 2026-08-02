@@ -39,8 +39,25 @@ type ApplyResult struct {
 // rather than stop at the first problem.
 func (a *Applier) Apply(ctx context.Context, changes []Change) []ApplyResult {
 	results := make([]ApplyResult, 0, len(changes))
+	// A failed delete strands what follows it: deletes run first to make room
+	// under the per-project limit, so the later changes were planned against a
+	// state that no longer holds. A failed create or update strands nothing,
+	// since no other schedule was waiting on it.
+	deleteFailed := false
 	for _, change := range changes {
-		results = append(results, ApplyResult{Change: change, Err: a.applyChange(ctx, change)})
+		isSchedule := change.Field == fieldPipelineSchedule
+		if isSchedule && deleteFailed {
+			results = append(results, ApplyResult{
+				Change: change,
+				Err:    fmt.Errorf("pipeline schedule %q on %s: %w", scheduleName(change), change.Name, errScheduleChangeSkipped),
+			})
+			continue
+		}
+		err := a.applyChange(ctx, change)
+		if err != nil && isSchedule && change.Type == ChangeDelete {
+			deleteFailed = true
+		}
+		results = append(results, ApplyResult{Change: change, Err: err})
 	}
 	return results
 }
@@ -52,34 +69,20 @@ var errUnexpectedValueType = errors.New("change value has unexpected type")
 // only updates, so a create is reported rather than performed.
 var errCreateUnsupported = errors.New("creating a project is not supported yet")
 
-// Signals a pipeline schedule difference this slice can describe but not write.
-// The plan reports it so drift is visible; writing one goes through endpoints of
-// its own and arrives with the next slice.
-var errScheduleWriteUnsupported = errors.New("writing a pipeline schedule is not supported yet")
-
-// Translates one change into its glab call. A create is reported unsupported;
-// archived is toggled through its own endpoint; every other field is a scalar
-// PUT.
+// Translates one change into its glab call. Creating a project is reported
+// unsupported; archived is toggled through its own endpoint; every other field
+// is a scalar PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
-	if change.Field == fieldPipelineSchedule {
-		return fmt.Errorf("%w: %q on %s", errScheduleWriteUnsupported, change.NewValue, change.Name)
-	}
-	if change.Type == ChangeCreate {
+	if change.Type == ChangeCreate && change.Field == fieldRepository {
 		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
 	}
 	switch change.Field {
+	case fieldPipelineSchedule:
+		return wrapScheduleWrite(a.applySchedule(ctx, change), change)
 	case fieldArchived:
-		archived, ok := change.NewValue.(bool)
-		if !ok {
-			return fmt.Errorf("%w: archived got %T", errUnexpectedValueType, change.NewValue)
-		}
-		return a.setArchived(ctx, change.Name, archived)
+		return a.applyToggle(ctx, change, a.setArchived)
 	case fieldCICatalog:
-		enabled, ok := change.NewValue.(bool)
-		if !ok {
-			return fmt.Errorf("%w: ci_catalog got %T", errUnexpectedValueType, change.NewValue)
-		}
-		return a.setCatalogResource(ctx, change.Name, enabled)
+		return a.applyToggle(ctx, change, a.setCatalogResource)
 	case fieldTopics:
 		topics, ok := change.NewValue.([]string)
 		if !ok {
@@ -89,6 +92,18 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 	default:
 		return a.putField(ctx, change.Name, change.Field, fmt.Sprintf("%v", change.NewValue))
 	}
+}
+
+// Applies a change whose value is a boolean toggle written through its own
+// endpoint rather than as a field on the project.
+func (a *Applier) applyToggle(
+	ctx context.Context, change Change, set func(context.Context, string, bool) error,
+) error {
+	enabled, ok := change.NewValue.(bool)
+	if !ok {
+		return fmt.Errorf("%w: %s got %T", errUnexpectedValueType, change.Field, change.NewValue)
+	}
+	return set(ctx, change.Name, enabled)
 }
 
 // Archives or unarchives a project. Unlike other settings the archived state is

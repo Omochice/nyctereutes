@@ -358,10 +358,9 @@ spec:
 const liveNightlyJSON = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *",
   "cron_timezone":"UTC","active":true}]`
 
-// The plan reports a schedule difference so drift is visible, but writing one
-// goes through endpoints this slice does not use. Applying it says so rather
-// than sending the change down the scalar PUT path every other field takes.
-func TestInfraApplyReportsScheduleWritesUnsupported(t *testing.T) {
+// A declared list is the complete desired set, so applying it removes the
+// schedule GitLab has and adds the one it lacks, each through its own endpoint.
+func TestInfraApplyWritesScheduleChanges(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", scheduleApplyManifest)
 	runner := &fakeApplyGlab{
 		projects:  map[string]string{targetGroupProj: projJSON},
@@ -370,13 +369,18 @@ func TestInfraApplyReportsScheduleWritesUnsupported(t *testing.T) {
 
 	exit, _, stderr := runWithRunner(runner, "infra", "apply", "--auto-approve", path)
 
-	if exit == 0 {
-		t.Errorf("exit = 0, want non-zero when a planned change cannot be written")
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0\n%s", exit, stderr)
 	}
-	if len(runner.writes) != 0 {
-		t.Errorf("writes = %v, want none: no endpoint here can write a schedule", runner.writes)
+	if len(runner.writes) != 2 {
+		t.Fatalf("writes = %v, want a delete and a create", runner.writes)
 	}
-	if !strings.Contains(stderr, "not supported yet") {
-		t.Errorf("stderr should say the schedule write is unsupported\n%s", stderr)
+	if want := "projects/group%2Fproj/pipeline_schedules/1 --method DELETE"; !strings.Contains(runner.writes[0], want) {
+		t.Errorf("first write %q missing %q", runner.writes[0], want)
+	}
+	for _, want := range []string{"pipeline_schedules --method POST", "description=weekly", "active=false"} {
+		if !strings.Contains(runner.writes[1], want) {
+			t.Errorf("second write %q missing %q", runner.writes[1], want)
+		}
 	}
 }
