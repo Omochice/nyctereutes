@@ -108,8 +108,16 @@ func rejectIncompleteSchedules(schedules []LiveSchedule) error {
 	return nil
 }
 
+// Signals a response that carries no variables field to read.
+var errVariablesNotReported = errors.New("pipeline schedule reports no variables field")
+
 // Reads one schedule's variables. The list response omits them entirely, so
 // knowing whether a schedule carries any costs a request per schedule.
+//
+// GitLab includes the field only for a Maintainer, an Owner, or the schedule's
+// own creator, and omits it entirely otherwise. A pointer tells that omission
+// apart from an empty list, so a token that cannot see the variables is refused
+// rather than read as a schedule carrying none.
 func (c *Client) fetchScheduleVariables(
 	ctx context.Context, owner, name string, scheduleID int,
 ) ([]ScheduleVariable, error) {
@@ -119,12 +127,16 @@ func (c *Client) fetchScheduleVariables(
 		return nil, fmt.Errorf("fetch pipeline schedule %d on %s/%s: %w", scheduleID, owner, name, err)
 	}
 	var schedule struct {
-		Variables []ScheduleVariable `json:"variables"`
+		Variables *[]ScheduleVariable `json:"variables"`
 	}
 	if err := json.Unmarshal(out, &schedule); err != nil {
 		return nil, fmt.Errorf("parse pipeline schedule %d on %s/%s: %w", scheduleID, owner, name, err)
 	}
-	return schedule.Variables, nil
+	if schedule.Variables == nil {
+		return nil, fmt.Errorf("read pipeline schedule %d on %s/%s: %w",
+			scheduleID, owner, name, errVariablesNotReported)
+	}
+	return *schedule.Variables, nil
 }
 
 // Signals a project carrying two schedules described alike.

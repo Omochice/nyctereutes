@@ -116,6 +116,27 @@ func TestFetchRepositoryReadsScheduleVariables(t *testing.T) {
 	}
 }
 
+// GitLab omits the variables field for a token below Maintainer that does not
+// own the schedule. Reading that as a schedule carrying none would export a
+// document declaring a deletion the run never verified, so the read fails and
+// the caller reports the schedules as undescribed.
+func TestFetchSchedulesRefusesVariablesGitLabDoesNotReport(t *testing.T) {
+	const listJSON = `[{"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
+	for name, single := range map[string]string{
+		"field omitted": `{"id":1,"description":"nightly"}`,
+		"field null":    `{"id":1,"description":"nightly","variables":null}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var calls []string
+			_, err := NewClient(variableRunner(listJSON, map[string]string{"1": single}, &calls)).
+				FetchSchedules(context.Background(), ownerGroup, nameProj, true)
+			if !errors.Is(err, errVariablesNotReported) {
+				t.Errorf("error = %v, want it to wrap errVariablesNotReported", err)
+			}
+		})
+	}
+}
+
 // A project whose live schedules repeat a description is rejected, and the
 // error names the description and both ids, which is what the reader needs to
 // find the pair and rename one.
