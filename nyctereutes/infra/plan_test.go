@@ -375,3 +375,48 @@ func TestInfraPlanReadsNoVariablesWhenNoneAreDeclared(t *testing.T) {
 		t.Errorf("variable reads = %d, want 0 when no variable is declared", runner.singleCalls)
 	}
 }
+
+// A manifest that manages variables against a token that cannot read them
+// would plan every declared variable as an addition and every live one as
+// already gone, because GitLab answers such a reader with the field left out.
+// The token cannot write them either, so the run stops and says which schedule
+// it could not read.
+const variablesDeclaredManifest = `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: proj
+  owner: group
+spec:
+  visibility: private
+  pipeline_schedules:
+    - description: nightly
+      ref: main
+      cron: "0 3 * * *"
+      variables:
+        - key: DEPLOY_ENV
+          value: staging
+`
+
+func TestInfraPlanRefusesVariablesItCannotRead(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", variablesDeclaredManifest)
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: `[{"id":1,"description":"nightly",
+		  "ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC","active":true}]`},
+		// The single-schedule body GitLab returns to a reader who may not see
+		// the variables: the field is absent rather than empty.
+		variables: map[string]string{"1": `{"id":1,"description":"nightly"}`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit == 0 {
+		t.Errorf("exit = 0, want non-zero when the variables cannot be read")
+	}
+	if !strings.Contains(stderr, "nightly") {
+		t.Errorf("stderr should name the schedule that could not be read\n%s", stderr)
+	}
+	if strings.Contains(stdout, "DEPLOY_ENV") {
+		t.Errorf("no variable change may be planned against a state never read\n%s", stdout)
+	}
+}
