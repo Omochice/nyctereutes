@@ -88,7 +88,7 @@ func TestApplyAddsVariablesToACreatedSchedule(t *testing.T) {
 	}
 
 	calls := joinedCalls(writer)
-	want := "api projects/group%2Fproj/pipeline_schedules/42/variables --method POST -f key=APP"
+	want := "api projects/group%2Fproj/pipeline_schedules/42/variables --method POST -f key=APP -f value=a"
 	if !slices.ContainsFunc(calls, func(call string) bool { return strings.HasPrefix(call, want) }) {
 		t.Errorf("calls = %v, want one starting %q", calls, want)
 	}
