@@ -10,11 +10,29 @@ import (
 // remove extras and report absences; the manifest carries the value, which
 // makes keeping secrets out of these documents the operator's responsibility.
 type ScheduleVariable struct {
-	Key   string `yaml:"key"`
-	Value string `yaml:"value"`
-	// GitLab's variable_type: "env_var" passes the value as an environment
-	// variable, "file" writes it to a file and passes the path.
-	VariableType string `yaml:"variable_type"`
+	Key          string       `yaml:"key"`
+	Value        string       `yaml:"value"`
+	VariableType VariableType `yaml:"variable_type"`
+}
+
+// How a schedule variable reaches the pipeline: "env_var" passes the value as
+// an environment variable, "file" writes it to a file and passes the path.
+type VariableType string
+
+const (
+	variableTypeEnvVar = "env_var"
+	variableTypeFile   = "file"
+)
+
+// Rejects values outside the variable-type set at decode time, so a typo is a
+// local error naming both allowed values rather than a remote rejection.
+func (variableType *VariableType) UnmarshalYAML(data []byte) error {
+	value, err := enumValue(data, "variable type", variableTypeEnvVar, variableTypeFile)
+	if err != nil {
+		return err
+	}
+	*variableType = VariableType(value)
+	return nil
 }
 
 // GitLab reports a raw flag on a schedule variable but ignores it on both
@@ -24,7 +42,7 @@ type ScheduleVariable struct {
 // honours it.
 
 // What GitLab stores when a variable is created without a type.
-const defaultVariableType = "env_var"
+const defaultVariableType = variableTypeEnvVar
 
 // Decodes a variable, filling the attributes GitLab defaults on create. The
 // defaults are seeded before decoding, so a declared value overwrites them.

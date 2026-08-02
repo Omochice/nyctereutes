@@ -150,3 +150,24 @@ func TestMarshalOmitsUndeclaredVariables(t *testing.T) {
 		t.Errorf("variables = %v after a round trip, want nil", variables)
 	}
 }
+
+// GitLab accepts only env_var and file, so a typo is caught locally with both
+// spellings named rather than deferred to a rejection from the API.
+func TestParseRejectsUnknownVariableType(t *testing.T) {
+	doc := validDoc + `  pipeline_schedules:
+    - description: nightly
+      ref: main
+      cron: "0 3 * * *"
+      variables:
+        - key: A
+          value: b
+          variable_type: secret
+`
+	_, errs := Parse([]byte(doc))
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want one", errs)
+	}
+	if !strings.Contains(errs[0].Error(), "env_var, file") {
+		t.Errorf("error = %q, want it to list the allowed values", errs[0])
+	}
+}

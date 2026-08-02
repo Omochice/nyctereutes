@@ -237,7 +237,7 @@ func toManifestVariables(live []ScheduleVariable) []manifest.ScheduleVariable {
 		variables = append(variables, manifest.ScheduleVariable{
 			Key:          variable.Key,
 			Value:        variable.Value,
-			VariableType: variable.VariableType,
+			VariableType: manifest.VariableType(variable.VariableType),
 		})
 	}
 	slices.SortFunc(variables, func(left, right manifest.ScheduleVariable) int {
