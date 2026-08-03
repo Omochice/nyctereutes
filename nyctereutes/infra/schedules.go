@@ -51,8 +51,19 @@ var errVariablesNotReadable = errors.New("pipeline schedule variables are not re
 // would plan every declared variable as an addition and every live one as
 // already gone. The token cannot write them either, so there is nothing to
 // gain by continuing.
+//
+// Only a schedule the manifest manages the variables of is checked. The read
+// asks for every schedule's variables because the endpoint is per schedule and
+// the manifest pairs by description, so a project can carry schedules nobody
+// declared; those going unread costs the plan nothing.
 func refuseHiddenVariables(repo *manifest.Repository, schedules []repository.LiveSchedule) error {
-	hidden := repository.SchedulesMissingVariables(schedules)
+	managed := managedVariableDescriptions(repo.Spec.PipelineSchedules)
+	var hidden []string
+	for _, description := range repository.SchedulesMissingVariables(schedules) {
+		if _, ok := managed[description]; ok {
+			hidden = append(hidden, description)
+		}
+	}
 	if len(hidden) == 0 {
 		return nil
 	}
@@ -60,12 +71,18 @@ func refuseHiddenVariables(repo *manifest.Repository, schedules []repository.Liv
 		repo.Metadata.Owner, repo.Metadata.Name, errVariablesNotReadable, strings.Join(hidden, ", "))
 }
 
-// Reports whether any declared schedule manages its variables.
-func declaresVariables(schedules []manifest.PipelineSchedule) bool {
+// The descriptions of the schedules whose variables the manifest declares.
+func managedVariableDescriptions(schedules []manifest.PipelineSchedule) map[string]struct{} {
+	managed := make(map[string]struct{}, len(schedules))
 	for _, schedule := range schedules {
 		if schedule.Variables != nil {
-			return true
+			managed[schedule.Description] = struct{}{}
 		}
 	}
-	return false
+	return managed
+}
+
+// Reports whether any declared schedule manages its variables.
+func declaresVariables(schedules []manifest.PipelineSchedule) bool {
+	return len(managedVariableDescriptions(schedules)) > 0
 }

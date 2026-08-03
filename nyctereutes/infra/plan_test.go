@@ -438,3 +438,35 @@ func TestInfraPlanRefusesVariablesItCannotRead(t *testing.T) {
 		t.Errorf("no variable change may be planned against a state never read\n%s", stdout)
 	}
 }
+
+// The read asks for every schedule's variables because the endpoint is per
+// schedule, so a project carrying one nobody declared answers with the field
+// left out for it. Only a schedule the manifest manages the variables of can
+// stop the run: the undeclared one is being removed, and its variables go with
+// it whether or not they were ever visible.
+func TestInfraPlanIgnoresHiddenVariablesOnAnUndeclaredSchedule(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", variablesDeclaredManifest)
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: `[
+		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *",
+		   "cron_timezone":"UTC","active":true},
+		  {"id":2,"description":"someone else's","ref":"refs/heads/main","cron":"0 5 * * *",
+		   "cron_timezone":"UTC","active":true}]`},
+		variables: map[string]string{
+			"1": `{"id":1,"variables":[{"variable_type":"env_var","key":"DEPLOY_ENV","value":"staging"}]}`,
+			// The schedule the manifest does not declare, answered the way GitLab
+			// answers a reader who may not see its variables.
+			"2": `{"id":2,"description":"someone else's"}`,
+		},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0: only a declared schedule's variables matter\n%s", exit, stderr)
+	}
+	if !strings.Contains(stdout, `- pipeline_schedule "someone else's"`) {
+		t.Errorf("the undeclared schedule should still be planned for removal\n%s", stdout)
+	}
+}
