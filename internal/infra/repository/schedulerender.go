@@ -18,8 +18,11 @@ func renderScheduleChange(change Change) string {
 	switch change.Type {
 	case ChangeDelete:
 		live, _ := change.OldValue.(LiveSchedule)
-		// The variables go with the schedule, so they are named here. Nothing
-		// else in the plan mentions them, and their values exist only on GitLab.
+		// The variables go with the schedule, so any that were read are named
+		// here: nothing else in the plan mentions them. A schedule whose
+		// variables went unread, which is every schedule when no manifest
+		// manages any, is rendered without them. Values never appear; they exist
+		// only on GitLab and a plan is read aloud and pasted into issues.
 		return scheduleBlock("-", live.Description, removedVariables(live.Variables))
 	case ChangeCreate:
 		desired, _ := change.NewValue.(manifest.PipelineSchedule)
