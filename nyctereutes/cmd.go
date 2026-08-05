@@ -83,9 +83,6 @@ func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
 	parser.Name = "nyctereutes"
-	// Carried in the usage text rather than printed separately, so it reaches
-	// both --help and every parse failure, which render through the same help
-	// writer.
 	parser.LongDescription = doc.Hint
 	// With --version set, go-flags would still run the subcommand (and its side
 	// effects) during ParseArgs, so skip execution here.
@@ -120,9 +117,7 @@ func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 			return 1
 		}
 		// A runtime error returned from a subcommand's Execute; the usage help
-		// is unrelated, so only the error itself is reported. The hint follows
-		// because this path never renders the usage text that carries it, and a
-		// failure is when a reader most wants the documentation.
+		// is unrelated, so it is not rendered.
 		_, _ = fmt.Fprintln(inout.Stderr, err)
 		_, _ = fmt.Fprintln(inout.Stderr, doc.Hint)
 		return 1

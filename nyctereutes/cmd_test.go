@@ -181,10 +181,6 @@ func TestUnknownSubcommandReportsError(t *testing.T) {
 	}
 }
 
-// The hint is for a reader who never asked for documentation. An agent that
-// meets this CLI learns the embedded pages exist only if the output it already
-// looks at says so, which is why the three tests below cover the three places
-// a first-time reader is most likely to be looking.
 func TestHelpPointsAtTheEmbeddedDocumentation(t *testing.T) {
 	exit, stdout, stderr := runOut([]string{"--help"})
 

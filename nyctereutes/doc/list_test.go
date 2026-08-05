@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// The shape `doc list` promises its reader: an entry per document plus the
-// instruction for reading one.
 type listOutput struct {
 	Results []struct {
 		Name        string `json:"name"`
@@ -40,9 +38,6 @@ func TestDocListWritesResultsAndHelpAsJSON(t *testing.T) {
 	}
 }
 
-// The help string spells its placeholder in angle brackets, which Go's encoder
-// escapes into < unless told otherwise. That leaves the reader most likely
-// to copy the command a command they cannot paste.
 func TestDocListWritesTheHelpTextLiterally(t *testing.T) {
 	exit, stdout, stderr := run("doc", "list")
 
@@ -54,9 +49,6 @@ func TestDocListWritesTheHelpTextLiterally(t *testing.T) {
 	}
 }
 
-// Guards the shipped pages rather than the collector: a page added without a
-// description would still be listed, and a reader choosing between pages would
-// have nothing to choose on.
 func TestDocListDescribesEveryShippedDocument(t *testing.T) {
 	exit, stdout, stderr := run("doc", "list")
 

@@ -7,8 +7,6 @@ import (
 	"testing/fstest"
 )
 
-// A page as the collector sees it, written out here so the tests can state a
-// tree the shipped documentation cannot contain.
 func page(body string) *fstest.MapFile {
 	return &fstest.MapFile{Data: []byte(body)}
 }
@@ -33,14 +31,11 @@ func TestDocumentsReadTheDescriptionFromFrontmatter(t *testing.T) {
 	}
 }
 
-// A name is what a reader types, so it says nothing about where the file sits.
-// Keeping the tree flat is what makes that possible, and a nested page would
-// have to be named around the directory holding it.
 func TestDocumentsIgnoreAnythingBelowTheTopLevel(t *testing.T) {
 	described := page("---\ndescription: A page.\n---\n\n# page\n")
 	fsys := fstest.MapFS{
-		"thing.md":     described,
-		"cmd/other.md": described,
+		"thing.md":        described,
+		"nested/other.md": described,
 	}
 
 	docs, err := documents(fsys)
@@ -52,9 +47,6 @@ func TestDocumentsIgnoreAnythingBelowTheTopLevel(t *testing.T) {
 	}
 }
 
-// The order pins what `doc list` promises its reader. It holds today because
-// the directory read is sorted, and the test keeps it holding if the collector
-// is ever rewritten around a map, whose range order is deliberately unstable.
 func TestDocumentsAreOrderedByName(t *testing.T) {
 	described := page("---\ndescription: A page.\n---\n\n# page\n")
 	fsys := fstest.MapFS{

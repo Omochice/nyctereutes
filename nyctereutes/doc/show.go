@@ -27,8 +27,6 @@ func (c *showCommand) Execute(args []string) error {
 	if err != nil {
 		return err
 	}
-	// An [fs.FS] rejects a path that climbs out of the tree, so a name cannot
-	// reach a file the build never embedded.
 	page, err := fs.ReadFile(fsys, args[0]+ext)
 	if err != nil {
 		return notFound(fsys, args[0])
@@ -37,8 +35,7 @@ func (c *showCommand) Execute(args []string) error {
 	return nil
 }
 
-// Reports a name no page carries, naming the pages that do exist so a reader
-// who guessed wrong recovers from this message instead of listing again.
+// Reports a name no page carries, listing the names that do exist.
 func notFound(fsys fs.FS, name string) error {
 	docs, err := documents(fsys)
 	if err != nil {

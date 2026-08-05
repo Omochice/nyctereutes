@@ -23,8 +23,6 @@ func TestDocShowWritesTheDocumentUnchanged(t *testing.T) {
 	}
 }
 
-// A reader that guessed a name wrong should recover from the failure itself,
-// without being sent back to doc list for a name it nearly had.
 func TestDocShowReportsAnUnknownNameWithTheAvailableOnes(t *testing.T) {
 	exit, stdout, stderr := run("doc", "show", "nope")
 

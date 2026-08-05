@@ -12,8 +12,7 @@ type listCommand struct {
 	inout *cli.ProcInout
 }
 
-// What `doc list` writes. The help string travels with the results so a reader
-// that has only this output still learns how to read a page.
+// What `doc list` writes.
 type listing struct {
 	Results []document `json:"results"`
 	Help    string     `json:"help"`
@@ -32,8 +31,6 @@ func (c *listCommand) Execute(_ []string) error {
 	}
 	encoder := json.NewEncoder(c.inout.Stdout)
 	encoder.SetIndent("", "  ")
-	// The help string is meant to be copied into a terminal, and the default
-	// escaping would render its placeholder as an escape sequence.
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(listing{Results: docs, Help: listHelp}); err != nil {
 		return fmt.Errorf("encode the documentation as JSON: %w", err)

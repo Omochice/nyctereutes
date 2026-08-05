@@ -11,26 +11,11 @@ import (
 	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
-// The extension every documentation page carries, and the suffix a page's name
-// drops.
-const ext = ".md"
-
-// The directory the pages sit in. It groups the markdown for the repository,
-// which is not something a reader typing a name should have to know, so the
-// pages are presented with it as their root rather than as part of a name.
-const dir = "cmd"
-
-// The embedded pages, rooted at the directory holding them.
-func pages() (fs.FS, error) {
-	rooted, err := fs.Sub(docfs.FS, dir)
-	if err != nil {
-		return nil, fmt.Errorf("open the embedded documentation: %w", err)
-	}
-	return rooted, nil
-}
-
-// The line that opens and closes a page's frontmatter.
-const fence = "---\n"
+const (
+	ext   = ".md"
+	dir   = "cmd"
+	fence = "---\n"
+)
 
 var (
 	errNoFrontmatter       = errors.New("no frontmatter")
@@ -43,10 +28,16 @@ type document struct {
 	Description string `json:"description"`
 }
 
-// Collects every page in fsys, which [fs.ReadDir] returns in name order. Only the
-// top level is read, so a page's name is its file name and carries no path the
-// reader would have to learn. The filesystem is a parameter rather than the
-// embedded one so a test can present a tree the real documentation cannot.
+// The embedded pages, with the directory holding them as the root.
+func pages() (fs.FS, error) {
+	rooted, err := fs.Sub(docfs.FS, dir)
+	if err != nil {
+		return nil, fmt.Errorf("open the embedded documentation: %w", err)
+	}
+	return rooted, nil
+}
+
+// Collects the pages at the root of fsys, in name order.
 func documents(fsys fs.FS) ([]document, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
@@ -74,9 +65,7 @@ func documents(fsys fs.FS) ([]document, error) {
 	return docs, nil
 }
 
-// Reads the description a page declares in its frontmatter. A page states it
-// there rather than in its prose because the prose says what a command does,
-// while a reader deciding which page to open needs to know when to open it.
+// Reads the description a page declares in its frontmatter.
 func describe(page []byte) (string, error) {
 	body, opened := strings.CutPrefix(string(page), fence)
 	if !opened {
