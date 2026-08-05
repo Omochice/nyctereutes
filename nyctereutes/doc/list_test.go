@@ -2,6 +2,7 @@ package doc_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -36,6 +37,20 @@ func TestDocListWritesResultsAndHelpAsJSON(t *testing.T) {
 	}
 	if got.Help == "" {
 		t.Error("help is empty, want the instruction to run doc show")
+	}
+}
+
+// The help string spells its placeholder in angle brackets, which Go's encoder
+// escapes into < unless told otherwise. That leaves the reader most likely
+// to copy the command a command they cannot paste.
+func TestDocListWritesTheHelpTextLiterally(t *testing.T) {
+	exit, stdout, stderr := run("doc", "list")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
+	}
+	if want := "doc show <name>"; !strings.Contains(stdout, want) {
+		t.Errorf("stdout does not carry %q literally:\n%s", want, stdout)
 	}
 }
 
