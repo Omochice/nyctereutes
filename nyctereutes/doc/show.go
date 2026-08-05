@@ -12,6 +12,7 @@ import (
 
 var (
 	errShowNeedsName  = errors.New("no document name given")
+	errShowOneName    = errors.New("doc show reads one document at a time")
 	errNoSuchDocument = errors.New("no such document")
 )
 
@@ -24,10 +25,16 @@ func (c *showCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errShowNeedsName
 	}
+	if len(args) > 1 {
+		return fmt.Errorf("%w: %s", errShowOneName, strings.Join(args[1:], ", "))
+	}
 	fsys := docfs.Pages()
 	page, err := fs.ReadFile(fsys, args[0]+ext)
 	if err != nil {
-		return notFound(fsys, args[0])
+		if errors.Is(err, fs.ErrNotExist) {
+			return notFound(fsys, args[0])
+		}
+		return fmt.Errorf("read the document %s: %w", args[0], err)
 	}
 	_, _ = fmt.Fprint(c.inout.Stdout, string(page))
 	return nil
