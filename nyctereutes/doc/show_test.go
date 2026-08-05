@@ -17,7 +17,10 @@ func TestDocShowWritesTheDocumentWithoutItsFrontmatter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the embedded page the test compares against: %v", err)
 	}
-	_, afterOpeningFence, _ := strings.Cut(string(page), "---\n")
+	// A checkout may write the page with carriage returns, which the command
+	// normalizes; the comparison has to start from the same text.
+	normalized := strings.ReplaceAll(string(page), "\r\n", "\n")
+	_, afterOpeningFence, _ := strings.Cut(normalized, "---\n")
 	_, want, found := strings.Cut(afterOpeningFence, "---\n")
 	if !found {
 		t.Fatalf("the page the test compares against carries no frontmatter:\n%s", page)
