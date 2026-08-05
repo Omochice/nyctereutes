@@ -2,8 +2,11 @@ package doc_test
 
 import (
 	"encoding/json"
+	"io/fs"
 	"strings"
 	"testing"
+
+	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 type listOutput struct {
@@ -50,14 +53,26 @@ func TestDocListWritesTheHelpTextLiterally(t *testing.T) {
 }
 
 func TestDocListDescribesEveryShippedDocument(t *testing.T) {
+	entries, err := fs.ReadDir(docfs.Pages(), ".")
+	if err != nil {
+		t.Fatalf("read the embedded documentation: %v", err)
+	}
+
 	exit, stdout, stderr := run("doc", "list")
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
 	}
-	for _, result := range decodeList(t, stdout).Results {
+	results := decodeList(t, stdout).Results
+	if len(results) != len(entries) {
+		t.Errorf("got %d results for %d embedded pages", len(results), len(entries))
+	}
+	for _, result := range results {
 		if result.Description == "" {
 			t.Errorf("%s has no description, want the one declared in its frontmatter", result.Name)
 		}
+	}
+	if stderr != "" {
+		t.Errorf("stderr = %q, want no page reported as unreadable", stderr)
 	}
 }

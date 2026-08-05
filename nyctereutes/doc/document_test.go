@@ -16,9 +16,12 @@ func TestDocumentsReadTheDescriptionFromFrontmatter(t *testing.T) {
 		"thing.md": page("---\ndescription: What thing does, and when to read this.\n---\n\n# thing\n"),
 	}
 
-	docs, err := documents(fsys)
+	docs, problems, err := documents(fsys)
 	if err != nil {
 		t.Fatalf("documents: %v", err)
+	}
+	if len(problems) != 0 {
+		t.Errorf("problems = %v, want none", problems)
 	}
 	if len(docs) != 1 {
 		t.Fatalf("got %d documents, want 1", len(docs))
@@ -38,7 +41,7 @@ func TestDocumentsIgnoreAnythingBelowTheTopLevel(t *testing.T) {
 		"nested/other.md": described,
 	}
 
-	docs, err := documents(fsys)
+	docs, _, err := documents(fsys)
 	if err != nil {
 		t.Fatalf("documents: %v", err)
 	}
@@ -55,7 +58,7 @@ func TestDocumentsAreOrderedByName(t *testing.T) {
 		"mid.md":   described,
 	}
 
-	docs, err := documents(fsys)
+	docs, _, err := documents(fsys)
 	if err != nil {
 		t.Fatalf("documents: %v", err)
 	}
@@ -69,23 +72,62 @@ func TestDocumentsAreOrderedByName(t *testing.T) {
 	}
 }
 
-func TestDocumentsRejectAPageThatDeclaresNoDescription(t *testing.T) {
+func TestDocumentsKeepThePagesThatCanBeRead(t *testing.T) {
+	fsys := fstest.MapFS{
+		"good.md": page("---\ndescription: A page.\n---\n\n# good\n"),
+		"bad.md":  page("# bad\n"),
+	}
+
+	docs, problems, err := documents(fsys)
+	if err != nil {
+		t.Fatalf("documents: %v", err)
+	}
+	if len(docs) != 1 || docs[0].Name != "good" {
+		t.Errorf("documents = %v, want only the page that could be read", docs)
+	}
+	if len(problems) != 1 {
+		t.Fatalf("got %d problems, want the unreadable page reported once", len(problems))
+	}
+	if !strings.Contains(problems[0].Error(), "bad.md") {
+		t.Errorf("problem does not name the page: %v", problems[0])
+	}
+}
+
+func TestDescribeAcceptsEveryClosedFrontmatter(t *testing.T) {
+	for _, testCase := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{"declared description", "---\ndescription: A page.\n---\n\n# p\n", "A page."},
+		{"no newline after the closing fence", "---\ndescription: A page.\n---", "A page."},
+		{"carriage returns", "---\r\ndescription: A page.\r\n---\r\n\r\n# p\r\n", "A page."},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := describe([]byte(testCase.body))
+			if err != nil {
+				t.Fatalf("describe: %v", err)
+			}
+			if got != testCase.want {
+				t.Errorf("description = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestDescribeRejectsAPageWithoutADescription(t *testing.T) {
 	for _, testCase := range []struct {
 		name string
 		body string
 	}{
 		{"no frontmatter at all", "# bare\n"},
 		{"frontmatter never closed", "---\ndescription: A page.\n\n# bare\n"},
+		{"empty frontmatter", "---\n---\n\n# bare\n"},
+		{"another key but no description", "---\ntitle: bare\n---\n\n# bare\n"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fsys := fstest.MapFS{"bare.md": page(testCase.body)}
-
-			_, err := documents(fsys)
-			if err == nil {
-				t.Fatal("documents succeeded, want a failure naming the page")
-			}
-			if !strings.Contains(err.Error(), "bare.md") {
-				t.Errorf("error does not name the page: %v", err)
+			if _, err := describe([]byte(testCase.body)); err == nil {
+				t.Error("describe succeeded, want a failure")
 			}
 		})
 	}
