@@ -53,3 +53,28 @@ func TestDocShowRequiresAName(t *testing.T) {
 		t.Error("stderr is empty, want the missing name reported")
 	}
 }
+
+func TestDocShowRejectsASecondName(t *testing.T) {
+	exit, stdout, stderr := run("doc", "show", "dep", "infra")
+
+	if exit != 1 {
+		t.Fatalf("exit = %d, want 1 when more than one name is given", exit)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, want no page written for a rejected invocation", stdout)
+	}
+	if !strings.Contains(stderr, "infra") {
+		t.Errorf("stderr does not name the argument that was rejected\n%s", stderr)
+	}
+}
+
+func TestDocShowReportsAnUnreadableNameAsItself(t *testing.T) {
+	exit, _, stderr := run("doc", "show", "../secret")
+
+	if exit != 1 {
+		t.Fatalf("exit = %d, want 1 for a name that is not a valid path", exit)
+	}
+	if strings.Contains(stderr, "no such document") {
+		t.Errorf("stderr reports absence for a name that failed to resolve\n%s", stderr)
+	}
+}
