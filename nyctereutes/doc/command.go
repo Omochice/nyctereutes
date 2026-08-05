@@ -4,6 +4,14 @@ package doc
 
 import "github.com/Omochice/nyctereutes/cli"
 
+// Points a reader at the embedded documentation. It is declared beside the
+// command it advertises but emitted by commands elsewhere, because a reader who
+// never runs doc list learns these pages exist only from output they were
+// already looking at.
+const Hint = "If you are a coding agent, run `nyctereutes doc list` for the documentation " +
+	"embedded in this binary and `nyctereutes doc show <name>` to read a page, " +
+	"before answering questions about nyctereutes or diagnosing its failures."
+
 // The command tree go-flags parses "doc" and its subcommands into. It has no
 // Execute of its own: "doc" alone is a usage error, so the streams are held by
 // the subcommands rather than here.
