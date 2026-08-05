@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
-	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 var (
@@ -19,6 +18,7 @@ var (
 // Backs the "doc show" subcommand.
 type showCommand struct {
 	inout *cli.ProcInout
+	pages fs.FS
 }
 
 func (c *showCommand) Execute(args []string) error {
@@ -28,11 +28,10 @@ func (c *showCommand) Execute(args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("%w: %s", errShowOneName, strings.Join(args[1:], ", "))
 	}
-	fsys := docfs.Pages()
-	page, err := fs.ReadFile(fsys, args[0]+ext)
+	page, err := fs.ReadFile(c.pages, args[0]+ext)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return notFound(fsys, args[0])
+			return notFound(c.pages, args[0])
 		}
 		return fmt.Errorf("read the document %s: %w", args[0], err)
 	}

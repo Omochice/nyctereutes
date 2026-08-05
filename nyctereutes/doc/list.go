@@ -3,14 +3,15 @@ package doc
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 
 	"github.com/Omochice/nyctereutes/cli"
-	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 // Backs the "doc list" subcommand.
 type listCommand struct {
 	inout *cli.ProcInout
+	pages fs.FS
 }
 
 // What `doc list` writes.
@@ -22,7 +23,7 @@ type listing struct {
 const listHelp = "Run `nyctereutes doc show <name>` to read one of these documents."
 
 func (c *listCommand) Execute(_ []string) error {
-	docs, problems, err := documents(docfs.Pages())
+	docs, problems, err := documents(c.pages)
 	if err != nil {
 		return err
 	}
