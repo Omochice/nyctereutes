@@ -22,9 +22,12 @@ type listing struct {
 const listHelp = "Run `nyctereutes doc show <name>` to read one of these documents."
 
 func (c *listCommand) Execute(_ []string) error {
-	docs, err := documents(docfs.Pages())
+	docs, problems, err := documents(docfs.Pages())
 	if err != nil {
 		return err
+	}
+	for _, problem := range problems {
+		_, _ = fmt.Fprintln(c.inout.Stderr, problem)
 	}
 	encoder := json.NewEncoder(c.inout.Stdout)
 	encoder.SetIndent("", "  ")

@@ -35,7 +35,7 @@ func (c *showCommand) Execute(args []string) error {
 
 // Reports a name no page carries, listing the names that do exist.
 func notFound(fsys fs.FS, name string) error {
-	docs, err := documents(fsys)
+	docs, _, err := documents(fsys)
 	if err != nil {
 		return fmt.Errorf("%w: %s: %w", errNoSuchDocument, name, err)
 	}
