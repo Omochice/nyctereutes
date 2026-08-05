@@ -15,7 +15,7 @@ func page(body string) *fstest.MapFile {
 
 func TestDocumentsReadTheDescriptionFromFrontmatter(t *testing.T) {
 	fsys := fstest.MapFS{
-		"cmd/thing.md": page("---\ndescription: What thing does, and when to read this.\n---\n\n# thing\n"),
+		"thing.md": page("---\ndescription: What thing does, and when to read this.\n---\n\n# thing\n"),
 	}
 
 	docs, err := documents(fsys)
@@ -25,7 +25,7 @@ func TestDocumentsReadTheDescriptionFromFrontmatter(t *testing.T) {
 	if len(docs) != 1 {
 		t.Fatalf("got %d documents, want 1", len(docs))
 	}
-	if want := "cmd/thing"; docs[0].Name != want {
+	if want := "thing"; docs[0].Name != want {
 		t.Errorf("name = %q, want %q", docs[0].Name, want)
 	}
 	if want := "What thing does, and when to read this."; docs[0].Description != want {
@@ -33,15 +33,34 @@ func TestDocumentsReadTheDescriptionFromFrontmatter(t *testing.T) {
 	}
 }
 
+// A name is what a reader types, so it says nothing about where the file sits.
+// Keeping the tree flat is what makes that possible, and a nested page would
+// have to be named around the directory holding it.
+func TestDocumentsIgnoreAnythingBelowTheTopLevel(t *testing.T) {
+	described := page("---\ndescription: A page.\n---\n\n# page\n")
+	fsys := fstest.MapFS{
+		"thing.md":     described,
+		"cmd/other.md": described,
+	}
+
+	docs, err := documents(fsys)
+	if err != nil {
+		t.Fatalf("documents: %v", err)
+	}
+	if len(docs) != 1 || docs[0].Name != "thing" {
+		t.Errorf("documents = %v, want only the top-level thing", docs)
+	}
+}
+
 // The order pins what `doc list` promises its reader. It holds today because
-// the walk is lexical, and the test keeps it holding if the collector is ever
-// rewritten around a map, whose range order is deliberately unstable.
+// the directory read is sorted, and the test keeps it holding if the collector
+// is ever rewritten around a map, whose range order is deliberately unstable.
 func TestDocumentsAreOrderedByName(t *testing.T) {
 	described := page("---\ndescription: A page.\n---\n\n# page\n")
 	fsys := fstest.MapFS{
-		"cmd/zeta.md":  described,
-		"cmd/alpha.md": described,
-		"top.md":       described,
+		"zeta.md":  described,
+		"alpha.md": described,
+		"mid.md":   described,
 	}
 
 	docs, err := documents(fsys)
@@ -52,7 +71,7 @@ func TestDocumentsAreOrderedByName(t *testing.T) {
 	for _, doc := range docs {
 		names = append(names, doc.Name)
 	}
-	want := []string{"cmd/alpha", "cmd/zeta", "top"}
+	want := []string{"alpha", "mid", "zeta"}
 	if !slices.Equal(names, want) {
 		t.Errorf("names = %v, want %v", names, want)
 	}
@@ -67,13 +86,13 @@ func TestDocumentsRejectAPageThatDeclaresNoDescription(t *testing.T) {
 		{"frontmatter never closed", "---\ndescription: A page.\n\n# bare\n"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fsys := fstest.MapFS{"cmd/bare.md": page(testCase.body)}
+			fsys := fstest.MapFS{"bare.md": page(testCase.body)}
 
 			_, err := documents(fsys)
 			if err == nil {
 				t.Fatal("documents succeeded, want a failure naming the page")
 			}
-			if !strings.Contains(err.Error(), "cmd/bare.md") {
+			if !strings.Contains(err.Error(), "bare.md") {
 				t.Errorf("error does not name the page: %v", err)
 			}
 		})
