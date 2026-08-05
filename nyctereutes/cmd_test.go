@@ -193,23 +193,32 @@ func TestHelpPointsAtTheEmbeddedDocumentation(t *testing.T) {
 }
 
 func TestUsageErrorPointsAtTheEmbeddedDocumentation(t *testing.T) {
-	exit, stderr := run([]string{"nope"})
+	for _, args := range [][]string{
+		{"nope"},
+		{"doc"},
+		{"infra", "--nope"},
+		{"dep", "list", "--nope"},
+	} {
+		exit, stderr := run(args)
 
-	if exit != 1 {
-		t.Fatalf("exit = %d, want 1 for an unknown command", exit)
-	}
-	if !strings.Contains(stderr, "doc list") {
-		t.Errorf("usage error does not point at doc list\n%s", stderr)
+		if exit != 1 {
+			t.Fatalf("%v: exit = %d, want 1 for a usage error", args, exit)
+		}
+		if !strings.Contains(stderr, "doc list") {
+			t.Errorf("%v: usage error does not point at doc list\n%s", args, stderr)
+		}
 	}
 }
 
-func TestRuntimeErrorPointsAtTheEmbeddedDocumentation(t *testing.T) {
+// A wrapper that reports the last line of stderr as the reason a command
+// failed must find the diagnostic there, not advice addressed to an agent.
+func TestRuntimeErrorReportsNothingButTheError(t *testing.T) {
 	exit, stderr := run([]string{"infra", "validate", "/nonexistent/manifest.yaml"})
 
 	if exit != 1 {
 		t.Fatalf("exit = %d, want 1 for an unreadable manifest", exit)
 	}
-	if !strings.Contains(stderr, "doc list") {
-		t.Errorf("runtime failure does not point at doc list\n%s", stderr)
+	if strings.Contains(stderr, "doc list") {
+		t.Errorf("runtime failure carries the documentation hint\n%s", stderr)
 	}
 }
