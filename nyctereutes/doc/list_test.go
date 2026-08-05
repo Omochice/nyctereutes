@@ -1,12 +1,16 @@
 package doc_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 
+	"github.com/Omochice/nyctereutes/cli"
 	docfs "github.com/Omochice/nyctereutes/doc"
+	"github.com/Omochice/nyctereutes/nyctereutes/doc"
 )
 
 type listOutput struct {
@@ -74,5 +78,29 @@ func TestDocListDescribesEveryShippedDocument(t *testing.T) {
 	}
 	if stderr != "" {
 		t.Errorf("stderr = %q, want no page reported as unreadable", stderr)
+	}
+}
+
+func TestDocListReportsAMalformedPageWithoutWithholdingTheRest(t *testing.T) {
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	command := doc.New(&cli.ProcInout{
+		Stdin:  strings.NewReader(""),
+		Stdout: stdout,
+		Stderr: stderr,
+	})
+	doc.SetPages(command, fstest.MapFS{
+		"good.md": &fstest.MapFile{Data: []byte("---\ndescription: A page.\n---\n\n# good\n")},
+		"bad.md":  &fstest.MapFile{Data: []byte("# bad\n")},
+	})
+
+	if err := command.List.Execute(nil); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	results := decodeList(t, stdout.String()).Results
+	if len(results) != 1 || results[0].Name != "good" {
+		t.Errorf("results = %v, want only the page that could be read", results)
+	}
+	if !strings.Contains(stderr.String(), "bad.md") {
+		t.Errorf("stderr does not name the malformed page\n%s", stderr)
 	}
 }
