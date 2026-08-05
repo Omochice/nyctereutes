@@ -27,6 +27,23 @@ type document struct {
 	Description string `json:"description"`
 }
 
+// The name of every page at the root of fsys, in order. Nothing is parsed, so a
+// page names itself here whether or not it can be described.
+func names(fsys fs.FS) ([]string, error) {
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return nil, fmt.Errorf("read the embedded documentation: %w", err)
+	}
+	found := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ext) {
+			continue
+		}
+		found = append(found, strings.TrimSuffix(entry.Name(), ext))
+	}
+	return found, nil
+}
+
 // Collects the pages at the root of fsys, in name order, along with one problem
 // per page that could not be described. A page nobody can read is reported and
 // left out rather than taking the readable pages down with it.

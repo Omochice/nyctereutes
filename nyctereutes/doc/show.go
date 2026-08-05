@@ -39,15 +39,13 @@ func (c *showCommand) Execute(args []string) error {
 	return nil
 }
 
-// Reports a name no page carries, listing the names that do exist.
+// Reports a name no page carries, listing the names that do exist. The names
+// come from the filesystem rather than from the described pages, because show
+// prints a page whether or not its frontmatter can be read.
 func notFound(fsys fs.FS, name string) error {
-	docs, _, err := documents(fsys)
+	available, err := names(fsys)
 	if err != nil {
 		return fmt.Errorf("%w: %s: %w", errNoSuchDocument, name, err)
 	}
-	names := make([]string, 0, len(docs))
-	for _, doc := range docs {
-		names = append(names, doc.Name)
-	}
-	return fmt.Errorf("%w: %s; available documents: %s", errNoSuchDocument, name, strings.Join(names, ", "))
+	return fmt.Errorf("%w: %s; available documents: %s", errNoSuchDocument, name, strings.Join(available, ", "))
 }
