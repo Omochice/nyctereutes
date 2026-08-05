@@ -36,7 +36,7 @@ func (c *showCommand) Execute(args []string) error {
 		}
 		return fmt.Errorf("read the document %s: %w", args[0], err)
 	}
-	_, _ = fmt.Fprint(c.inout.Stdout, string(page))
+	_, _ = fmt.Fprint(c.inout.Stdout, prose(page))
 	return nil
 }
 

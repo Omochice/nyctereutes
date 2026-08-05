@@ -60,22 +60,32 @@ func documents(fsys fs.FS) ([]document, []error, error) {
 	return docs, problems, nil
 }
 
-// Reads the description a page declares in its frontmatter. The fences are
+// Splits a page into its frontmatter and the prose that follows. The fences are
 // matched as whole lines, so a page is not rejected over the newline that
 // happens to follow them or the carriage returns a checkout may add.
-func describe(page []byte) (string, error) {
+func split(page []byte) (frontmatter, prose string, err error) {
 	lines := strings.Split(strings.ReplaceAll(string(page), "\r\n", "\n"), "\n")
-	if len(lines) == 0 || lines[0] != fence {
-		return "", errNoFrontmatter
+	if lines[0] != fence {
+		return "", "", errNoFrontmatter
 	}
 	end := slices.Index(lines[1:], fence)
 	if end < 0 {
-		return "", errUnclosedFrontmatter
+		return "", "", errUnclosedFrontmatter
+	}
+	frontmatter = strings.Join(lines[1:1+end], "\n")
+	prose = strings.TrimLeft(strings.Join(lines[end+2:], "\n"), "\n")
+	return frontmatter, prose, nil
+}
+
+// Reads the description a page declares in its frontmatter.
+func describe(page []byte) (string, error) {
+	frontmatter, _, err := split(page)
+	if err != nil {
+		return "", err
 	}
 	var declared struct {
 		Description string `yaml:"description"`
 	}
-	frontmatter := strings.Join(lines[1:1+end], "\n")
 	if err := yaml.Unmarshal([]byte(frontmatter), &declared); err != nil {
 		return "", fmt.Errorf("parse the frontmatter as YAML: %w", err)
 	}
@@ -83,4 +93,15 @@ func describe(page []byte) (string, error) {
 		return "", errNoDescription
 	}
 	return declared.Description, nil
+}
+
+// The page as a reader wants it: the frontmatter feeds `doc list` and says
+// nothing a reader of the page needs. A page carrying none is returned whole,
+// so a document stays readable even when its frontmatter is what is wrong.
+func prose(page []byte) string {
+	_, text, err := split(page)
+	if err != nil {
+		return string(page)
+	}
+	return text
 }

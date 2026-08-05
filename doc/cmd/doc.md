@@ -11,7 +11,7 @@ description: Read the documentation compiled into the nyctereutes binary. Read t
 The command is split between finding a document and reading it.
 
 - `doc list` reports every embedded document as JSON, giving the name and description of each.
-- `doc show <name>` writes one document to standard output unchanged, and reads one name at a time.
+- `doc show <name>` writes one document to standard output, and reads one name at a time.
 
 ## Names
 
@@ -24,3 +24,4 @@ Passing a name no document carries fails with the names that do exist, so a mist
 Each document declares its description in YAML frontmatter rather than having one derived from its prose.
 The prose says what a command does, while the description says when the document is worth opening, which is what a reader choosing between documents needs.
 A document that declares none is reported on standard error and left out of the listing, so a mistake in one document costs that document alone.
+`doc show` drops the frontmatter, because it addresses the reader choosing a document rather than the reader who has already chosen one.
