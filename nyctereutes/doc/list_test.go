@@ -38,3 +38,19 @@ func TestDocListWritesResultsAndHelpAsJSON(t *testing.T) {
 		t.Error("help is empty, want the instruction to run doc show")
 	}
 }
+
+// Guards the shipped pages rather than the collector: a page added without a
+// description would still be listed, and a reader choosing between pages would
+// have nothing to choose on.
+func TestDocListDescribesEveryShippedDocument(t *testing.T) {
+	exit, stdout, stderr := run("doc", "list")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
+	}
+	for _, result := range decodeList(t, stdout).Results {
+		if result.Description == "" {
+			t.Errorf("%s has no description, want the one declared in its frontmatter", result.Name)
+		}
+	}
+}
