@@ -7,9 +7,8 @@ package doc
 import "embed"
 
 // The documentation, compiled into the binary so that the pages a build serves
-// are the ones written for that build. The pattern matches only this directory,
-// which is what keeps a page's name free of any path a reader would have to
-// learn before typing it.
+// are the ones written for that build. The pattern reaches one directory deep
+// and no further, which is what lets a page be named after its file alone.
 //
-//go:embed *.md
+//go:embed cmd/*.md
 var FS embed.FS

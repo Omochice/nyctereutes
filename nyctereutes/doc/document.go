@@ -7,11 +7,27 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+
+	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 // The extension every documentation page carries, and the suffix a page's name
-// drops so that a name reads as a path into the tree.
+// drops.
 const ext = ".md"
+
+// The directory the pages sit in. It groups the markdown for the repository,
+// which is not something a reader typing a name should have to know, so the
+// pages are presented with it as their root rather than as part of a name.
+const dir = "cmd"
+
+// The embedded pages, rooted at the directory holding them.
+func pages() (fs.FS, error) {
+	rooted, err := fs.Sub(docfs.FS, dir)
+	if err != nil {
+		return nil, fmt.Errorf("open the embedded documentation: %w", err)
+	}
+	return rooted, nil
+}
 
 // The line that opens and closes a page's frontmatter.
 const fence = "---\n"

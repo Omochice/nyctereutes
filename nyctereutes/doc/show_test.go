@@ -8,7 +8,7 @@ import (
 )
 
 func TestDocShowWritesTheDocumentUnchanged(t *testing.T) {
-	want, err := docfs.FS.ReadFile("dep.md")
+	want, err := docfs.FS.ReadFile("cmd/dep.md")
 	if err != nil {
 		t.Fatalf("read the embedded page the test compares against: %v", err)
 	}

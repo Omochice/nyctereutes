@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
-	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 var (
@@ -24,11 +23,15 @@ func (c *showCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errShowNeedsName
 	}
-	// An fs.FS rejects a path that climbs out of the tree, so a name cannot
-	// reach a file the build never embedded.
-	page, err := fs.ReadFile(docfs.FS, args[0]+ext)
+	fsys, err := pages()
 	if err != nil {
-		return notFound(docfs.FS, args[0])
+		return err
+	}
+	// An [fs.FS] rejects a path that climbs out of the tree, so a name cannot
+	// reach a file the build never embedded.
+	page, err := fs.ReadFile(fsys, args[0]+ext)
+	if err != nil {
+		return notFound(fsys, args[0])
 	}
 	_, _ = fmt.Fprint(c.inout.Stdout, string(page))
 	return nil
