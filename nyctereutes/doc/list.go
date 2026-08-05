@@ -29,6 +29,9 @@ func (c *listCommand) Execute(_ []string) error {
 	}
 	encoder := json.NewEncoder(c.inout.Stdout)
 	encoder.SetIndent("", "  ")
+	// The help string is meant to be copied into a terminal, and the default
+	// escaping would render its placeholder as an escape sequence.
+	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(listing{Results: docs, Help: listHelp}); err != nil {
 		return fmt.Errorf("encode the documentation as JSON: %w", err)
 	}
