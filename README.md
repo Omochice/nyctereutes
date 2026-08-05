@@ -24,15 +24,15 @@ go install github.com/Omochice/nyctereutes@latest
 
 The main commands are documented in their own pages.
 
-- [dep](doc/cmd/dep.md) manages dependency-update merge requests.
-- [infra](doc/cmd/infra.md) manages project settings through YAML manifests.
-- [doc](doc/cmd/doc.md) reads these pages back out of the installed binary.
+- [dep](doc/dep.md) manages dependency-update merge requests.
+- [infra](doc/infra.md) manages project settings through YAML manifests.
+- [doc](doc/doc.md) reads these pages back out of the installed binary.
 
 The pages are compiled into the binary, so they can be read without leaving the terminal.
 
 ```sh
 nyctereutes doc list
-nyctereutes doc show cmd/dep
+nyctereutes doc show dep
 ```
 
 ## Development

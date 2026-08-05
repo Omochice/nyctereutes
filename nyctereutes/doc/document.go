@@ -27,33 +27,33 @@ type document struct {
 	Description string `json:"description"`
 }
 
-// Collects every page in fsys. The filesystem is a parameter rather than the
+// Collects every page in fsys, which [fs.ReadDir] returns in name order. Only the
+// top level is read, so a page's name is its file name and carries no path the
+// reader would have to learn. The filesystem is a parameter rather than the
 // embedded one so a test can present a tree the real documentation cannot.
 func documents(fsys fs.FS) ([]document, error) {
-	var docs []document
-	walk := func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return nil, fmt.Errorf("read the embedded documentation: %w", err)
+	}
+	docs := make([]document, 0, len(entries))
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ext) {
+			continue
 		}
-		if entry.IsDir() || !strings.HasSuffix(path, ext) {
-			return nil
-		}
-		page, err := fs.ReadFile(fsys, path)
+		page, err := fs.ReadFile(fsys, name)
 		if err != nil {
-			return fmt.Errorf("read %s: %w", path, err)
+			return nil, fmt.Errorf("read %s: %w", name, err)
 		}
 		description, err := describe(page)
 		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
+			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		docs = append(docs, document{
-			Name:        strings.TrimSuffix(path, ext),
+			Name:        strings.TrimSuffix(name, ext),
 			Description: description,
 		})
-		return nil
-	}
-	if err := fs.WalkDir(fsys, ".", walk); err != nil {
-		return nil, fmt.Errorf("walk the embedded documentation: %w", err)
 	}
 	return docs, nil
 }

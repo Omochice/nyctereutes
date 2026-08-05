@@ -6,8 +6,10 @@ package doc
 
 import "embed"
 
-// The documentation tree, compiled into the binary so that the pages a build
-// serves are the ones written for that build.
+// The documentation, compiled into the binary so that the pages a build serves
+// are the ones written for that build. The pattern matches only this directory,
+// which is what keeps a page's name free of any path a reader would have to
+// learn before typing it.
 //
-//go:embed cmd/*.md
+//go:embed *.md
 var FS embed.FS

@@ -15,7 +15,8 @@ The command is split between finding a document and reading it.
 
 ## Names
 
-A document is named by its path under `doc/` with the `.md` extension removed, so `doc/cmd/dep.md` is named `cmd/dep`.
+A document is named by its file name with the `.md` extension removed, so `doc/dep.md` is named `dep`.
+The documentation is kept in one flat directory, so a name never carries a path the reader would have to learn before typing it.
 Passing a name no document carries fails with the names that do exist, so a mistyped name can be corrected without listing again.
 
 ## Descriptions
