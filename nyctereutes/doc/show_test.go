@@ -8,19 +8,25 @@ import (
 	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
-func TestDocShowWritesTheDocumentUnchanged(t *testing.T) {
-	want, err := fs.ReadFile(docfs.Pages(), "dep.md")
+func TestDocShowWritesTheDocumentWithoutItsFrontmatter(t *testing.T) {
+	page, err := fs.ReadFile(docfs.Pages(), "dep.md")
 	if err != nil {
 		t.Fatalf("read the embedded page the test compares against: %v", err)
 	}
+	_, afterOpeningFence, _ := strings.Cut(string(page), "---\n")
+	_, want, found := strings.Cut(afterOpeningFence, "---\n")
+	if !found {
+		t.Fatalf("the page the test compares against carries no frontmatter:\n%s", page)
+	}
+	want = strings.TrimLeft(want, "\n")
 
 	exit, stdout, stderr := run("doc", "show", "dep")
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
 	}
-	if stdout != string(want) {
-		t.Errorf("stdout = %q, want the page unchanged %q", stdout, want)
+	if stdout != want {
+		t.Errorf("stdout = %q, want the page without its frontmatter %q", stdout, want)
 	}
 }
 
