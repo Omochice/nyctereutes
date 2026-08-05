@@ -9,6 +9,7 @@ import "github.com/Omochice/nyctereutes/cli"
 // the subcommands rather than here.
 type Command struct {
 	List *listCommand `command:"list" description:"list the embedded documents"`
+	Show *showCommand `command:"show" description:"print one embedded document"`
 }
 
 // Builds the tree with every subcommand wired to the given streams. It takes no
@@ -16,5 +17,6 @@ type Command struct {
 func New(inout *cli.ProcInout) *Command {
 	return &Command{
 		List: &listCommand{inout: inout},
+		Show: &showCommand{inout: inout},
 	}
 }
