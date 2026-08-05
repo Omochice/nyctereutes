@@ -180,3 +180,40 @@ func TestUnknownSubcommandReportsError(t *testing.T) {
 		t.Error("want a usage error on stderr, got empty output")
 	}
 }
+
+// The hint is for a reader who never asked for documentation. An agent that
+// meets this CLI learns the embedded pages exist only if the output it already
+// looks at says so, which is why the three tests below cover the three places
+// a first-time reader is most likely to be looking.
+func TestHelpPointsAtTheEmbeddedDocumentation(t *testing.T) {
+	exit, stdout, stderr := runOut([]string{"--help"})
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
+	}
+	if !strings.Contains(stdout, "doc list") {
+		t.Errorf("help does not point at doc list\n%s", stdout)
+	}
+}
+
+func TestUsageErrorPointsAtTheEmbeddedDocumentation(t *testing.T) {
+	exit, stderr := run([]string{"nope"})
+
+	if exit != 1 {
+		t.Fatalf("exit = %d, want 1 for an unknown command", exit)
+	}
+	if !strings.Contains(stderr, "doc list") {
+		t.Errorf("usage error does not point at doc list\n%s", stderr)
+	}
+}
+
+func TestRuntimeErrorPointsAtTheEmbeddedDocumentation(t *testing.T) {
+	exit, stderr := run([]string{"infra", "validate", "/nonexistent/manifest.yaml"})
+
+	if exit != 1 {
+		t.Fatalf("exit = %d, want 1 for an unreadable manifest", exit)
+	}
+	if !strings.Contains(stderr, "doc list") {
+		t.Errorf("runtime failure does not point at doc list\n%s", stderr)
+	}
+}
