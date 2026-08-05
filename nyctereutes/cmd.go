@@ -11,6 +11,7 @@ import (
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/nyctereutes/dep"
+	"github.com/Omochice/nyctereutes/nyctereutes/doc"
 	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
@@ -58,6 +59,7 @@ type options struct {
 	Version    bool            `short:"v" long:"version" description:"show version"`
 	Dep        *dep.Command    `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
 	Infra      *infra.Command  `command:"infra" description:"manage infrastructure"`
+	Doc        *doc.Command    `command:"doc" description:"read the embedded documentation"`
 	Help       *helpCommand    `command:"help" description:"show help"`
 	VersionCmd *versionCommand `command:"version" description:"show version"`
 }
@@ -75,6 +77,7 @@ func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:        dep.New(inout, runner),
 		Infra:      infra.New(inout, runner),
+		Doc:        doc.New(inout),
 		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
 	}
