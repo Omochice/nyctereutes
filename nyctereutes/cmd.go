@@ -64,6 +64,16 @@ type options struct {
 	VersionCmd *versionCommand `command:"version" description:"show version"`
 }
 
+// Carries the documentation pointer into every command's usage text. go-flags
+// renders the long description of the deepest active command only, so a pointer
+// set on the root alone would miss every subcommand's usage error.
+func advise(commands []*flags.Command) {
+	for _, command := range commands {
+		command.LongDescription = doc.Hint
+		advise(command.Commands())
+	}
+}
+
 // The production entry point; it drives the real glab CLI.
 func MainCommand(args []string, inout *cli.ProcInout) int {
 	return Dispatch(args, inout, glab.ExecRunner{})
@@ -84,6 +94,7 @@ func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
 	parser.Name = "nyctereutes"
 	parser.LongDescription = doc.Hint
+	advise(parser.Commands())
 	// With --version set, go-flags would still run the subcommand (and its side
 	// effects) during ParseArgs, so skip execution here.
 	parser.CommandHandler = func(command flags.Commander, cmdArgs []string) error {
@@ -119,7 +130,6 @@ func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 		// A runtime error returned from a subcommand's Execute; the usage help
 		// is unrelated, so it is not rendered.
 		_, _ = fmt.Fprintln(inout.Stderr, err)
-		_, _ = fmt.Fprintln(inout.Stderr, doc.Hint)
 		return 1
 	}
 	return 0
