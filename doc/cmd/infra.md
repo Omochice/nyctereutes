@@ -1,3 +1,7 @@
+---
+description: Manage GitLab project settings declaratively through YAML manifests, following an import, validate, plan, apply cycle. Read this before answering questions about the infra command, the manifest schema, or a plan that reports drift nobody expected.
+---
+
 # infra
 
 `infra` manages GitLab project settings declaratively through YAML manifests.
