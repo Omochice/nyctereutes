@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
+	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 var (
@@ -23,10 +24,7 @@ func (c *showCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errShowNeedsName
 	}
-	fsys, err := pages()
-	if err != nil {
-		return err
-	}
+	fsys := docfs.Pages()
 	page, err := fs.ReadFile(fsys, args[0]+ext)
 	if err != nil {
 		return notFound(fsys, args[0])

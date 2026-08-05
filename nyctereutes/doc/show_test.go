@@ -1,6 +1,7 @@
 package doc_test
 
 import (
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -8,7 +9,7 @@ import (
 )
 
 func TestDocShowWritesTheDocumentUnchanged(t *testing.T) {
-	want, err := docfs.FS.ReadFile("cmd/dep.md")
+	want, err := fs.ReadFile(docfs.Pages(), "dep.md")
 	if err != nil {
 		t.Fatalf("read the embedded page the test compares against: %v", err)
 	}

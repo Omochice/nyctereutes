@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Omochice/nyctereutes/cli"
+	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 // Backs the "doc list" subcommand.
@@ -21,11 +22,7 @@ type listing struct {
 const listHelp = "Run `nyctereutes doc show <name>` to read one of these documents."
 
 func (c *listCommand) Execute(_ []string) error {
-	fsys, err := pages()
-	if err != nil {
-		return err
-	}
-	docs, err := documents(fsys)
+	docs, err := documents(docfs.Pages())
 	if err != nil {
 		return err
 	}

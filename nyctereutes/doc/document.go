@@ -7,13 +7,10 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
-
-	docfs "github.com/Omochice/nyctereutes/doc"
 )
 
 const (
 	ext   = ".md"
-	dir   = "cmd"
 	fence = "---\n"
 )
 
@@ -26,15 +23,6 @@ var (
 type document struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-}
-
-// The embedded pages, with the directory holding them as the root.
-func pages() (fs.FS, error) {
-	rooted, err := fs.Sub(docfs.FS, dir)
-	if err != nil {
-		return nil, fmt.Errorf("open the embedded documentation: %w", err)
-	}
-	return rooted, nil
 }
 
 // Collects the pages at the root of fsys, in name order.
