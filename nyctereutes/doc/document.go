@@ -79,12 +79,13 @@ func split(page []byte) (frontmatter, prose string, err error) {
 	if lines[0] != fence {
 		return "", "", errNoFrontmatter
 	}
-	end := slices.Index(lines[1:], fence)
-	if end < 0 {
+	offset := slices.Index(lines[1:], fence)
+	if offset < 0 {
 		return "", "", errUnclosedFrontmatter
 	}
-	frontmatter = strings.Join(lines[1:1+end], "\n")
-	prose = strings.TrimLeft(strings.Join(lines[end+2:], "\n"), "\n")
+	closing := offset + 1
+	frontmatter = strings.Join(lines[1:closing], "\n")
+	prose = strings.TrimLeft(strings.Join(lines[closing+1:], "\n"), "\n")
 	return frontmatter, prose, nil
 }
 
