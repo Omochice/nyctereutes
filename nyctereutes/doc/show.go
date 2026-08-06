@@ -45,7 +45,7 @@ func (c *showCommand) Execute(args []string) error {
 func notFound(fsys fs.FS, name string) error {
 	available, err := names(fsys)
 	if err != nil {
-		return fmt.Errorf("%w: %s: %w", errNoSuchDocument, name, err)
+		return fmt.Errorf("look up %s: %w", name, err)
 	}
 	return fmt.Errorf("%w: %s; available documents: %s", errNoSuchDocument, name, strings.Join(available, ", "))
 }
