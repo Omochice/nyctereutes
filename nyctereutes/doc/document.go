@@ -48,31 +48,25 @@ func names(fsys fs.FS) ([]string, error) {
 // per page that could not be described. A page nobody can read is reported and
 // left out rather than taking the readable pages down with it.
 func documents(fsys fs.FS) ([]document, []error, error) {
-	entries, err := fs.ReadDir(fsys, ".")
+	found, err := names(fsys)
 	if err != nil {
-		return nil, nil, fmt.Errorf("read the embedded documentation: %w", err)
+		return nil, nil, err
 	}
-	docs := make([]document, 0, len(entries))
+	docs := make([]document, 0, len(found))
 	var problems []error
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ext) {
-			continue
-		}
-		page, err := fs.ReadFile(fsys, name)
+	for _, name := range found {
+		file := name + ext
+		page, err := fs.ReadFile(fsys, file)
 		if err != nil {
-			problems = append(problems, fmt.Errorf("read %s: %w", name, err))
+			problems = append(problems, fmt.Errorf("read %s: %w", file, err))
 			continue
 		}
 		description, err := describe(page)
 		if err != nil {
-			problems = append(problems, fmt.Errorf("%s: %w", name, err))
+			problems = append(problems, fmt.Errorf("%s: %w", file, err))
 			continue
 		}
-		docs = append(docs, document{
-			Name:        strings.TrimSuffix(name, ext),
-			Description: description,
-		})
+		docs = append(docs, document{Name: name, Description: description})
 	}
 	return docs, problems, nil
 }
