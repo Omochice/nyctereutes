@@ -28,13 +28,6 @@ The main commands are documented in their own pages.
 - [infra](doc/cmd/infra.md) manages project settings through YAML manifests.
 - [doc](doc/cmd/doc.md) reads these pages back out of the installed binary.
 
-The pages are compiled into the binary, so they can be read without leaving the terminal.
-
-```sh
-nyctereutes doc list
-nyctereutes doc show dep
-```
-
 ## Development
 
 The development environment is provided by the flake.
