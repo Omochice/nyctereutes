@@ -11,6 +11,7 @@ import (
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/nyctereutes/dep"
+	"github.com/Omochice/nyctereutes/nyctereutes/doc"
 	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
@@ -58,8 +59,19 @@ type options struct {
 	Version    bool            `short:"v" long:"version" description:"show version"`
 	Dep        *dep.Command    `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
 	Infra      *infra.Command  `command:"infra" description:"manage infrastructure"`
+	Doc        *doc.Command    `command:"doc" description:"read the embedded documentation"`
 	Help       *helpCommand    `command:"help" description:"show help"`
 	VersionCmd *versionCommand `command:"version" description:"show version"`
+}
+
+// Carries the documentation pointer into every command's usage text. go-flags
+// renders the long description of the deepest active command only, so a pointer
+// set on the root alone would miss every subcommand's usage error.
+func advise(commands []*flags.Command) {
+	for _, command := range commands {
+		command.LongDescription = doc.Hint
+		advise(command.Commands())
+	}
 }
 
 // The production entry point; it drives the real glab CLI.
@@ -75,11 +87,14 @@ func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:        dep.New(inout, runner),
 		Infra:      infra.New(inout, runner),
+		Doc:        doc.New(inout),
 		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
 	}
 	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash|flags.AllowBoolValues)
 	parser.Name = "nyctereutes"
+	parser.LongDescription = doc.Hint
+	advise(parser.Commands())
 	// With --version set, go-flags would still run the subcommand (and its side
 	// effects) during ParseArgs, so skip execution here.
 	parser.CommandHandler = func(command flags.Commander, cmdArgs []string) error {
@@ -113,7 +128,7 @@ func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 			return 1
 		}
 		// A runtime error returned from a subcommand's Execute; the usage help
-		// is unrelated, so only the error itself is reported.
+		// is unrelated, so it is not rendered.
 		_, _ = fmt.Fprintln(inout.Stderr, err)
 		return 1
 	}

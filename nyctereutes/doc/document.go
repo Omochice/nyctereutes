@@ -1,0 +1,119 @@
+package doc
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"slices"
+	"strings"
+
+	"github.com/goccy/go-yaml"
+)
+
+const (
+	ext   = ".md"
+	fence = "---"
+)
+
+var (
+	errNoFrontmatter       = errors.New("no frontmatter")
+	errUnclosedFrontmatter = errors.New("unclosed frontmatter")
+	errNoDescription       = errors.New("frontmatter declares no description")
+)
+
+// One page as `doc list` reports it.
+type document struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// The name of every page at the root of fsys, in order. Nothing is parsed, so a
+// page names itself here whether or not it can be described.
+func names(fsys fs.FS) ([]string, error) {
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return nil, fmt.Errorf("read the embedded documentation: %w", err)
+	}
+	found := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ext) {
+			continue
+		}
+		found = append(found, strings.TrimSuffix(entry.Name(), ext))
+	}
+	return found, nil
+}
+
+// Collects the pages at the root of fsys, in name order, along with one problem
+// per page that could not be described. A page nobody can read is reported and
+// left out rather than taking the readable pages down with it.
+func documents(fsys fs.FS) ([]document, []error, error) {
+	found, err := names(fsys)
+	if err != nil {
+		return nil, nil, err
+	}
+	docs := make([]document, 0, len(found))
+	var problems []error
+	for _, name := range found {
+		file := name + ext
+		page, err := fs.ReadFile(fsys, file)
+		if err != nil {
+			problems = append(problems, fmt.Errorf("read %s: %w", file, err))
+			continue
+		}
+		description, err := describe(page)
+		if err != nil {
+			problems = append(problems, fmt.Errorf("%s: %w", file, err))
+			continue
+		}
+		docs = append(docs, document{Name: name, Description: description})
+	}
+	return docs, problems, nil
+}
+
+// Splits a page into its frontmatter and the prose that follows. The fences are
+// matched as whole lines, so a page is not rejected over the newline that
+// happens to follow them or the carriage returns a checkout may add.
+func split(page []byte) (frontmatter, prose string, err error) {
+	lines := strings.Split(strings.ReplaceAll(string(page), "\r\n", "\n"), "\n")
+	if lines[0] != fence {
+		return "", "", errNoFrontmatter
+	}
+	offset := slices.Index(lines[1:], fence)
+	if offset < 0 {
+		return "", "", errUnclosedFrontmatter
+	}
+	closing := offset + 1
+	frontmatter = strings.Join(lines[1:closing], "\n")
+	prose = strings.TrimLeft(strings.Join(lines[closing+1:], "\n"), "\n")
+	return frontmatter, prose, nil
+}
+
+// Reads the description a page declares in its frontmatter.
+func describe(page []byte) (string, error) {
+	frontmatter, _, err := split(page)
+	if err != nil {
+		return "", err
+	}
+	var declared struct {
+		Description string `yaml:"description"`
+	}
+	if err := yaml.Unmarshal([]byte(frontmatter), &declared); err != nil {
+		return "", fmt.Errorf("parse the frontmatter as YAML: %w", err)
+	}
+	if declared.Description == "" {
+		return "", errNoDescription
+	}
+	return declared.Description, nil
+}
+
+// The page as a reader wants it: the frontmatter feeds `doc list` and says
+// nothing a reader of the page needs. A page carrying none is returned whole,
+// so a document stays readable even when its frontmatter is what is wrong.
+func prose(page []byte) string {
+	_, text, err := split(page)
+	if err != nil {
+		return string(page)
+	}
+	return text
+}

@@ -1,3 +1,7 @@
+---
+description: Bulk-approve and bulk-merge Renovate dependency-update merge requests on GitLab, grouped by the package@version they target. Read this before answering questions about the dep command, its search-scope flags, or why a group of merge requests is missing from the list.
+---
+
 # dep
 
 `dep` manages Renovate-style dependency-update merge requests on GitLab.
