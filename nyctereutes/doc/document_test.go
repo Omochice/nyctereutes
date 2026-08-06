@@ -1,6 +1,8 @@
 package doc
 
 import (
+	"errors"
+	"io/fs"
 	"slices"
 	"strings"
 	"testing"
@@ -130,5 +132,29 @@ func TestDescribeRejectsAPageWithoutADescription(t *testing.T) {
 				t.Error("describe succeeded, want a failure")
 			}
 		})
+	}
+}
+
+var errUnreadableTree = errors.New("unreadable tree")
+
+// A filesystem that cannot be listed at all, which is a different failure from
+// a name no page carries.
+type unreadableFS struct{}
+
+func (unreadableFS) Open(string) (fs.File, error) {
+	return nil, errUnreadableTree
+}
+
+func TestNotFoundReportsAnUnreadableTreeAsItself(t *testing.T) {
+	err := notFound(unreadableFS{}, "nope")
+
+	if err == nil {
+		t.Fatal("notFound succeeded, want the failure to read the tree")
+	}
+	if errors.Is(err, errNoSuchDocument) {
+		t.Errorf("a tree that cannot be read is reported as an absent document: %v", err)
+	}
+	if !errors.Is(err, errUnreadableTree) {
+		t.Errorf("error does not carry the reason the tree could not be read: %v", err)
 	}
 }
