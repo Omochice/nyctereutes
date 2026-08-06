@@ -198,23 +198,44 @@ single list request.
 naming the schedule.
 
 **Change to**: before rendering such a deletion, the schedule's variables are
-read and their keys are listed under it. Values are never rendered. A read that
-fails or is refused is reported as a warning and the deletion is still shown.
+read through a disclosure-only client call and their keys are listed under it.
+Values are never rendered. A read that fails or is refused is reported as a
+warning and the deletion is still shown.
+
+The call is not the removed `withVariables` path. It answers with keys alone,
+takes one schedule id rather than a project's whole list, and no reconciliation
+consumes it:
+
+```go
+// The keys of one schedule's variables, for a plan about to destroy them.
+// Values are not returned: nothing downstream may render or write one.
+func (c *Client) ScheduleVariableKeys(
+	ctx context.Context, owner, name string, scheduleID int,
+) ([]string, error)
+```
 
 **Rationale**: The variables are destroyed with the schedule and nothing else in
 the plan mentions them, so this is the operator's only chance to see them. It is
 scoped to deletions because that is the only change that destroys a variable
-without naming it, which keeps the ordinary plan at one request per project.
+without naming it, which keeps a plan that deletes nothing at one request per
+project. Returning keys rather than variables is what keeps a value from
+reaching a caller that could render or write it, which is the property the
+removed path could not offer.
 
 ## Consequences
 
 ### Positive
 
-1. **No credential is written to version control**: the ordinary `infra import`
-   path stops emitting values, so the file an operator commits cannot carry a
-   token that a schedule holds.
-2. **A project's plan costs one request again**: removing the per-schedule read
-   removes the multiplication by schedule count on every plan and apply.
+1. **No credential is written to version control, once this is carried out**:
+   the ordinary `infra import` path stops emitting values, so the file an
+   operator commits cannot carry a token that a schedule holds. Until then the
+   exposure described in the context is live: `infra import` on `main` writes
+   the values today, and this record changes nothing on its own.
+2. **A plan that deletes nothing costs one request per project**: removing the
+   per-schedule read removes the multiplication by schedule count. A plan that
+   deletes schedules still pays one disclosure read for each of those, and
+   `infra apply` never pays it, because the disclosure happens where the plan is
+   rendered.
 3. **Three failure modes stop existing**: the permission-gated absence of the
    variables field, the mismatch between who may read and who may write them,
    and the distinction between "not read" and "read, none" all stop being
@@ -253,15 +274,24 @@ PR #68, and they come back out: the schema type, `Client.FetchSchedules`'s
 them. The schedule's own attributes stay, so the revert is partial rather than a
 reversal of the whole feature.
 
+What replaces the removed read is the disclosure call named in decision 3, not a
+narrowing of the old one. It is added rather than kept, because the property
+that makes it safe — a value never reaches the caller — is not something the old
+signature could be trimmed into.
+
 Removing a schema field is a breaking change for any manifest already written.
 A document still carrying `variables` reports it as an unknown field rather than
 being ignored, which the schema's strict decoding already does, so an operator
-learns the field is gone instead of watching it silently stop working.
+learns the field is gone instead of watching it silently stop working. How
+existing manifests are migrated, and what is done about values already committed
+to a repository's history, are operational questions this record does not
+answer.
 
 Verification worth pinning: an export of a project whose schedule carries a
 variable contains neither the key nor the value; a plan deleting such a schedule
-names the key and not the value; a plan that deletes nothing issues one request
-per project.
+names the key and not the value; a plan deleting a schedule whose variables the
+token may not read still shows the deletion and warns; a plan that deletes
+nothing issues one request per project.
 
 ## References
 

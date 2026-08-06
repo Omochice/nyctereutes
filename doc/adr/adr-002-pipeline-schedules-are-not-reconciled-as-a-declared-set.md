@@ -51,8 +51,9 @@ and its apply refused.
 
 The schedule's variables are permission-gated within a successful response, and
 carry credentials. [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md)
-removes them from the manifest for that reason, which by itself invalidates the
-variable diffing and applying that PR #66 is largely made of.
+takes them out of the manifest for that reason, and once it is carried out the
+variable diffing and applying that PR #66 is largely made of has nothing left to
+reconcile.
 
 Doing nothing is not acceptable because the branch's current behaviour is
 destructive on partial knowledge. A live state that was never read reports every
@@ -95,9 +96,11 @@ open branch.
 
 ### Positive
 
-1. **The destructive path is closed**: nothing deletes or duplicates a schedule,
-   so partial knowledge of the live state cannot cost an operator a schedule or
-   the variables attached to it.
+1. **The destructive path is closed**: manifest reconciliation neither deletes
+   nor creates a schedule, so partial knowledge of the live state cannot cost an
+   operator a schedule or the variables attached to it. This covers the path
+   this record governs; a schedule remains removable through GitLab itself and
+   through anything else holding the same token.
 2. **Review stops paying for a model that does not hold**: the findings still
    open on PR #66 do not need answering, because the code they describe is not
    going in.
@@ -147,5 +150,9 @@ of this decision.
 
 - [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md)
 - PR #66, and the review findings that prompted this decision
-- `.momomo/plans/archive-write-order.md`, an ordering defect found during that
-  review which is independent of this decision and predates the branch
+- An ordering defect found during that review, independent of this decision and
+  predating the branch: `infra apply` archives a project before writing the
+  settings that follow it, and GitLab makes an archived project read-only, so
+  every later write is refused and re-running cannot repair it. It is written up
+  in `.momomo/plans/archive-write-order.md`, which is not committed, so the
+  description here is what survives for a reader without that working tree.
