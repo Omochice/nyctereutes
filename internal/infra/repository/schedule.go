@@ -126,18 +126,25 @@ func toManifestSchedules(live []LiveSchedule) []manifest.PipelineSchedule {
 	}
 	schedules := make([]manifest.PipelineSchedule, 0, len(live))
 	for _, schedule := range live {
-		schedules = append(schedules, manifest.PipelineSchedule{
-			Description:  schedule.Description,
-			Ref:          manifest.Ref(schedule.Ref),
-			Cron:         schedule.Cron,
-			CronTimezone: schedule.CronTimezone,
-			Active:       schedule.Active,
-		})
+		schedules = append(schedules, toManifestSchedule(schedule))
 	}
 	slices.SortFunc(schedules, func(left, right manifest.PipelineSchedule) int {
 		return cmp.Compare(left.Description, right.Description)
 	})
 	return schedules
+}
+
+// Describes one live schedule the way a manifest would. The id is dropped
+// because no manifest holds one, which is also what makes the result comparable
+// with a declared schedule.
+func toManifestSchedule(live LiveSchedule) manifest.PipelineSchedule {
+	return manifest.PipelineSchedule{
+		Description:  live.Description,
+		Ref:          manifest.Ref(live.Ref),
+		Cron:         live.Cron,
+		CronTimezone: live.CronTimezone,
+		Active:       live.Active,
+	}
 }
 
 // Signals output that carries no page of schedules to read.
