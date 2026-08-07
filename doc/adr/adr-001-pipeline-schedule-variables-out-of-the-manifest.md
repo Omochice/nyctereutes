@@ -166,7 +166,7 @@ func (c *Client) ScheduleVariableKeys(
 
 **Rationale**: The variables are destroyed with the schedule and nothing else in the plan mentions them, so this is the operator's only chance to see them. It is scoped to deletions because that is the only change that destroys a variable without naming it, which keeps a plan that deletes nothing at one request per project. Returning keys rather than variables is what keeps a value from reaching a caller that could render or write it, which is the property the removed path could not offer.
 
-**Not carried out**: decisions 1 and 2 are in effect; this one waits. [ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md) stops `infra plan` reconciling schedules at all, so no plan proposes a deletion and there is nothing to disclose. The decision stands as written and takes effect with whatever record settles how schedules are reconciled; `ScheduleVariableKeys` is not written until then, because a call with no caller is a guess at what its caller will want.
+**Not carried out**: decisions 1 and 2 are in effect; this one waits. [ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md) stops `infra plan` reconciling schedules at all, so no plan proposes a deletion and there is nothing to disclose. [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) restores deletions, which is what makes this decision due: it lands with that work rather than before it, because `ScheduleVariableKeys` with no caller is a guess at what its caller will want.
 
 ## Consequences
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted. The question decision 2 deferred is answered by [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md).
 
 ## Context
 
