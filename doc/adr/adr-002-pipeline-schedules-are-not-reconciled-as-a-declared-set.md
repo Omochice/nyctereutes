@@ -28,7 +28,7 @@ A schedule has no identity the manifest can hold. GitLab addresses it by a serve
 
 Reading a schedule and writing it need different permissions. Every write returned 403 unless the token both owned the schedule and held Maintainer, while a Maintainer who did not create it can read it. A plan can therefore be correct and its apply refused.
 
-The schedule's variables are permission-gated within a successful response, and carry credentials. [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) takes them out of the manifest for that reason, and once it is carried out the variable diffing and applying that PR #66 is largely made of has nothing left to reconcile.
+The schedule's variables are permission-gated within a successful response, and carry credentials. [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) takes them out of the manifest for that reason. Once it is carried out, the parts of PR #66 that diff and apply manifest-held variables have nothing left to reconcile, and those are most of the branch.
 
 Doing nothing is not acceptable because the branch's current behaviour is destructive on partial knowledge. A live state that was never read reports every declared schedule as missing, GitLab accepts a second schedule described like the first, and the manifest can no longer tell the copies apart.
 
@@ -40,7 +40,7 @@ We will discard PR #66 and stop treating pipeline schedules as a declared set th
 
 **Change from**: nine commits on `feat/pipeline-schedules` adding schedule and variable diffing, rendering and applying, plus the guards added during review.
 
-**Change to**: the branch is not merged. What was learned from it is recorded here, not in code.
+**Change to**: the branch is not merged. What was learned from it is recorded in this file and in [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md), which is where a reader without that branch checked out has to be able to find it.
 
 **Rationale**: The branch is built on the declared-set model this ADR rejects and on the variables schema [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) removes, so most of it would be rewritten rather than amended. Continuing to patch it spends review on defects the model keeps producing.
 
@@ -68,7 +68,7 @@ We will discard PR #66 and stop treating pipeline schedules as a declared set th
 
 ### Mitigations
 
-- The command documentation states that schedules are exported but not applied, so the manifest does not silently imply more than the tool does.
+- `doc/cmd/infra.md` gains a section saying schedules are exported and validated but not reconciled, and why, so the manifest does not silently imply more than the tool does. It ships with this decision rather than after it, because a manifest declaring schedules that nothing applies is already the state on `main` once PR #66 is closed.
 - The discarded branch stays reachable in the repository's history and its findings are summarised here, so a later attempt can lift the parts that were sound.
 - The deferred question is recorded as a follow-up ADR to be written, not as an informal intention.
 

@@ -183,7 +183,7 @@ func (c *Client) ScheduleVariableKeys(
 
 ### Mitigations
 
-- The command documentation states that schedule variables are outside the manifest, so an operator is not left inferring it from a missing field.
+- `doc/cmd/infra.md` gains a note that schedule variables are outside the manifest, written when the field is removed rather than now, so an operator is not left inferring it from a field that has quietly stopped being accepted.
 - The deletion disclosure covers the case where invisible drift is destructive; the remaining invisible drift changes what a pipeline receives but destroys nothing.
 - The conditional read is named for what it is and justified where it happens, so it reads as a disclosure step rather than as part of reconciliation.
 
