@@ -51,9 +51,10 @@ func (c *Client) FetchSchedules(ctx context.Context, owner, name string) ([]Live
 	return schedules, nil
 }
 
-// The attributes a schedule must carry to be describable. They repeat the JSON
-// tags because a tag cannot name a constant.
+// The attributes a schedule must carry to be describable or addressable. They
+// repeat the JSON tags because a tag cannot name a constant.
 const (
+	fieldID   = "id"
 	fieldRef  = "ref"
 	fieldCron = "cron"
 )
@@ -66,8 +67,17 @@ var errIncompleteLiveSchedule = errors.New("incomplete pipeline schedule")
 // own check runs on parse, which a document built from live state never goes
 // through. GitLab skips its presence checks for a schedule brought in by its
 // project import, so a project can hold one that cannot be described.
+//
+// The id is required too, though no manifest holds it: it is how GitLab
+// addresses a schedule, so one reported without it would send an update or a
+// delete to pipeline_schedules/0, which names some other project's schedule or
+// nothing at all.
 func rejectIncompleteSchedules(schedules []LiveSchedule) error {
 	for _, schedule := range schedules {
+		if schedule.ID == 0 {
+			return fmt.Errorf("%w: schedule %q reports no %s",
+				errIncompleteLiveSchedule, schedule.Description, fieldID)
+		}
 		for _, required := range []struct{ field, value string }{
 			{field: fieldDescription, value: schedule.Description},
 			{field: fieldRef, value: schedule.Ref},
