@@ -39,10 +39,10 @@ func (a *Applier) applySchedule(ctx context.Context, change Change) error {
 	}
 }
 
-// Names the schedule inside the field a failure is reported under, so a line in
-// the report can be matched to the line in the plan it came from.
+// Names the schedule as the field a failure is reported under, in the same form
+// the plan line uses, so a failure can be matched to the line it came from.
 func scheduleField(description string) string {
-	return fmt.Sprintf("%s[%q]", fieldPipelineSchedules, description)
+	return fmt.Sprintf("%s %q", schedulePrefix, description)
 }
 
 // The form fields a create or an update sends. Every attribute goes on both,

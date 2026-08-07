@@ -185,7 +185,7 @@ func writeHint(err error, field string) string {
 // the token both held Maintainer and had created the schedule, so the role hint
 // alone would send the operator to a fix that does not apply.
 func forbiddenHint(field string) string {
-	if strings.HasPrefix(field, fieldPipelineSchedules) {
+	if strings.HasPrefix(field, schedulePrefix) {
 		return "permission denied; writing a schedule needs the Maintainer or Owner role " +
 			"and the schedule to have been created by this token's user"
 	}

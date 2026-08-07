@@ -12,6 +12,11 @@ import (
 // tells one from a project setting.
 const fieldPipelineSchedules = "pipeline_schedules"
 
+// How one schedule is named wherever it is spoken about singly: on a plan line
+// and in the error of a write that failed. The two share it so a failure can be
+// matched to the line it came from.
+const schedulePrefix = "pipeline_schedule"
+
 // The pipeline schedule one [Change] acts on. Only the side the change type
 // implies is filled: a creation has no Live and an id of zero, a deletion no
 // Desired. Description is held separately because it is the one thing every
@@ -107,7 +112,7 @@ func scheduleAttributes(schedule manifest.PipelineSchedule) []scheduleAttribute 
 // attribute because none of them exists yet, an update only those that differ,
 // and a deletion none, naming instead the variable keys going with the schedule.
 func (s *ScheduleChange) line(kind ChangeType) string {
-	header := fmt.Sprintf("pipeline_schedule %q", s.Description)
+	header := fmt.Sprintf("%s %q", schedulePrefix, s.Description)
 	switch kind {
 	case ChangeCreate:
 		declared := scheduleAttributes(s.Desired)

@@ -417,3 +417,30 @@ func TestInfraApplyRemovesARenamedScheduleBeforeCreatingIt(t *testing.T) {
 		t.Errorf("writes[1] = %q, want the create of renamed second", runner.writes[1])
 	}
 }
+
+// A project whose live schedules repeat a description is refused by apply as it
+// is by plan, and nothing is written for it. The other settings are still
+// applied, so the ambiguity costs the project its schedules rather than the
+// project.
+func TestInfraApplyRefusesDuplicateScheduleDescriptions(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
+	runner := &fakeApplyGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: `[
+		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"},
+		  {"id":5,"description":"nightly","ref":"refs/heads/main","cron":"0 8 * * *"}
+		]`},
+	}
+
+	exit, _, stderr := runWithRunner(runner, "infra", "apply", "--auto-approve", path)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 for a project that cannot be described", exit)
+	}
+	if !strings.Contains(stderr, "duplicate") {
+		t.Errorf("stderr missing the refusal\n%s", stderr)
+	}
+	if len(runner.writes) != 1 || !strings.Contains(runner.writes[0], "-f visibility=internal") {
+		t.Errorf("writes = %q, want just the project setting", runner.writes)
+	}
+}
