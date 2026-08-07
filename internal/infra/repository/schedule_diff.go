@@ -8,34 +8,28 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// The manifest key every schedule change is reported under, which is also how
-// [Applier] tells a schedule change from a project setting.
+// The field every schedule change is reported under, which is how [Applier]
+// tells one from a project setting.
 const fieldPipelineSchedules = "pipeline_schedules"
 
-// The pipeline schedule one [Change] acts on. Which side is filled follows the
-// change type: a create has no live schedule and a delete no declared one, so
-// the description is held here rather than read off whichever side is present.
+// The pipeline schedule one [Change] acts on. Only the side the change type
+// implies is filled: a creation has no Live and an id of zero, a deletion no
+// Desired. Description is held separately because it is the one thing every
+// change carries, and it is what pairs a declared schedule with a live one.
 type ScheduleChange struct {
-	// What the manifest calls the schedule, which is what pairs a declared
-	// schedule with a live one.
 	Description string
-	// How GitLab addresses the schedule, zero for one that does not exist yet.
-	ID int
-	// What the manifest declares, zero for a deletion.
+	// How GitLab addresses the schedule.
+	ID      int
 	Desired manifest.PipelineSchedule
-	// What GitLab holds, zero for a creation.
-	Live manifest.PipelineSchedule
+	Live    manifest.PipelineSchedule
 }
 
 // Reports how a project's live schedules differ from the declared ones, pairing
-// them by description. A declared schedule with no live counterpart is created,
-// one whose other attributes differ is updated, and a live schedule no
-// declaration names is deleted.
+// them by description.
 //
 // Deletions come first because [Applier.Apply] performs changes in the order it
-// is given them, and an instance caps how many schedules a project may hold.
-// Creating first would have that cap refuse the replacement on a project already
-// at it, for a plan that only swaps one schedule for another.
+// is given them, and an instance caps how many schedules a project may hold, so
+// creating first would have that cap refuse a replacement on a project at it.
 func diffSchedules(name string, desired []manifest.PipelineSchedule, live []LiveSchedule) []Change {
 	declared := make(map[string]struct{}, len(desired))
 	for _, want := range desired {
@@ -76,19 +70,18 @@ func diffSchedules(name string, desired []manifest.PipelineSchedule, live []Live
 }
 
 // Wraps one schedule as a [Change], so the three producers cannot disagree
-// about the field a schedule is reported under.
+// about the field it is reported under.
 func scheduleChange(kind ChangeType, name string, schedule ScheduleChange) Change {
 	return Change{Type: kind, Name: name, Field: fieldPipelineSchedules, Schedule: &schedule}
 }
 
-// The remaining schedule attribute names, kept as constants beside the ones
-// [rejectIncompleteSchedules] uses so the scattered copies cannot drift apart.
+// The schedule attribute names not already named for
+// [rejectIncompleteSchedules].
 const (
 	fieldCronTimezone = "cron_timezone"
 	fieldActive       = "active"
 )
 
-// One schedule attribute as a plan line reports it.
 type scheduleAttribute struct {
 	field string
 	value string
@@ -96,8 +89,7 @@ type scheduleAttribute struct {
 
 // Renders a schedule's attributes in a fixed order, so two of them line up
 // position by position. The description is absent because it is the identity: a
-// schedule described differently is a different schedule rather than a changed
-// one.
+// schedule described differently is a different one, not a changed one.
 func scheduleAttributes(schedule manifest.PipelineSchedule) []scheduleAttribute {
 	return []scheduleAttribute{
 		{field: fieldRef, value: string(schedule.Ref)},
@@ -107,10 +99,9 @@ func scheduleAttributes(schedule manifest.PipelineSchedule) []scheduleAttribute 
 	}
 }
 
-// Renders the change as the lines a plan shows for it: a header naming the
-// schedule, then the attributes the change is about. A create lists them all
-// because none of them exists yet, an update lists only those that differ, and
-// a delete lists none because the schedule goes whole.
+// Renders the change as the lines a plan shows for it. A creation lists every
+// attribute because none of them exists yet, an update only those that differ,
+// and a deletion none because the schedule goes whole.
 func (s *ScheduleChange) line(kind ChangeType) string {
 	header := fmt.Sprintf("pipeline_schedule %q", s.Description)
 	switch kind {

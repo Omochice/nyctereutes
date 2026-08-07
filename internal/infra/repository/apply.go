@@ -52,8 +52,7 @@ var errUnexpectedValueType = errors.New("change value has unexpected type")
 // only updates, so a create is reported rather than performed.
 var errCreateUnsupported = errors.New("creating a project is not supported yet")
 
-// Signals a pipeline schedule change reaching the applier, which does not write
-// one yet.
+// Signals a schedule change reaching the applier, which does not write one yet.
 var errScheduleWriteUnsupported = errors.New("applying a pipeline schedule change is not supported yet")
 
 // Translates one change into its glab call. A create is reported unsupported;

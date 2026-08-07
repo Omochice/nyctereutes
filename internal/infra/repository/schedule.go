@@ -68,10 +68,8 @@ var errIncompleteLiveSchedule = errors.New("incomplete pipeline schedule")
 // through. GitLab skips its presence checks for a schedule brought in by its
 // project import, so a project can hold one that cannot be described.
 //
-// The id is required too, though no manifest holds it: it is how GitLab
-// addresses a schedule, so one reported without it would send an update or a
-// delete to pipeline_schedules/0, which names some other project's schedule or
-// nothing at all.
+// The id is required too, though no manifest holds it: one reported without it
+// would have its update or delete addressed to pipeline_schedules/0.
 func rejectIncompleteSchedules(schedules []LiveSchedule) error {
 	for _, schedule := range schedules {
 		if schedule.ID == 0 {
@@ -134,9 +132,8 @@ func toManifestSchedules(live []LiveSchedule) []manifest.PipelineSchedule {
 	return schedules
 }
 
-// Describes one live schedule the way a manifest would. The id is dropped
-// because no manifest holds one, which is also what makes the result comparable
-// with a declared schedule.
+// Describes one live schedule the way a manifest would, which is what makes it
+// comparable with a declared one.
 func toManifestSchedule(live LiveSchedule) manifest.PipelineSchedule {
 	return manifest.PipelineSchedule{
 		Description:  live.Description,

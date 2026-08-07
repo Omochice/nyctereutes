@@ -264,8 +264,7 @@ func TestInfraPlanCIExitCode(t *testing.T) {
 }
 
 // A document carrying no pipeline_schedules key makes no schedule request. The
-// fake answers no schedule read, so one would surface as an unexpected call
-// rather than being absorbed; that is what keeps such a project at one request.
+// fake leaves that read unanswered, so one would surface as an unexpected call.
 func TestInfraPlanReadsNoSchedulesForADocumentDeclaringNone(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest)
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
@@ -280,8 +279,7 @@ func TestInfraPlanReadsNoSchedulesForADocumentDeclaringNone(t *testing.T) {
 	}
 }
 
-// A declared schedule the project does not hold is planned for creation, named
-// by its description and listing what it would be created with.
+// A declared schedule the project does not hold is planned for creation.
 func TestInfraPlanShowsAScheduleCreation(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planScheduleManifest)
 	runner := &fakeInfraGlab{
@@ -321,8 +319,7 @@ func TestInfraPlanShowsAScheduleRemoval(t *testing.T) {
 }
 
 // A schedule read the token may not make is reported and counted, and the rest
-// of the project is still planned: ending the plan there would cost every
-// setting that could be compared over one child resource.
+// of the project is still planned rather than lost over one child resource.
 func TestInfraPlanStillPlansAProjectWhoseSchedulesCannotBeRead(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
 

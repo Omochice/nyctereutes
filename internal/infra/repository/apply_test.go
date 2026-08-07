@@ -176,9 +176,8 @@ func TestApplyReportsCreateAsUnsupported(t *testing.T) {
 	}
 }
 
-// Each of the three schedule changes is refused rather than written. A schedule
-// reaching the scalar PUT would send its attributes to the project endpoint,
-// which GitLab answers with a 200 that changes nothing.
+// Each of the three schedule changes is refused rather than written: one
+// reaching the scalar PUT would be answered with a 200 that changed nothing.
 func TestApplyReportsAScheduleChangeAsUnsupported(t *testing.T) {
 	for _, kind := range []ChangeType{ChangeCreate, ChangeUpdate, ChangeDelete} {
 		t.Run(string(kind), func(t *testing.T) {

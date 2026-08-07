@@ -83,10 +83,7 @@ func scheduleBody(schedules map[string]string, project string) []byte {
 // error so unexpected calls fail the test loudly.
 //
 // A nil schedules map turns a schedule read into an unexpected call, so a test
-// asserting that none is made needs only to leave the map out. Import always
-// reads them, and plan and apply read them for a document declaring the key and
-// must not for one that omits it, which is what keeps such a project at one
-// request.
+// asserting that none is made needs only to leave the map out.
 type fakeInfraGlab struct {
 	projects  map[string]string // "owner/name" -> project JSON
 	catalog   map[string]bool   // "owner/name" -> catalog status, default false

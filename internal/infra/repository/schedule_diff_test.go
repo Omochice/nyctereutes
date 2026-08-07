@@ -7,9 +7,8 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// A document declaring the given schedules. A nil slice is the document
-// carrying no pipeline_schedules key at all, which the decoder keeps distinct
-// from an empty list.
+// A document declaring the given schedules. A nil slice is one carrying no
+// pipeline_schedules key at all.
 func declaring(schedules []manifest.PipelineSchedule) *manifest.Repository {
 	return &manifest.Repository{
 		Metadata: manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj},
@@ -23,9 +22,8 @@ func holding(schedules []LiveSchedule) *CurrentState {
 	return &CurrentState{Owner: ownerGroup, Name: nameProj, PipelineSchedules: schedules}
 }
 
-// One schedule as a decoded document holds it. The timezone and the active flag
-// are filled because the decoder seeds the values GitLab defaults on create, so
-// a schedule a person wrote without them still compares against live state.
+// One schedule as a decoded document holds it: the timezone and the active flag
+// are filled because the decoder seeds what GitLab defaults on create.
 func declaredSchedule(description, cron string) manifest.PipelineSchedule {
 	return manifest.PipelineSchedule{
 		Description:  description,
@@ -48,8 +46,8 @@ func liveSchedule(id int, description, cron string) LiveSchedule {
 	}
 }
 
-// The single schedule change in changes, failing the test when the count is not
-// one, because every later assertion would otherwise read an arbitrary member.
+// The single schedule change in changes, failing the test when there is not
+// exactly one to read.
 func onlyScheduleChange(t *testing.T, changes []Change) Change {
 	t.Helper()
 	if len(changes) != 1 {
@@ -92,8 +90,7 @@ func TestDiffPlansEveryLiveScheduleRemovedByAnEmptyList(t *testing.T) {
 }
 
 // A project whose schedules were not read plans no schedule change, however
-// much the document declares. The read is what would say which of them exist,
-// and a plan does not speak about state it has not seen.
+// much the document declares: a plan does not speak about what it has not seen.
 func TestDiffSaysNothingAboutSchedulesThatWereNotRead(t *testing.T) {
 	declared := []manifest.PipelineSchedule{declaredSchedule("nightly", "0 3 * * *")}
 
@@ -124,8 +121,7 @@ func TestDiffPlansADeclaredScheduleWithNoLiveCounterpartAsACreation(t *testing.T
 }
 
 // A schedule whose declaration and live state differ is updated, carrying the
-// live id so the write can address it, and both sides so the plan can say what
-// changes.
+// live id so a write can address it and both sides so a plan can say what changes.
 func TestDiffPlansADifferingScheduleAsAnUpdate(t *testing.T) {
 	want := declaredSchedule("nightly", "0 4 * * *")
 	live := liveSchedule(7, "nightly", "0 3 * * *")
@@ -158,9 +154,8 @@ func TestDiffPlansNothingForAScheduleThatAlreadyMatches(t *testing.T) {
 	}
 }
 
-// Renaming a schedule is a removal and a creation, and the removal is planned
-// first. An instance caps how many schedules a project holds, so a project at
-// that cap can only take the replacement once the old one is gone.
+// Renaming a schedule is a removal and a creation, and the removal comes first:
+// an instance caps how many schedules a project may hold.
 func TestDiffPlansARemovalBeforeTheCreationThatReplacesIt(t *testing.T) {
 	changes := Diff(
 		declaring([]manifest.PipelineSchedule{declaredSchedule("renamed", "0 3 * * *")}),
@@ -178,8 +173,8 @@ func TestDiffPlansARemovalBeforeTheCreationThatReplacesIt(t *testing.T) {
 	}
 }
 
-// A creation shows every attribute, because none of them exists yet and the
-// operator is approving the whole schedule rather than a change to one.
+// A creation shows every attribute, because the operator is approving a whole
+// schedule rather than a change to one.
 func TestScheduleCreationLineShowsEveryAttribute(t *testing.T) {
 	changes := Diff(
 		declaring([]manifest.PipelineSchedule{declaredSchedule("nightly", "0 3 * * *")}),
@@ -214,8 +209,8 @@ func TestScheduleUpdateLineShowsOnlyTheAttributesThatDiffer(t *testing.T) {
 	}
 }
 
-// A deletion names the schedule alone: everything it holds goes with it, so
-// listing the attributes would say what is destroyed rather than what changes.
+// A deletion names the schedule alone, because everything it holds goes with
+// it.
 func TestScheduleDeletionLineNamesTheScheduleAlone(t *testing.T) {
 	changes := Diff(
 		declaring([]manifest.PipelineSchedule{}),

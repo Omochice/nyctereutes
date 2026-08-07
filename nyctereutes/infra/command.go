@@ -61,11 +61,10 @@ func readManifestFile(stderr io.Writer, path string) ([]*manifest.Repository, in
 	return repos, len(errs)
 }
 
-// Reads the live state one declared project is compared against, reporting a
-// failed read to stderr and counting it rather than returning it, the way
-// [readManifestFile] treats a document that will not parse. A nil state is one
-// nothing can be said about; plan and apply share this so a project reads the
-// same either side of the confirmation prompt.
+// Reads the live state one declared project is compared against. A failed read
+// is written to stderr and counted rather than returned, the way
+// [readManifestFile] treats an unparseable document, and a nil state is one
+// nothing can be said about.
 func fetchState(
 	ctx context.Context, client *repository.Client, stderr io.Writer, repo *manifest.Repository,
 ) (*repository.CurrentState, int) {
@@ -75,16 +74,15 @@ func fetchState(
 		_, _ = fmt.Fprintf(stderr, "%v\n", err)
 		return nil, 1
 	}
-	// A manifest that declares no schedules says nothing about them, so the read
-	// whose answer nothing would be compared against is not made; that keeps such
-	// a project at one request. A read that fails is counted, but the state still
-	// goes back, so a project whose schedules cannot be described still has the
-	// settings that could be.
+	// A manifest declaring no schedules says nothing about them, so the read is
+	// not made and such a project stays at one request.
 	if repo.Spec.PipelineSchedules == nil {
 		return state, 0
 	}
 	schedules, err := client.FetchSchedules(ctx, repo.Metadata.Owner, repo.Metadata.Name)
 	if err != nil {
+		// The state still goes back, so a project whose schedules cannot be
+		// described keeps the settings that can be.
 		_, _ = fmt.Fprintf(stderr, "%v\n", err)
 		return state, 1
 	}
