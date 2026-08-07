@@ -22,6 +22,10 @@ type ScheduleChange struct {
 	ID      int
 	Desired manifest.PipelineSchedule
 	Live    manifest.PipelineSchedule
+	// The keys of the variables a removal would destroy, filled by the command
+	// that plans the removal and empty everywhere else. The manifest holds no
+	// variables, so nothing else in a plan would mention them.
+	VariableKeys []string
 }
 
 // Reports how a project's live schedules differ from the declared ones, pairing
@@ -101,7 +105,7 @@ func scheduleAttributes(schedule manifest.PipelineSchedule) []scheduleAttribute 
 
 // Renders the change as the lines a plan shows for it. A creation lists every
 // attribute because none of them exists yet, an update only those that differ,
-// and a deletion none because the schedule goes whole.
+// and a deletion none, naming instead the variable keys going with the schedule.
 func (s *ScheduleChange) line(kind ChangeType) string {
 	header := fmt.Sprintf("pipeline_schedule %q", s.Description)
 	switch kind {
@@ -124,7 +128,12 @@ func (s *ScheduleChange) line(kind ChangeType) string {
 		}
 		return strings.Join(lines, "\n")
 	case ChangeDelete:
-		return "- " + header
+		lines := make([]string, 0, len(s.VariableKeys)+1)
+		lines = append(lines, "- "+header)
+		for _, key := range s.VariableKeys {
+			lines = append(lines, "    - variable: "+key)
+		}
+		return strings.Join(lines, "\n")
 	default:
 		return ""
 	}

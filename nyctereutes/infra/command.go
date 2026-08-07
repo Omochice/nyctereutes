@@ -71,7 +71,36 @@ func planRepo(
 	if state == nil {
 		return nil, failures
 	}
-	return repository.Diff(repo, state), failures
+	changes := repository.Diff(repo, state)
+	discloseDestroyedVariables(ctx, client, stderr, repo, changes)
+	return changes, failures
+}
+
+// Names the variables each planned removal would destroy, so the operator
+// approving one sees what goes with the schedule. The manifest holds no
+// variables, which is what leaves the rest of the plan silent about them.
+//
+// Only a removal is read, so a plan that removes nothing pays nothing. A read
+// that fails costs a warning and no more: the removal is still shown, because
+// nothing about performing it depends on the answer. Keys are all that comes
+// back, so the plan cannot disclose a value it was written to protect.
+func discloseDestroyedVariables(
+	ctx context.Context, client *repository.Client, stderr io.Writer,
+	repo *manifest.Repository, changes []repository.Change,
+) {
+	for _, change := range changes {
+		if change.Type != repository.ChangeDelete || change.Schedule == nil {
+			continue
+		}
+		keys, err := client.ScheduleVariableKeys(
+			ctx, repo.Metadata.Owner, repo.Metadata.Name, change.Schedule.ID,
+		)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "%v\n", err)
+			continue
+		}
+		change.Schedule.VariableKeys = keys
+	}
 }
 
 // Reads the live state one declared project is compared against. A failed read

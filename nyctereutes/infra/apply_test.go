@@ -22,6 +22,7 @@ type fakeApplyGlab struct {
 	projects   map[string]string // "owner/name" -> project JSON, absent means 404
 	catalog    map[string]bool   // "owner/name" -> catalog status, default false
 	schedules  map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
+	variables  map[string]string // schedule id -> the variables field; absent holds none
 	writes     []string          // joined args of each write call, in order
 	writeBody  []string          // parallel to writes: stdin body, "" for none
 	failWrites map[string]bool   // "owner/name" whose writes fail
@@ -29,6 +30,11 @@ type fakeApplyGlab struct {
 }
 
 func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	// Tried before the project read, which a disclosure otherwise matches: both
+	// are two arguments addressing a projects/ endpoint.
+	if id, ok := scheduleDetailRead(args); ok {
+		return scheduleDetailBody(f.variables, id), nil
+	}
 	if isProjectRead(args) {
 		return f.readProject(args)
 	}
