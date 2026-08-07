@@ -221,6 +221,12 @@
               files = "^\\.github/workflows/.*$";
               pass_filenames = false;
             };
+            gitleaks = {
+              enable = true;
+              name = "gitleaks";
+              entry = "${pkgs.lib.getExe pkgs.gitleaks} git --pre-commit --redact --staged --verbose --no-banner";
+              pass_filenames = false;
+            };
             renovate-config-validator = {
               enable = true;
               name = "renovate-config-validator";
