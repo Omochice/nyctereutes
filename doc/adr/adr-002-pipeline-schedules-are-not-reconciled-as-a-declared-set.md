@@ -52,6 +52,8 @@ We will discard PR #66 and stop treating pipeline schedules as a declared set th
 
 **Rationale**: The evidence gathered so far says the declared-set model does not fit, but it does not by itself say which model does. Recording the stop separately from the replacement keeps this decision reviewable on what it actually rests on, and stops a replacement being chosen under the pressure of an open branch.
 
+Whatever settles that question inherits one obligation from here. Stopping deletions is what makes decision 3 of [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) unnecessary today: no plan destroys a schedule, so none has to name the variables going with it. A model that deletes again has to carry that disclosure with it, or it restores the silent destruction ADR-001 was written to prevent.
+
 ## Consequences
 
 ### Positive

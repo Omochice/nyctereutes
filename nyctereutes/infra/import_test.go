@@ -230,31 +230,3 @@ func TestInfraImportReportsDuplicateSchedulesAndContinues(t *testing.T) {
 		t.Errorf("the settings of the project with the repeated description are still describable\n%s", stdout)
 	}
 }
-
-// A token below Maintainer that does not own a schedule cannot read its
-// variables, and losing every schedule over one attribute the role cannot see
-// would leave a Developer unable to export at all. The schedule is exported
-// without the key, the omission is named on stderr, and the run succeeds.
-func TestInfraImportExportsSchedulesWhoseVariablesAreHidden(t *testing.T) {
-	runner := &fakeInfraGlab{
-		projects: map[string]string{targetGroupProj: projJSON},
-		schedules: map[string]string{targetGroupProj: `[
-		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`},
-		variables: map[string]string{"1": `{"id":1,"description":"nightly"}`},
-	}
-
-	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj)
-
-	if exit != 0 {
-		t.Errorf("exit = %d, want 0: a role that cannot read variables still exports\n%s", exit, stderr)
-	}
-	if !strings.Contains(stdout, "description: nightly") {
-		t.Errorf("the schedule itself should still be exported\n%s", stdout)
-	}
-	if strings.Contains(stdout, "variables") {
-		t.Errorf("variables the token cannot read must not be declared\n%s", stdout)
-	}
-	if !strings.Contains(stderr, "nightly") {
-		t.Errorf("the undescribed variables should be named on stderr\n%s", stderr)
-	}
-}

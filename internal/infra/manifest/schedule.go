@@ -15,12 +15,6 @@ type PipelineSchedule struct {
 	Cron         string `yaml:"cron"`
 	CronTimezone string `yaml:"cron_timezone"`
 	Active       bool   `yaml:"active"`
-	// omitzero, for the reason the schedule list carries it: nil says nothing
-	// about the live variables, an empty list declares that the schedule should
-	// carry none, and a populated one declares exactly those. Variables cost a
-	// request of their own, so a command that has not paid it has to be able to
-	// say nothing rather than declare a deletion.
-	Variables []ScheduleVariable `yaml:"variables,omitzero"`
 }
 
 // What GitLab stores when a schedule is created without a timezone.
@@ -67,7 +61,7 @@ func (schedule *PipelineSchedule) validate(index int) error {
 			return fmt.Errorf("%w: spec.pipeline_schedules[%d].%s", errRequiredField, index, required.field)
 		}
 	}
-	return validateVariables(schedule.Description, schedule.Variables)
+	return nil
 }
 
 // The git ref a schedule runs against, always held as the full path GitLab

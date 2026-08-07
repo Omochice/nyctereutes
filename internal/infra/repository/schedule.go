@@ -24,39 +24,15 @@ type LiveSchedule struct {
 	Cron         string `json:"cron"`
 	CronTimezone string `json:"cron_timezone"`
 	Active       bool   `json:"active"`
-	// Read from the single-schedule endpoint, which is the only place GitLab
-	// reports them, and only when a caller asks: the read costs one request per
-	// schedule. Nil therefore means "not read", which is why a manifest that
-	// declares no variable never triggers the read.
-	Variables []ScheduleVariable `json:"variables"`
-}
-
-// One variable attached to a pipeline schedule. The value is free text the same
-// way a description or a template is, and a file-typed one is routinely
-// multiline, so it carries the type that normalizes line endings: a bare CR
-// reaching the manifest would cost Marshal its literal block.
-type ScheduleVariable struct {
-	Key          string   `json:"key"`
-	Value        freeText `json:"value"`
-	VariableType string   `json:"variable_type"`
 }
 
 // Reads every pipeline schedule a project owns. The endpoint pages at 20 while
 // an instance can raise the schedule limit above that, so glab is asked to
 // follow the pages rather than the project being described by its first page.
 //
-// The variables cost one request per schedule and are read only when
-// withVariables asks for them: a caller that manages no variable cannot use
-// them, and paying for them regardless turns one project read into as many
-// requests as the project has schedules.
-//
-// A schedule whose variables the token may not see keeps them nil even when
-// withVariables asked, so having asked is what makes nil mean "not permitted"
-// rather than "not requested". [SchedulesMissingVariables] names those for a
-// caller that wants to say so.
-func (c *Client) FetchSchedules(
-	ctx context.Context, owner, name string, withVariables bool,
-) ([]LiveSchedule, error) {
+// A schedule's variables are not read. They are not part of the manifest, and
+// the only endpoint carrying them answers one schedule at a time.
+func (c *Client) FetchSchedules(ctx context.Context, owner, name string) ([]LiveSchedule, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
 		"projects/"+glab.EncodePath(owner+"/"+name)+"/pipeline_schedules")
 	if err != nil {
@@ -71,16 +47,6 @@ func (c *Client) FetchSchedules(
 	}
 	if err := rejectDuplicateDescriptions(schedules); err != nil {
 		return nil, fmt.Errorf("read pipeline schedules %s/%s: %w", owner, name, err)
-	}
-	if !withVariables {
-		return schedules, nil
-	}
-	for index := range schedules {
-		variables, err := c.fetchScheduleVariables(ctx, owner, name, schedules[index].ID)
-		if err != nil {
-			return nil, err
-		}
-		schedules[index].Variables = variables
 	}
 	return schedules, nil
 }
@@ -114,48 +80,6 @@ func rejectIncompleteSchedules(schedules []LiveSchedule) error {
 		}
 	}
 	return nil
-}
-
-// Reads one schedule's variables. The list response omits them entirely, so
-// knowing whether a schedule carries any costs a request per schedule.
-//
-// GitLab answers a reader who is neither Maintainer, Owner, nor the schedule's
-// creator with the field left out rather than with an error, so nil is returned
-// for it and the schedule stays undescribed on that one attribute. A pointer is
-// what tells that omission apart from the empty list a permitted reader gets
-// for a schedule carrying none, which is a description rather than a silence.
-func (c *Client) fetchScheduleVariables(
-	ctx context.Context, owner, name string, scheduleID int,
-) ([]ScheduleVariable, error) {
-	endpoint := fmt.Sprintf("projects/%s/pipeline_schedules/%d", glab.EncodePath(owner+"/"+name), scheduleID)
-	out, err := c.runner.Run(ctx, "api", endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("fetch pipeline schedule %d on %s/%s: %w", scheduleID, owner, name, err)
-	}
-	var schedule struct {
-		Variables *[]ScheduleVariable `json:"variables"`
-	}
-	if err := json.Unmarshal(out, &schedule); err != nil {
-		return nil, fmt.Errorf("parse pipeline schedule %d on %s/%s: %w", scheduleID, owner, name, err)
-	}
-	if schedule.Variables == nil {
-		return nil, nil
-	}
-	return *schedule.Variables, nil
-}
-
-// Names the schedules whose variables were asked for and not answered, which is
-// how GitLab replies to a reader below Maintainer who does not own them. Only a
-// caller that passed withVariables may read the result: without that, every
-// schedule is missing its variables and the answer means nothing.
-func SchedulesMissingVariables(schedules []LiveSchedule) []string {
-	var missing []string
-	for _, schedule := range schedules {
-		if schedule.Variables == nil {
-			missing = append(missing, schedule.Description)
-		}
-	}
-	return missing
 }
 
 // Signals a project carrying two schedules described alike.
@@ -198,7 +122,6 @@ func toManifestSchedules(live []LiveSchedule) []manifest.PipelineSchedule {
 			Cron:         schedule.Cron,
 			CronTimezone: schedule.CronTimezone,
 			Active:       schedule.Active,
-			Variables:    toManifestVariables(schedule.Variables),
 		})
 	}
 	slices.SortFunc(schedules, func(left, right manifest.PipelineSchedule) int {
@@ -239,28 +162,4 @@ func decodeSchedulePages(out []byte) ([]LiveSchedule, error) {
 		return nil, errNoSchedulePage
 	}
 	return schedules, nil
-}
-
-// Converts a schedule's variables, ordered by key for the reason the schedules
-// themselves are ordered by description: GitLab guarantees no order, and the
-// document has to be stable under version control.
-//
-// Variables that were never read pass through as nil, which the field on
-// [manifest.PipelineSchedule] keeps distinct from the empty list.
-func toManifestVariables(live []ScheduleVariable) []manifest.ScheduleVariable {
-	if live == nil {
-		return nil
-	}
-	variables := make([]manifest.ScheduleVariable, 0, len(live))
-	for _, variable := range live {
-		variables = append(variables, manifest.ScheduleVariable{
-			Key:          variable.Key,
-			Value:        string(variable.Value),
-			VariableType: manifest.VariableType(variable.VariableType),
-		})
-	}
-	slices.SortFunc(variables, func(left, right manifest.ScheduleVariable) int {
-		return cmp.Compare(left.Key, right.Key)
-	})
-	return variables
 }
