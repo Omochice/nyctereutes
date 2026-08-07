@@ -418,3 +418,35 @@ func (f *countingDetailGlab) Run(ctx context.Context, args ...string) ([]byte, e
 	}
 	return f.fakeInfraGlab.Run(ctx, args...)
 }
+
+// A project whose live schedules repeat a description is refused, because the
+// pairing a plan rests on would land on an arbitrary member of the pair. The
+// refusal costs the project its schedules and not the project: its other
+// settings are still planned.
+func TestInfraPlanRefusesDuplicateScheduleDescriptionsAndPlansTheRest(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: `[
+		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"},
+		  {"id":5,"description":"nightly","ref":"refs/heads/main","cron":"0 8 * * *"}
+		]`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 for a project that cannot be described", exit)
+	}
+	for _, want := range []string{"duplicate", "nightly", "1", "5"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr missing %q\n%s", want, stderr)
+		}
+	}
+	if !strings.Contains(stdout, "visibility") {
+		t.Errorf("stdout does not still carry the project drift\n%s", stdout)
+	}
+	if strings.Contains(stdout, "pipeline_schedule") {
+		t.Errorf("stdout plans a schedule change for an undescribable project\n%s", stdout)
+	}
+}

@@ -119,7 +119,9 @@ func TestApplyScheduleFailureNamesTheSchedule(t *testing.T) {
 	if len(results) != 1 || results[0].Err == nil {
 		t.Fatalf("results = %+v, want one failed result", results)
 	}
-	for _, want := range []string{`pipeline_schedules["nightly"]`, "group/proj", "permission denied"} {
+	for _, want := range []string{
+		`pipeline_schedules["nightly"]`, "group/proj", "permission denied", "created by this token's user",
+	} {
 		if !strings.Contains(results[0].Err.Error(), want) {
 			t.Errorf("error %q does not name %q", results[0].Err, want)
 		}

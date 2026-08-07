@@ -159,7 +159,7 @@ func wrapWrite(err error, project, field string) error {
 	if err == nil {
 		return nil
 	}
-	if hint := writeHint(err); hint != "" {
+	if hint := writeHint(err, field); hint != "" {
 		err = fmt.Errorf("%s: %w", hint, err)
 	}
 	return fmt.Errorf("apply %s on %s: %w", field, project, err)
@@ -168,16 +168,28 @@ func wrapWrite(err error, project, field string) error {
 // The hint names the likely cause of a classified failure so the operator
 // reading the aggregated report knows whether to fix a token, a path, or a
 // value; "" when the failure was not classified.
-func writeHint(err error) string {
+func writeHint(err error, field string) string {
 	switch {
 	case errors.Is(err, glab.ErrForbidden):
-		return "permission denied; check the token has the Maintainer or Owner role"
+		return forbiddenHint(field)
 	case errors.Is(err, glab.ErrNotFound):
 		return "project not found; it may have been removed or renamed"
 	case errors.Is(err, glab.ErrValidation):
 		return "GitLab rejected the value"
 	}
 	return ""
+}
+
+// Names what a refused write actually needs. Writing a schedule takes more than
+// the role that reads it: against GitLab 19.2.1 every write was refused unless
+// the token both held Maintainer and had created the schedule, so the role hint
+// alone would send the operator to a fix that does not apply.
+func forbiddenHint(field string) string {
+	if strings.HasPrefix(field, fieldPipelineSchedules) {
+		return "permission denied; writing a schedule needs the Maintainer or Owner role " +
+			"and the schedule to have been created by this token's user"
+	}
+	return "permission denied; check the token has the Maintainer or Owner role"
 }
 
 // Maps a plan field name to the GitLab API parameter that carries it. A
