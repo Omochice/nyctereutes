@@ -369,7 +369,7 @@ func TestInfraPlanWarnsWhenARemovalsVariablesAreNotDisclosed(t *testing.T) {
 	runner := &fakeInfraGlab{
 		projects:  map[string]string{targetGroupProj: projJSON},
 		schedules: map[string]string{targetGroupProj: nightlyScheduleJSON},
-		variables: map[string]string{"7": "null"},
+		variables: map[string]string{"7": ""},
 	}
 
 	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)

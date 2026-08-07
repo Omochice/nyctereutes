@@ -93,14 +93,18 @@ func scheduleDetailRead(args []string) (id string, ok bool) {
 	return id, found
 }
 
-// The single-schedule response for a disclosure read, built from the variables
-// field a test scripted for that schedule id. A schedule absent from the map
-// holds no variable, which is what most of them hold; a "null" entry is the
-// field GitLab leaves out for a reader who may not see them.
+// The single-schedule response for a disclosure read, carrying the variables a
+// test scripted for that schedule id. A schedule absent from the map holds
+// none, which is what most of them hold. An empty entry leaves the field out of
+// the response altogether, which is how GitLab answers a reader who may not see
+// them.
 func scheduleDetailBody(variables map[string]string, id string) []byte {
 	field, ok := variables[id]
 	if !ok {
 		field = "[]"
+	}
+	if field == "" {
+		return []byte(`{"description":"nightly"}`)
 	}
 	return fmt.Appendf(nil, `{"variables":%s}`, field)
 }
