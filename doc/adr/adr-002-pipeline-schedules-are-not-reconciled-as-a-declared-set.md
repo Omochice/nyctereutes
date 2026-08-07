@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Schedules are not reconciled today, which is what this record decided. [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) proposes an answer to the question decision 2 deferred; until that record is accepted and carried out, the question stays open and this one stays in force.
+Superseded by [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md), which answers the question decision 2 deferred and reconciles schedules again. This record still explains why the first attempt was discarded and what had to change before a second one was worth making.
 
 ## Context
 

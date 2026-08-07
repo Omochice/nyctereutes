@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted, except for the writes
 
 ## Context
 
@@ -106,30 +106,31 @@ We will reconcile pipeline schedules as a declared set, and require the descript
 
 ## Consequences
 
-This record is proposed, so what follows describes the state once it is carried out rather than how the tool behaves today. Today `infra plan` and `infra apply` still ignore schedules, which is [ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md)'s decision, and the one thing below that already exists is named as such.
+This record is carried out as far as `infra plan`: a schedule change is reported, and `infra apply` refuses to perform one. What follows is therefore stated as behaviour where a plan alone produces it, and as what will follow where writing is what produces it.
 
 ### Positive
 
-1. **A declared schedule will be acted on**: the block the schema accepts becomes the block apply reconciles, so writing one has an effect and reading a manifest tells the truth about the project.
-2. **The pairing will rest on a stated rule**: a delete addresses the schedule a declaration names, because a project where that is ambiguous is refused before any change is planned.
-3. **The refusal already exists and already explains itself**: `infra import` names both ids today, so the message plan and apply will reuse is one the operator can already act on rather than one being invented with them.
-4. **The model will match the rest of the manifest**: a reader who knows what an omitted topic means will know what an omitted schedule means.
+1. **A declared schedule stops being ignored**: a plan reports what the block the schema accepts would change, so reading a manifest beside a plan tells the truth about the project. Apply acts on it once the writes land.
+2. **The pairing rests on a stated rule**: a removal addresses the schedule a declaration names, because a project where that is ambiguous is refused before any change is planned.
+3. **The refusal explains itself**: it names both ids, so the operator knows which schedule to rename rather than being told the project is unmanageable.
+4. **The model matches the rest of the manifest**: a reader who knows what an omitted topic means knows what an omitted schedule means.
 
 ### Negative
 
 1. **A rename will destroy and recreate**: editing a description costs the schedule its id, and with it whatever GitLab associates with that id, for a change an operator will read as cosmetic.
 2. **A correct plan can become a refused apply**: a token that reads a schedule it does not own produces a plan it cannot carry out, and 403 is what the operator sees.
 3. **A deletion will destroy variables the manifest never held**: [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) took variables out of the document, so a deleted schedule takes variables nothing in the plan mentions.
-4. **A duplicate description will block a project's schedules entirely**: one pair created by two different people leaves the schedules unmanageable until someone renames one.
+4. **A duplicate description blocks a project's schedules entirely**: one pair created by two different people leaves the schedules unmanageable until someone renames one.
+5. **An exported manifest opts a project into removal**: `infra import` writes `pipeline_schedules: []` for a project owning none, so committing that document declares that none may be added, for an operator who only meant to record the project as it stood.
 
 ### Mitigations
 
-Each of these is written with the reconciliation rather than before it, because a mitigation for behaviour that does not exist has nothing to attach to.
+A mitigation for a write lands with that write, because one written before it has nothing to attach to.
 
-- The documentation gains the rename behaviour, so an operator meets the cost in `doc/cmd/infra.md` rather than in a plan that deletes a schedule they meant to rename.
-- The apply error distinguishes a missing role from a schedule owned by someone else, because those have different fixes and the generic permission hint names the wrong one.
-- Decision 3 of [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) lands with this: a plan deleting a schedule names the variable keys going with it. That decision was deferred only because nothing deleted a schedule, and carrying this record out is what changes that.
-- A project refused for duplicate descriptions still has its other settings planned and applied, so the ambiguity costs its schedules rather than the project.
+- `doc/cmd/infra.md` states the rename behaviour, the meaning of an empty list in an exported document, and that an omitted `active` declares `true`, so an operator meets each cost there rather than in a plan.
+- A project refused for duplicate descriptions still has its other settings planned, so the ambiguity costs its schedules rather than the project.
+- The apply error will distinguish a missing role from a schedule created by someone else, because those have different fixes and the role hint alone names a fix that does not apply. Nothing writes a schedule yet, so no such error exists to carry it.
+- Decision 3 of [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) lands with the writes: a plan removing a schedule will name the variable keys going with it. Until a removal is performed nothing is destroyed, which is what lets this record land in two parts rather than one.
 
 ## Implementation Notes
 
@@ -137,7 +138,9 @@ The reconciliation is written fresh rather than lifted from the discarded branch
 
 Two defects found while reviewing that branch apply to whatever is written here, and neither is caused by this decision. `infra apply` archives a project before writing the settings that follow it, and GitLab makes an archived project read-only, so a manifest that both archives and changes schedules fails on every later write. Separately, a schedule GitLab reports without an id would have an update or a delete addressed to `pipeline_schedules/0`.
 
-Verification worth pinning: a live schedule the manifest omits is planned for deletion and its variable keys are named; a project holding two schedules described alike is refused by plan and apply as it already is by import, with the other settings still reported; a manifest declaring no schedules plans no schedule change; an empty list plans the removal of every live schedule.
+Verification for the plan side: a project holding two schedules described alike is refused by plan as it already is by import, with the other settings still reported; a manifest declaring no schedules plans no schedule change and makes no schedule read; an empty list plans the removal of every live schedule; a schedule change reaching apply is reported rather than written.
+
+Verification for the writes, when they land: applying a manifest and planning it again reports no change, including for a paused schedule and a non-UTC timezone; a plan removing a schedule names its variable keys and not their values.
 
 ## References
 

@@ -17,13 +17,19 @@ It follows an import, validate, plan, apply cycle so the manifests stay the sing
 
 ## Pipeline schedules
 
-`infra import` exports a project's pipeline schedules, and `infra validate` checks them, but `infra plan` and `infra apply` do not reconcile them: a declared schedule is neither created, changed nor removed, and a plan reports no drift in one.
+`infra import` exports a project's pipeline schedules, `infra validate` checks them, and `infra plan` reports how the schedules a project holds differ from the ones a manifest declares.
 
-A schedule is exported so a manifest describes the project as it stands, not so the manifest drives it. Reconciling one needs the live set to be knowable, and it is not: GitLab addresses a schedule by an id no manifest can hold, so a declared one is paired by its description, which GitLab neither keeps unique nor keeps stable when someone edits it in the web UI. Reading a schedule and writing it also need different permissions, so a plan can be correct and its apply refused.
+Writing that difference back is not in place yet. `infra apply` reports a schedule change as unsupported instead of performing it, and counts it as a failure, so a plan showing schedule drift can be read but not carried out and nothing is applied by halves.
 
-A schedule's variables are outside the manifest altogether. They are not exported, and a manifest declaring a `variables` block on a schedule is rejected as carrying an unknown field rather than being read and ignored, so a schedule in a manifest describes when a pipeline runs and not what it receives. GitLab requires a value to create a variable, and a manifest that is committed to version control is the wrong place to keep one, so a declared variable could never be created from the document that declares it.
+A schedule is identified by its description. GitLab addresses one by a server-assigned id that no manifest holds, so the description is what pairs a declared schedule with a live one. GitLab does not require descriptions to be unique, and a project holding two schedules described alike is refused, because a change addressed to that description would land on an arbitrary member of the pair. The refusal names both ids, and it costs the project its schedules rather than the project: its other settings are still planned.
 
-Whether schedules become manageable, and under what model, is an open question rather than a planned feature.
+Because the description is the identity, editing one is not a rename. A plan reports the schedule with the old description as removed and one with the new description as created, so it would lose its id and everything GitLab keeps against that id.
+
+The `pipeline_schedules` key follows the same rule as `topics`. A manifest that omits the key says nothing about schedules and no plan reports one. A manifest that carries the key with an empty list declares that the project holds no schedule, so a plan reports every one that exists as a removal. This matters for an exported manifest: `infra import` writes `pipeline_schedules: []` for a project owning none, so committing that document is a declaration that none may be added.
+
+An omitted attribute takes the value GitLab defaults on create, which for `active` is `true`. A declared schedule that does not say `active: false` is therefore a declaration that it runs, and a plan reports a schedule someone paused in the web UI as one to resume.
+
+A schedule's variables are outside the manifest. They are not exported, and a manifest declaring a `variables` block on a schedule is rejected as carrying an unknown field rather than being read and ignored, so a schedule in a manifest describes when a pipeline runs and not what it receives. GitLab requires a value to create a variable, and a manifest that is committed to version control is the wrong place to keep one, so a declared variable could never be created from the document that declares it.
 
 ## Inspired by
 
