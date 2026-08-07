@@ -174,7 +174,7 @@ func (c *Client) ScheduleVariableKeys(
 
 1. **No credential is written to version control**: the ordinary `infra import` path no longer emits values, so the file an operator commits cannot carry a token that a schedule holds.
 2. **A project costs one request per read**: removing the per-schedule read removed the multiplication by schedule count. A plan pays one disclosure read per schedule it removes, and none otherwise; `infra apply` adds no read of its own, because the disclosure happens while the plan it then performs is built.
-3. **Three failure modes stop existing**: the permission-gated absence of the variables field, the mismatch between who may read and who may write them, and the distinction between "not read" and "read, none" all stop being states the code has to represent.
+3. **Three failure modes are confined to one call**: the permission-gated absence of the variables field, the mismatch between who may read and who may write them, and the distinction between "not read" and "read, none" all left the reconciliation. Decision 3 brought them back into `ScheduleVariableKeys` alone, where nothing compares against the answer, so getting one wrong costs a warning rather than a plan.
 4. **The document stops overstating itself**: a manifest no longer looks as though it describes a schedule's variables when applying it could not produce them.
 
 ### Negative
