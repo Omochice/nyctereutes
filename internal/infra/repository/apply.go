@@ -52,10 +52,19 @@ var errUnexpectedValueType = errors.New("change value has unexpected type")
 // only updates, so a create is reported rather than performed.
 var errCreateUnsupported = errors.New("creating a project is not supported yet")
 
+// Signals a pipeline schedule change reaching the applier, which does not write
+// one yet.
+var errScheduleWriteUnsupported = errors.New("applying a pipeline schedule change is not supported yet")
+
 // Translates one change into its glab call. A create is reported unsupported;
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
+	// Reported rather than left to the scalar PUT below, which would send a
+	// schedule's attributes to the project endpoint and be answered with a 200.
+	if change.Field == fieldPipelineSchedules {
+		return fmt.Errorf("%w: %s", errScheduleWriteUnsupported, change.Name)
+	}
 	if change.Type == ChangeCreate {
 		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
 	}

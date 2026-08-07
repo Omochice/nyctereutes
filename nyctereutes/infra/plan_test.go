@@ -43,6 +43,35 @@ spec:
   visibility: internal
 `
 
+// planScheduleManifest declares one schedule and nothing else, so a plan
+// against projJSON's live state reports the schedule alone.
+const planScheduleManifest = `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: proj
+  owner: group
+spec:
+  pipeline_schedules:
+  - description: nightly
+    ref: main
+    cron: 0 3 * * *
+`
+
+// planScheduleErrGlab answers every project read from projJSON and refuses
+// every schedule read, standing in for a token that may read a project but not
+// the schedules it owns.
+type planScheduleErrGlab struct{}
+
+func (f *planScheduleErrGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	if _, ok := catalogRead(args); ok {
+		return catalogBody(false), nil
+	}
+	if _, ok := scheduleRead(args); ok {
+		return nil, errors.New("403 Forbidden")
+	}
+	return []byte(projJSON), nil
+}
+
 func TestInfraPlanRequiresPath(t *testing.T) {
 	exit, _, _ := runWithRunner(&fakeInfraGlab{}, "infra", "plan")
 	if exit != 1 {
@@ -232,4 +261,80 @@ func TestInfraPlanCIExitCode(t *testing.T) {
 			t.Errorf("exit = %d, want 0 with --ci and no drift", exit)
 		}
 	})
+}
+
+// A document carrying no pipeline_schedules key makes no schedule request. The
+// fake answers no schedule read, so one would surface as an unexpected call
+// rather than being absorbed; that is what keeps such a project at one request.
+func TestInfraPlanReadsNoSchedulesForADocumentDeclaringNone(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest)
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	if !strings.Contains(stdout, "visibility") {
+		t.Errorf("stdout missing the project drift\n%s", stdout)
+	}
+}
+
+// A declared schedule the project does not hold is planned for creation, named
+// by its description and listing what it would be created with.
+func TestInfraPlanShowsAScheduleCreation(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planScheduleManifest)
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	for _, want := range []string{`pipeline_schedule "nightly"`, "cron: 0 3 * * *", "ref: refs/heads/main"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+}
+
+// A live schedule the document does not declare is planned for removal.
+func TestInfraPlanShowsAScheduleRemoval(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: `[{"id":7,"description":"nightly",` +
+			`"ref":"refs/heads/main","cron":"0 3 * * *","cron_timezone":"UTC","active":true}]`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	if want := `- pipeline_schedule "nightly"`; !strings.Contains(stdout, want) {
+		t.Errorf("stdout missing %q\n%s", want, stdout)
+	}
+}
+
+// A schedule read the token may not make is reported and counted, and the rest
+// of the project is still planned: ending the plan there would cost every
+// setting that could be compared over one child resource.
+func TestInfraPlanStillPlansAProjectWhoseSchedulesCannotBeRead(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
+
+	exit, stdout, stderr := runWithRunner(&planScheduleErrGlab{}, "infra", "plan", path)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 for a read that failed", exit)
+	}
+	if !strings.Contains(stderr, "pipeline schedules") {
+		t.Errorf("stderr does not report the schedule read\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "visibility") {
+		t.Errorf("stdout does not still carry the project drift\n%s", stdout)
+	}
 }

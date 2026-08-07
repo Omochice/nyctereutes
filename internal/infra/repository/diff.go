@@ -15,6 +15,10 @@ const (
 	ChangeCreate ChangeType = "create"
 	// Marks a field whose live value differs from the declared one.
 	ChangeUpdate ChangeType = "update"
+	// Marks a live child resource no declaration names. A project itself is
+	// never deleted: a manifest names the projects it describes, so one it does
+	// not name is one it says nothing about.
+	ChangeDelete ChangeType = "delete"
 )
 
 // Field names shared with the manifest struct tags, kept as constants so the
@@ -48,11 +52,21 @@ type Change struct {
 	Field    string
 	OldValue any
 	NewValue any
+
+	// The pipeline schedule a [fieldPipelineSchedules] change acts on, and nil
+	// for every other field. A schedule is carried in its own typed field rather
+	// than in OldValue and NewValue because rendering the line and performing the
+	// write both read its attributes, and an any would make each of them assert
+	// for a type only [diffSchedules] ever puts there.
+	Schedule *ScheduleChange
 }
 
 // Renders one plan line. The project header already carries the name, so
 // neither a create nor an update line repeats it.
 func (c Change) String() string {
+	if c.Schedule != nil {
+		return c.Schedule.line(c.Type)
+	}
 	switch c.Type {
 	case ChangeCreate:
 		return "+ new repository"
@@ -65,6 +79,11 @@ func (c Change) String() string {
 			return fmt.Sprintf("~ %s:\n%s\n%s", c.Field, markLines(old, "-"), markLines(next, "+"))
 		}
 		return fmt.Sprintf("~ %s: %v → %v", c.Field, c.OldValue, c.NewValue)
+	case ChangeDelete:
+		// Reached only by a change carrying no schedule, and nothing else is ever
+		// deleted: a manifest names the projects it describes, so one it omits is
+		// one it says nothing about.
+		return ""
 	default:
 		return ""
 	}
@@ -134,6 +153,13 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	// as-is; a declared block still leaves its own nil fields untouched.
 	if spec.Features != nil {
 		diffFeatures(&changes, name, spec.Features, current)
+	}
+	// A nil schedule list manages no schedule, the way a nil topics list leaves
+	// the topics alone. A nil live list is a project whose schedules were not
+	// read or could not be, and a plan says nothing about what it has not seen;
+	// the command that made the read is what reports why it is missing.
+	if spec.PipelineSchedules != nil && current.PipelineSchedules != nil {
+		changes = append(changes, diffSchedules(name, spec.PipelineSchedules, current.PipelineSchedules)...)
 	}
 	return changes
 }

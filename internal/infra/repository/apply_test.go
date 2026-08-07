@@ -176,6 +176,30 @@ func TestApplyReportsCreateAsUnsupported(t *testing.T) {
 	}
 }
 
+// Each of the three schedule changes is refused rather than written. A schedule
+// reaching the scalar PUT would send its attributes to the project endpoint,
+// which GitLab answers with a 200 that changes nothing.
+func TestApplyReportsAScheduleChangeAsUnsupported(t *testing.T) {
+	for _, kind := range []ChangeType{ChangeCreate, ChangeUpdate, ChangeDelete} {
+		t.Run(string(kind), func(t *testing.T) {
+			writer := &recordingWriter{}
+			changes := []Change{{
+				Type: kind, Name: "group/proj", Field: fieldPipelineSchedules,
+				Schedule: &ScheduleChange{Description: "nightly", ID: 7},
+			}}
+
+			results := NewApplier(writer).Apply(context.Background(), changes)
+
+			if len(results) != 1 || !errors.Is(results[0].Err, errScheduleWriteUnsupported) {
+				t.Fatalf("results = %+v, want one refused as unsupported", results)
+			}
+			if len(writer.calls) != 0 {
+				t.Errorf("calls = %v, want none", writer.calls)
+			}
+		})
+	}
+}
+
 func TestApplyMapsFeatureFieldsToAccessLevelParams(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string

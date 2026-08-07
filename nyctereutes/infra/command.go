@@ -75,6 +75,20 @@ func fetchState(
 		_, _ = fmt.Fprintf(stderr, "%v\n", err)
 		return nil, 1
 	}
+	// A manifest that declares no schedules says nothing about them, so the read
+	// whose answer nothing would be compared against is not made; that keeps such
+	// a project at one request. A read that fails is counted, but the state still
+	// goes back, so a project whose schedules cannot be described still has the
+	// settings that could be.
+	if repo.Spec.PipelineSchedules == nil {
+		return state, 0
+	}
+	schedules, err := client.FetchSchedules(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
+		return state, 1
+	}
+	state.PipelineSchedules = schedules
 	return state, 0
 }
 
