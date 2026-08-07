@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
@@ -29,6 +30,9 @@ var errVariablesNotDisclosed = errors.New("pipeline schedule variables were not 
 //
 // The list endpoint carries no variables, so this is one request per schedule
 // and worth making only where a change would destroy them.
+//
+// The keys come back sorted. GitLab documents no order for them, and a plan an
+// operator reads twice should not shuffle the lines under a removal.
 func (c *Client) ScheduleVariableKeys(
 	ctx context.Context, owner, name string, scheduleID int,
 ) ([]string, error) {
@@ -49,5 +53,6 @@ func (c *Client) ScheduleVariableKeys(
 	for _, variable := range *detail.Variables {
 		keys = append(keys, variable.Key)
 	}
+	slices.Sort(keys)
 	return keys, nil
 }

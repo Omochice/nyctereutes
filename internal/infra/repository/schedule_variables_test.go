@@ -20,13 +20,14 @@ func detailRunner(body string, record *[]string) glab.RunnerFunc {
 	}
 }
 
-// The keys come back, and the read addresses one schedule rather than the list,
-// which carries no variables.
+// The keys come back sorted, and the read addresses one schedule rather than
+// the list, which carries no variables. GitLab documents no order for them, so
+// the fixture reports them out of order.
 func TestScheduleVariableKeysReadsOneScheduleAndReturnsItsKeys(t *testing.T) {
 	var args []string
 	body := `{"id":7,"description":"nightly","variables":[` +
-		`{"key":"DEPLOY_TOKEN","value":"glpat-secret","variable_type":"env_var"},` +
-		`{"key":"REGION","value":"tokyo","variable_type":"env_var"}]}`
+		`{"key":"REGION","value":"tokyo","variable_type":"env_var"},` +
+		`{"key":"DEPLOY_TOKEN","value":"glpat-secret","variable_type":"env_var"}]}`
 
 	keys, err := NewClient(detailRunner(body, &args)).
 		ScheduleVariableKeys(context.Background(), "group/sub", "proj", 7)
