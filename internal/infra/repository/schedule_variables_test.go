@@ -10,8 +10,7 @@ import (
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
-// Answers the single-schedule read with body and records the args it was called
-// with, so a test can assert which schedule was addressed.
+// Answers the single-schedule read with body, recording the args it was given.
 func detailRunner(body string, record *[]string) glab.RunnerFunc {
 	return func(_ context.Context, args ...string) ([]byte, error) {
 		if record != nil {
@@ -21,9 +20,8 @@ func detailRunner(body string, record *[]string) glab.RunnerFunc {
 	}
 }
 
-// The keys come back and the read addresses the one schedule, because the list
-// endpoint carries no variables and a plan pays this only where a removal is at
-// stake.
+// The keys come back, and the read addresses one schedule rather than the list,
+// which carries no variables.
 func TestScheduleVariableKeysReadsOneScheduleAndReturnsItsKeys(t *testing.T) {
 	var args []string
 	body := `{"id":7,"description":"nightly","variables":[` +

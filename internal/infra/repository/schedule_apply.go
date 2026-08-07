@@ -9,10 +9,9 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// Creates, updates or removes one pipeline schedule. Unlike a project setting,
-// a schedule is a resource of its own: GitLab addresses it by an id the
-// manifest never holds, so an update and a delete carry the one the read
-// reported while a create has none to carry.
+// Creates, updates or removes one pipeline schedule. GitLab addresses it by an
+// id the manifest never holds, so an update and a delete carry the one the read
+// reported while a create has none.
 func (a *Applier) applySchedule(ctx context.Context, change Change) error {
 	schedule := change.Schedule
 	if schedule == nil {
@@ -39,16 +38,15 @@ func (a *Applier) applySchedule(ctx context.Context, change Change) error {
 	}
 }
 
-// Names the schedule as the field a failure is reported under, in the same form
-// the plan line uses, so a failure can be matched to the line it came from.
+// Names the schedule as the field a failure is reported under, in the form the
+// plan line uses.
 func scheduleField(description string) string {
 	return fmt.Sprintf("%s %q", schedulePrefix, description)
 }
 
 // The form fields a create or an update sends. Every attribute goes on both,
-// because GitLab's update changes only the ones it is given: omitting one would
-// leave the schedule running on whatever it already held, which is the state
-// the plan said would be replaced.
+// because GitLab's update changes only the ones it is given, and an omitted one
+// would leave the schedule on the state the plan said would be replaced.
 func scheduleForm(schedule manifest.PipelineSchedule) []string {
 	return []string{
 		"-f", fieldDescription + "=" + schedule.Description,

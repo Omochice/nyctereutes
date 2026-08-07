@@ -11,26 +11,24 @@ import (
 )
 
 // One schedule as the single-schedule endpoint reports it, read for its
-// variables alone. The field is a pointer so its absence stays distinct from an
-// empty list, which is the difference between a set nobody may see and a set
-// that holds nothing.
+// variables alone. The pointer keeps an absent field distinct from an empty
+// list: a set nobody may see against one that holds nothing.
 type scheduleDetail struct {
 	Variables *[]struct {
 		Key string `json:"key"`
 	} `json:"variables"`
 }
 
-// Signals a schedule whose variables the response did not carry. GitLab answers
-// 200 with the field left out for a reader who is neither Maintainer, Owner,
-// nor the schedule's creator, so an unreadable set arrives as a successful read
-// rather than a refusal.
+// Signals a schedule whose variables the response did not carry. GitLab leaves
+// the field out of a 200 for a reader who is neither Maintainer, Owner, nor the
+// schedule's creator, so an unreadable set arrives as a successful read.
 var errVariablesNotDisclosed = errors.New("pipeline schedule variables were not disclosed")
 
 // The keys of one schedule's variables, for a plan about to destroy them.
 // Values are not returned: nothing downstream may render or write one.
 //
-// The list endpoint carries no variables, so this addresses one schedule at a
-// time and is worth making only where a change would destroy them.
+// The list endpoint carries no variables, so this is one request per schedule
+// and worth making only where a change would destroy them.
 func (c *Client) ScheduleVariableKeys(
 	ctx context.Context, owner, name string, scheduleID int,
 ) ([]string, error) {

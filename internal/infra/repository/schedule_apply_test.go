@@ -9,16 +9,14 @@ import (
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
-// One schedule change addressed to group/proj, so a test states only what makes
-// its own case.
+// One schedule change addressed to group/proj.
 func scheduleWrite(kind ChangeType, schedule ScheduleChange) []Change {
 	return []Change{{
 		Type: kind, Name: "group/proj", Field: fieldPipelineSchedules, Schedule: &schedule,
 	}}
 }
 
-// The glab invocation the applier made, failing the test unless it made exactly
-// one.
+// The one glab invocation the applier made, failing the test if it made more.
 func onlyCall(t *testing.T, writer *recordingWriter) string {
 	t.Helper()
 	if len(writer.calls) != 1 {
@@ -50,8 +48,8 @@ func TestApplyCreatesAScheduleThroughTheCollectionEndpoint(t *testing.T) {
 }
 
 // An update puts to the schedule's own endpoint, addressed by the id the read
-// reported, and sends every attribute: GitLab changes only the ones it is
-// given, so an omitted one would leave the schedule on what it already held.
+// reported, and sends every attribute because GitLab changes only what it is
+// given.
 func TestApplyUpdatesAScheduleByItsID(t *testing.T) {
 	writer := &recordingWriter{}
 	changes := scheduleWrite(ChangeUpdate, ScheduleChange{
@@ -108,8 +106,7 @@ func TestApplyDeletesAScheduleByItsID(t *testing.T) {
 	}
 }
 
-// A refused write names the schedule as the plan named it, so the operator can
-// match the failure to the line they approved.
+// A refused write names the schedule as the plan named it.
 func TestApplyScheduleFailureNamesTheSchedule(t *testing.T) {
 	writer := &recordingWriter{errAt: map[int]error{0: glab.ErrForbidden}}
 	changes := scheduleWrite(ChangeDelete, ScheduleChange{Description: "nightly", ID: 7})

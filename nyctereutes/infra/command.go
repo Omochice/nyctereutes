@@ -77,13 +77,12 @@ func planRepo(
 }
 
 // Names the variables each planned removal would destroy, so the operator
-// approving one sees what goes with the schedule. The manifest holds no
-// variables, which is what leaves the rest of the plan silent about them.
+// approving one sees what goes with the schedule. Nothing else in a plan
+// mentions them, because the manifest holds none.
 //
-// Only a removal is read, so a plan that removes nothing pays nothing. A read
-// that fails costs a warning and no more: the removal is still shown, because
-// nothing about performing it depends on the answer. Keys are all that comes
-// back, so the plan cannot disclose a value it was written to protect.
+// Only a removal is read, so a plan that removes nothing pays nothing, and a
+// read that fails costs a warning: the removal is still shown, because
+// performing it needs no answer.
 func discloseDestroyedVariables(
 	ctx context.Context, client *repository.Client, stderr io.Writer,
 	repo *manifest.Repository, changes []repository.Change,

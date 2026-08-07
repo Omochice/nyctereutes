@@ -12,9 +12,8 @@ import (
 // tells one from a project setting.
 const fieldPipelineSchedules = "pipeline_schedules"
 
-// How one schedule is named wherever it is spoken about singly: on a plan line
-// and in the error of a write that failed. The two share it so a failure can be
-// matched to the line it came from.
+// How one schedule is named on a plan line and in the error of a write that
+// failed, shared so the two can be matched.
 const schedulePrefix = "pipeline_schedule"
 
 // The pipeline schedule one [Change] acts on. Only the side the change type
@@ -28,8 +27,7 @@ type ScheduleChange struct {
 	Desired manifest.PipelineSchedule
 	Live    manifest.PipelineSchedule
 	// The keys of the variables a removal would destroy, filled by the command
-	// that plans the removal and empty everywhere else. The manifest holds no
-	// variables, so nothing else in a plan would mention them.
+	// that plans it and empty everywhere else.
 	VariableKeys []string
 }
 

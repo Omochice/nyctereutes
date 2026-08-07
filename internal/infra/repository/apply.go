@@ -56,9 +56,9 @@ var errCreateUnsupported = errors.New("creating a project is not supported yet")
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
-	// Taken before the create check below, because a schedule is created through
-	// its own endpoint while a project cannot be created at all, and before the
-	// scalar PUT, which would send a schedule's attributes to the project.
+	// Taken first: a schedule is created through its own endpoint while a project
+	// cannot be created at all, and the scalar PUT below would send a schedule's
+	// attributes to the project.
 	if change.Field == fieldPipelineSchedules {
 		return a.applySchedule(ctx, change)
 	}
@@ -180,10 +180,9 @@ func writeHint(err error, field string) string {
 	return ""
 }
 
-// Names what a refused write actually needs. Writing a schedule takes more than
-// the role that reads it: against GitLab 19.2.1 every write was refused unless
-// the token both held Maintainer and had created the schedule, so the role hint
-// alone would send the operator to a fix that does not apply.
+// Names what a refused write actually needs. Against GitLab 19.2.1 every
+// schedule write was refused unless the token both held Maintainer and had
+// created the schedule, so the role hint alone names a fix that does not apply.
 func forbiddenHint(field string) string {
 	if strings.HasPrefix(field, schedulePrefix) {
 		return "permission denied; writing a schedule needs the Maintainer or Owner role " +
