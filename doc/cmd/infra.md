@@ -15,6 +15,14 @@ It follows an import, validate, plan, apply cycle so the manifests stay the sing
 - `infra plan` shows the drift between manifests and live GitLab state.
 - `infra apply` applies manifests to live GitLab state after a confirmation prompt.
 
+## Pipeline schedules
+
+`infra import` exports a project's pipeline schedules, and `infra validate` checks them, but `infra plan` and `infra apply` do not reconcile them: a declared schedule is neither created, changed nor removed, and a plan reports no drift in one.
+
+A schedule is exported so a manifest describes the project as it stands, not so the manifest drives it. Reconciling one needs the live set to be knowable, and it is not: GitLab addresses a schedule by an id no manifest can hold, so a declared one is paired by its description, which GitLab neither keeps unique nor keeps stable when someone edits it in the web UI. Reading a schedule and writing it also need different permissions, so a plan can be correct and its apply refused.
+
+Whether schedules become manageable, and under what model, is an open question rather than a planned feature.
+
 ## Inspired by
 
 This command is inspired by [babarot/gh-infra](https://github.com/babarot/gh-infra).
