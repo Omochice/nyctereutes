@@ -15,6 +15,9 @@ const (
 	ChangeCreate ChangeType = "create"
 	// Marks a field whose live value differs from the declared one.
 	ChangeUpdate ChangeType = "update"
+	// Marks a live child resource no declaration names. A project is never
+	// deleted: one a manifest does not name is one it says nothing about.
+	ChangeDelete ChangeType = "delete"
 )
 
 // Field names shared with the manifest struct tags, kept as constants so the
@@ -48,11 +51,19 @@ type Change struct {
 	Field    string
 	OldValue any
 	NewValue any
+
+	// The pipeline schedule a [fieldPipelineSchedules] change acts on, nil for
+	// every other field. Typed rather than held in OldValue and NewValue, which
+	// would make both the plan line and the write assert for it.
+	Schedule *ScheduleChange
 }
 
 // Renders one plan line. The project header already carries the name, so
 // neither a create nor an update line repeats it.
 func (c Change) String() string {
+	if c.Schedule != nil {
+		return c.Schedule.line(c.Type)
+	}
 	switch c.Type {
 	case ChangeCreate:
 		return "+ new repository"
@@ -65,6 +76,9 @@ func (c Change) String() string {
 			return fmt.Sprintf("~ %s:\n%s\n%s", c.Field, markLines(old, "-"), markLines(next, "+"))
 		}
 		return fmt.Sprintf("~ %s: %v → %v", c.Field, c.OldValue, c.NewValue)
+	case ChangeDelete:
+		// Only a child resource is deleted, and one renders through its own type.
+		return ""
 	default:
 		return ""
 	}
@@ -134,6 +148,12 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	// as-is; a declared block still leaves its own nil fields untouched.
 	if spec.Features != nil {
 		diffFeatures(&changes, name, spec.Features, current)
+	}
+	// A nil declared list manages no schedule, the way a nil topics list does. A
+	// nil live list was not read, and a plan says nothing about what it has not
+	// seen; the command that made the read is what reports why.
+	if spec.PipelineSchedules != nil && current.PipelineSchedules != nil {
+		changes = append(changes, diffSchedules(name, spec.PipelineSchedules, current.PipelineSchedules)...)
 	}
 	return changes
 }

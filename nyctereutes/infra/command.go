@@ -3,6 +3,7 @@
 package infra
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -58,6 +59,35 @@ func readManifestFile(stderr io.Writer, path string) ([]*manifest.Repository, in
 		_, _ = fmt.Fprintf(stderr, "%s: %v\n", path, parseErr)
 	}
 	return repos, len(errs)
+}
+
+// Reads the live state one declared project is compared against. A failed read
+// is written to stderr and counted rather than returned, the way
+// [readManifestFile] treats an unparseable document, and a nil state is one
+// nothing can be said about.
+func fetchState(
+	ctx context.Context, client *repository.Client, stderr io.Writer, repo *manifest.Repository,
+) (*repository.CurrentState, int) {
+	state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+	if err != nil {
+		// The error already carries "fetch project <owner>/<name>" context.
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
+		return nil, 1
+	}
+	// A manifest declaring no schedules says nothing about them, so the read is
+	// not made and such a project stays at one request.
+	if repo.Spec.PipelineSchedules == nil {
+		return state, 0
+	}
+	schedules, err := client.FetchSchedules(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+	if err != nil {
+		// The state still goes back, so a project whose schedules cannot be
+		// described keeps the settings that can be.
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
+		return state, 1
+	}
+	state.PipelineSchedules = schedules
+	return state, 0
 }
 
 // Expands one path argument into the manifest files it names: a file is

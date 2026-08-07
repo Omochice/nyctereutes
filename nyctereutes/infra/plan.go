@@ -71,10 +71,9 @@ func (c *planCommand) planFile(
 ) (changed, failures int) {
 	repos, failures := readManifestFile(c.inout.Stderr, file)
 	for _, repo := range repos {
-		state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
-		if err != nil {
-			_, _ = fmt.Fprintf(c.inout.Stderr, "%v\n", err)
-			failures++
+		state, failed := fetchState(ctx, client, c.inout.Stderr, repo)
+		failures += failed
+		if state == nil {
 			continue
 		}
 		changes := repository.Diff(repo, state)

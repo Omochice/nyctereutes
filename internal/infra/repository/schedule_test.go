@@ -171,6 +171,25 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 	}
 }
 
+// A schedule reported without an id is refused, named by its description
+// because there is no id to name it by. No manifest holds the id, so nothing
+// downstream would notice it missing until a write reached
+// pipeline_schedules/0.
+func TestFetchSchedulesRejectsAScheduleWithoutAnID(t *testing.T) {
+	const body = `[{"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
+
+	_, err := NewClient(scheduleRunner(body, nil)).
+		FetchSchedules(context.Background(), ownerGroup, nameProj)
+	if !errors.Is(err, errIncompleteLiveSchedule) {
+		t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
+	}
+	for _, want := range []string{"nightly", "id"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+}
+
 // Each of the three attributes the schema requires is refused when GitLab
 // reports it blank, and the error names the schedule and the attribute, which is
 // what the reader needs to go and find it.

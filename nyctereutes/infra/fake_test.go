@@ -82,10 +82,8 @@ func scheduleBody(schedules map[string]string, project string) []byte {
 // error so the importer treats it as missing. Any other glab invocation is an
 // error so unexpected calls fail the test loudly.
 //
-// A nil schedules map keeps a schedule read inside that guard, so only a test
-// that declares the command reads schedules can make one. Answering it for
-// every command would let plan or apply grow a schedule read unnoticed, which
-// is the read FetchRepository is documented to keep out of them.
+// A nil schedules map turns a schedule read into an unexpected call, so a test
+// asserting that none is made needs only to leave the map out.
 type fakeInfraGlab struct {
 	projects  map[string]string // "owner/name" -> project JSON
 	catalog   map[string]bool   // "owner/name" -> catalog status, default false
