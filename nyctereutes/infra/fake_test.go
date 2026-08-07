@@ -77,6 +77,38 @@ func scheduleBody(schedules map[string]string, project string) []byte {
 	return []byte("[]")
 }
 
+// Reports whether args is the single-schedule read the disclosure of destroyed
+// variables issues, returning the schedule id it addresses. It has the same
+// two-argument shape as a project read, so a fake must try this one first or
+// answer a disclosure with a project.
+func scheduleDetailRead(args []string) (id string, ok bool) {
+	if len(args) != 2 || args[0] != "api" {
+		return "", false
+	}
+	endpoint, found := strings.CutPrefix(args[1], "projects/")
+	if !found {
+		return "", false
+	}
+	_, id, found = strings.Cut(endpoint, "/pipeline_schedules/")
+	return id, found
+}
+
+// The single-schedule response for a disclosure read, carrying the variables a
+// test scripted for that schedule id. A schedule absent from the map holds
+// none, which is what most of them hold. An empty entry leaves the field out of
+// the response altogether, which is how GitLab answers a reader who may not see
+// them.
+func scheduleDetailBody(variables map[string]string, id string) []byte {
+	field, ok := variables[id]
+	if !ok {
+		field = "[]"
+	}
+	if field == "" {
+		return []byte(`{"description":"nightly"}`)
+	}
+	return fmt.Appendf(nil, `{"variables":%s}`, field)
+}
+
 // fakeInfraGlab answers `glab api projects/<enc>` from a project map and the
 // catalog GraphQL query from a catalog map; an absent project yields a 404
 // error so the importer treats it as missing. Any other glab invocation is an
@@ -88,6 +120,7 @@ type fakeInfraGlab struct {
 	projects  map[string]string // "owner/name" -> project JSON
 	catalog   map[string]bool   // "owner/name" -> catalog status, default false
 	schedules map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
+	variables map[string]string // schedule id -> the variables field; absent holds none
 }
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
@@ -96,6 +129,9 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	if path, ok := scheduleRead(args); ok && f.schedules != nil {
 		return scheduleBody(f.schedules, path), nil
+	}
+	if id, ok := scheduleDetailRead(args); ok {
+		return scheduleDetailBody(f.variables, id), nil
 	}
 	if len(args) != 2 || args[0] != "api" || !strings.HasPrefix(args[1], "projects/") {
 		return nil, fmt.Errorf("%w: %v", errUnexpectedGlab, args)

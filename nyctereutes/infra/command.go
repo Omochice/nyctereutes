@@ -61,6 +61,47 @@ func readManifestFile(stderr io.Writer, path string) ([]*manifest.Repository, in
 	return repos, len(errs)
 }
 
+// The changes one declared project needs to match its manifest, with the number
+// of problems met on the way. Plan and apply share it so the plan shown before
+// the confirmation prompt is built exactly as the one apply then performs.
+func planRepo(
+	ctx context.Context, client *repository.Client, stderr io.Writer, repo *manifest.Repository,
+) ([]repository.Change, int) {
+	state, failures := fetchState(ctx, client, stderr, repo)
+	if state == nil {
+		return nil, failures
+	}
+	changes := repository.Diff(repo, state)
+	discloseDestroyedVariables(ctx, client, stderr, repo, changes)
+	return changes, failures
+}
+
+// Names the variables each planned removal would destroy, so the operator
+// approving one sees what goes with the schedule. Nothing else in a plan
+// mentions them, because the manifest holds none.
+//
+// Only a removal is read, so a plan that removes nothing pays nothing, and a
+// read that fails costs a warning: the removal is still shown, because
+// performing it needs no answer.
+func discloseDestroyedVariables(
+	ctx context.Context, client *repository.Client, stderr io.Writer,
+	repo *manifest.Repository, changes []repository.Change,
+) {
+	for _, change := range changes {
+		if change.Type != repository.ChangeDelete || change.Schedule == nil {
+			continue
+		}
+		keys, err := client.ScheduleVariableKeys(
+			ctx, repo.Metadata.Owner, repo.Metadata.Name, change.Schedule.ID,
+		)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "%v\n", err)
+			continue
+		}
+		change.Schedule.VariableKeys = keys
+	}
+}
+
 // Reads the live state one declared project is compared against. A failed read
 // is written to stderr and counted rather than returned, the way
 // [readManifestFile] treats an unparseable document, and a nil state is one

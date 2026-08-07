@@ -52,17 +52,15 @@ var errUnexpectedValueType = errors.New("change value has unexpected type")
 // only updates, so a create is reported rather than performed.
 var errCreateUnsupported = errors.New("creating a project is not supported yet")
 
-// Signals a schedule change reaching the applier, which does not write one yet.
-var errScheduleWriteUnsupported = errors.New("applying a pipeline schedule change is not supported yet")
-
 // Translates one change into its glab call. A create is reported unsupported;
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
-	// Reported rather than left to the scalar PUT below, which would send a
-	// schedule's attributes to the project endpoint and be answered with a 200.
+	// Taken first: a schedule is created through its own endpoint while a project
+	// cannot be created at all, and the scalar PUT below would send a schedule's
+	// attributes to the project.
 	if change.Field == fieldPipelineSchedules {
-		return fmt.Errorf("%w: %s", errScheduleWriteUnsupported, change.Name)
+		return a.applySchedule(ctx, change)
 	}
 	if change.Type == ChangeCreate {
 		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
@@ -161,7 +159,7 @@ func wrapWrite(err error, project, field string) error {
 	if err == nil {
 		return nil
 	}
-	if hint := writeHint(err); hint != "" {
+	if hint := writeHint(err, field); hint != "" {
 		err = fmt.Errorf("%s: %w", hint, err)
 	}
 	return fmt.Errorf("apply %s on %s: %w", field, project, err)
@@ -170,16 +168,27 @@ func wrapWrite(err error, project, field string) error {
 // The hint names the likely cause of a classified failure so the operator
 // reading the aggregated report knows whether to fix a token, a path, or a
 // value; "" when the failure was not classified.
-func writeHint(err error) string {
+func writeHint(err error, field string) string {
 	switch {
 	case errors.Is(err, glab.ErrForbidden):
-		return "permission denied; check the token has the Maintainer or Owner role"
+		return forbiddenHint(field)
 	case errors.Is(err, glab.ErrNotFound):
 		return "project not found; it may have been removed or renamed"
 	case errors.Is(err, glab.ErrValidation):
 		return "GitLab rejected the value"
 	}
 	return ""
+}
+
+// Names what a refused write actually needs. Against GitLab 19.2.1 every
+// schedule write was refused unless the token both held Maintainer and had
+// created the schedule, so the role hint alone names a fix that does not apply.
+func forbiddenHint(field string) string {
+	if strings.HasPrefix(field, schedulePrefix) {
+		return "permission denied; writing a schedule needs the Maintainer or Owner role " +
+			"and the schedule to have been created by this token's user"
+	}
+	return "permission denied; check the token has the Maintainer or Owner role"
 }
 
 // Maps a plan field name to the GitLab API parameter that carries it. A

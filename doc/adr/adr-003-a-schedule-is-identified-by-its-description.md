@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, except for the writes
+Accepted
 
 ## Context
 
@@ -106,41 +106,39 @@ We will reconcile pipeline schedules as a declared set, and require the descript
 
 ## Consequences
 
-This record is carried out as far as `infra plan`: a schedule change is reported, and `infra apply` refuses to perform one. What follows is therefore stated as behaviour where a plan alone produces it, and as what will follow where writing is what produces it.
+This record is carried out, so what follows describes how the tool behaves rather than what it would do. Each consequence was exercised against GitLab 19.2.1 CE.
 
 ### Positive
 
-1. **A declared schedule stops being ignored**: a plan reports what the block the schema accepts would change, so reading a manifest beside a plan tells the truth about the project. Apply acts on it once the writes land.
-2. **The pairing rests on a stated rule**: a removal addresses the schedule a declaration names, because a project where that is ambiguous is refused before any change is planned.
+1. **A declared schedule is acted on**: the block the schema accepts is the block apply reconciles, so writing one has an effect and reading a manifest tells the truth about the project.
+2. **The pairing rests on a stated rule**: a delete addresses the schedule a declaration names, because a project where that is ambiguous is refused before any change is planned.
 3. **The refusal explains itself**: it names both ids, so the operator knows which schedule to rename rather than being told the project is unmanageable.
 4. **The model matches the rest of the manifest**: a reader who knows what an omitted topic means knows what an omitted schedule means.
+5. **What is written reads back as what was declared**: applying a manifest and planning it again reports no change, including for a paused schedule and a non-UTC timezone, which are the two attributes a normalisation would have shown as perpetual drift.
 
 ### Negative
 
-1. **A rename will destroy and recreate**: editing a description costs the schedule its id, and with it whatever GitLab associates with that id, for a change an operator will read as cosmetic.
-2. **A correct plan can become a refused apply**: a token that reads a schedule it does not own produces a plan it cannot carry out, and 403 is what the operator sees.
-3. **A deletion will destroy variables the manifest never held**: [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) took variables out of the document, so a deleted schedule takes variables nothing in the plan mentions.
+1. **A rename destroys and recreates**: editing a description costs the schedule its id, and with it whatever GitLab associates with that id, for a change an operator will read as cosmetic.
+2. **A correct plan can be a refused apply**: a token that reads a schedule it did not create produces a plan it cannot carry out, and 403 is what the operator sees.
+3. **A deletion destroys variables the manifest never held**: [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) took variables out of the document, so a deleted schedule takes variables nothing in the plan would otherwise mention.
 4. **A duplicate description blocks a project's schedules entirely**: one pair created by two different people leaves the schedules unmanageable until someone renames one.
 5. **An exported manifest opts a project into removal**: `infra import` writes `pipeline_schedules: []` for a project owning none, so committing that document declares that none may be added, for an operator who only meant to record the project as it stood.
 
 ### Mitigations
 
-A mitigation for a write lands with that write, because one written before it has nothing to attach to.
-
 - `doc/cmd/infra.md` states the rename behaviour, the meaning of an empty list in an exported document, and that an omitted `active` declares `true`, so an operator meets each cost there rather than in a plan.
-- A project refused for duplicate descriptions still has its other settings planned, so the ambiguity costs its schedules rather than the project.
-- The apply error will distinguish a missing role from a schedule created by someone else, because those have different fixes and the role hint alone names a fix that does not apply. Nothing writes a schedule yet, so no such error exists to carry it.
-- Decision 3 of [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) lands with the writes: a plan removing a schedule will name the variable keys going with it. Until a removal is performed nothing is destroyed, which is what lets this record land in two parts rather than one.
+- The apply error distinguishes a missing role from a schedule created by someone else, because those have different fixes and the role hint alone names a fix that does not apply.
+- Decision 3 of [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) lands with this: a plan deleting a schedule names the variable keys going with it, and the client returns keys without values so no plan can render one.
+- A project refused for duplicate descriptions still has its other settings planned and applied, so the ambiguity costs its schedules rather than the project.
+- Deletions are performed before creations, because an instance caps how many schedules a project may hold; the default limit measured on GitLab 19.2.1 CE is 10, which a project swapping one schedule for another would otherwise hit.
 
 ## Implementation Notes
 
-The reconciliation is written fresh rather than lifted from the discarded branch. Roughly half of that branch was variable diffing and applying, which [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) leaves nothing to reconcile, and the guards it accumulated were answers to problems that came from the variables.
+The reconciliation was written fresh rather than lifted from the discarded branch. Roughly half of that branch was variable diffing and applying, which [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) leaves nothing to reconcile, and the guards it accumulated were answers to problems that came from the variables.
 
-Two defects found while reviewing that branch apply to whatever is written here, and neither is caused by this decision. `infra apply` archives a project before writing the settings that follow it, and GitLab makes an archived project read-only, so a manifest that both archives and changes schedules fails on every later write. Separately, a schedule GitLab reports without an id would have an update or a delete addressed to `pipeline_schedules/0`.
+Two defects found while reviewing that branch apply here too, and neither is caused by this decision. One is fixed and one is not. A schedule GitLab reports without an id is now refused on read, because an update or a delete would otherwise be addressed to `pipeline_schedules/0`. `infra apply` still archives a project before writing the settings that follow it, and GitLab makes an archived project read-only, so a manifest that both archives and declares schedules fails on every write after the archive; that is a defect of the apply ordering rather than of this decision, and it is left to the record that fixes it.
 
-Verification for the plan side: a project holding two schedules described alike is refused by plan as it already is by import, with the other settings still reported; a manifest declaring no schedules plans no schedule change and makes no schedule read; an empty list plans the removal of every live schedule; a schedule change reaching apply is reported rather than written.
-
-Verification for the writes, when they land: applying a manifest and planning it again reports no change, including for a paused schedule and a non-UTC timezone; a plan removing a schedule names its variable keys and not their values.
+The verification this record asked for was carried out against GitLab 19.2.1 CE, and one check subsumes several: applying a manifest and planning it again reports no change. A ref written as a bare branch name comes back as `refs/heads/main`, a paused schedule as `active: false`, and `Asia/Tokyo` unchanged, so nothing normalises into perpetual drift. Beyond that: a live schedule the manifest omits is planned for removal and its variable keys are named without their values; a project holding two schedules described alike is refused by plan and apply as it already was by import, with the other settings still reported; a manifest that omits `pipeline_schedules` plans no schedule change and makes no schedule read; an empty list removes every live schedule.
 
 ## References
 

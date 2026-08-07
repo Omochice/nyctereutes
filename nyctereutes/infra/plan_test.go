@@ -335,3 +335,118 @@ func TestInfraPlanStillPlansAProjectWhoseSchedulesCannotBeRead(t *testing.T) {
 		t.Errorf("stdout does not still carry the project drift\n%s", stdout)
 	}
 }
+
+// A planned removal names the variables destroyed with the schedule, so the
+// operator approving it sees what goes too. Nothing else in the plan mentions
+// them, because the manifest holds no variables.
+func TestInfraPlanNamesTheVariablesARemovalDestroys(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: nightlyScheduleJSON},
+		variables: map[string]string{
+			"7": `[{"key":"DEPLOY_TOKEN","value":"glpat-secret","variable_type":"env_var"}]`,
+		},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	if want := "- variable: DEPLOY_TOKEN"; !strings.Contains(stdout, want) {
+		t.Errorf("stdout missing %q\n%s", want, stdout)
+	}
+	if strings.Contains(stdout, "glpat-secret") {
+		t.Errorf("stdout carries the value, which never leaves the client\n%s", stdout)
+	}
+}
+
+// Variables the token may not see cost a warning and no more: the removal is
+// still shown, because nothing about performing it depends on the answer.
+func TestInfraPlanWarnsWhenARemovalsVariablesAreNotDisclosed(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: nightlyScheduleJSON},
+		variables: map[string]string{"7": ""},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0: an undisclosed set is not a failed plan", exit)
+	}
+	if !strings.Contains(stderr, "not disclosed") {
+		t.Errorf("stderr does not warn about the undisclosed variables\n%s", stderr)
+	}
+	if want := `- pipeline_schedule "nightly"`; !strings.Contains(stdout, want) {
+		t.Errorf("stdout missing %q, the removal is still shown\n%s", want, stdout)
+	}
+}
+
+// A plan that removes no schedule makes no disclosure read, which is what keeps
+// the ordinary path at the reads it already made.
+func TestInfraPlanMakesNoDisclosureReadWithoutARemoval(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planScheduleManifest)
+	runner := &countingDetailGlab{fakeInfraGlab: fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{},
+	}}
+
+	exit, _, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	if runner.detailReads != 0 {
+		t.Errorf("disclosure reads = %d, want 0 for a plan that removes nothing", runner.detailReads)
+	}
+}
+
+// countingDetailGlab counts the single-schedule reads made through it, so a
+// test can assert that none was.
+type countingDetailGlab struct {
+	fakeInfraGlab
+
+	detailReads int
+}
+
+func (f *countingDetailGlab) Run(ctx context.Context, args ...string) ([]byte, error) {
+	if _, ok := scheduleDetailRead(args); ok {
+		f.detailReads++
+	}
+	return f.fakeInfraGlab.Run(ctx, args...)
+}
+
+// A project whose live schedules repeat a description is refused, because the
+// pairing a plan rests on would land on an arbitrary member of the pair. The
+// refusal costs the project its schedules and not the project: its other
+// settings are still planned.
+func TestInfraPlanRefusesDuplicateScheduleDescriptionsAndPlansTheRest(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest+"  pipeline_schedules: []\n")
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: `[
+		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"},
+		  {"id":5,"description":"nightly","ref":"refs/heads/main","cron":"0 8 * * *"}
+		]`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 for a project that cannot be described", exit)
+	}
+	for _, want := range []string{"duplicate", "nightly", "1", "5"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr missing %q\n%s", want, stderr)
+		}
+	}
+	if !strings.Contains(stdout, "visibility") {
+		t.Errorf("stdout does not still carry the project drift\n%s", stdout)
+	}
+	if strings.Contains(stdout, "pipeline_schedule") {
+		t.Errorf("stdout plans a schedule change for an undescribable project\n%s", stdout)
+	}
+}

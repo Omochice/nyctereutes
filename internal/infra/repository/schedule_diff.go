@@ -12,6 +12,10 @@ import (
 // tells one from a project setting.
 const fieldPipelineSchedules = "pipeline_schedules"
 
+// How one schedule is named on a plan line and in the error of a write that
+// failed, shared so the two can be matched.
+const schedulePrefix = "pipeline_schedule"
+
 // The pipeline schedule one [Change] acts on. Only the side the change type
 // implies is filled: a creation has no Live and an id of zero, a deletion no
 // Desired. Description is held separately because it is the one thing every
@@ -22,6 +26,9 @@ type ScheduleChange struct {
 	ID      int
 	Desired manifest.PipelineSchedule
 	Live    manifest.PipelineSchedule
+	// The keys of the variables a removal would destroy, filled by the command
+	// that plans it and empty everywhere else.
+	VariableKeys []string
 }
 
 // Reports how a project's live schedules differ from the declared ones, pairing
@@ -101,9 +108,9 @@ func scheduleAttributes(schedule manifest.PipelineSchedule) []scheduleAttribute 
 
 // Renders the change as the lines a plan shows for it. A creation lists every
 // attribute because none of them exists yet, an update only those that differ,
-// and a deletion none because the schedule goes whole.
+// and a deletion none, naming instead the variable keys going with the schedule.
 func (s *ScheduleChange) line(kind ChangeType) string {
-	header := fmt.Sprintf("pipeline_schedule %q", s.Description)
+	header := fmt.Sprintf("%s %q", schedulePrefix, s.Description)
 	switch kind {
 	case ChangeCreate:
 		declared := scheduleAttributes(s.Desired)
@@ -124,7 +131,12 @@ func (s *ScheduleChange) line(kind ChangeType) string {
 		}
 		return strings.Join(lines, "\n")
 	case ChangeDelete:
-		return "- " + header
+		lines := make([]string, 0, len(s.VariableKeys)+1)
+		lines = append(lines, "- "+header)
+		for _, key := range s.VariableKeys {
+			lines = append(lines, "    - variable: "+key)
+		}
+		return strings.Join(lines, "\n")
 	default:
 		return ""
 	}

@@ -222,3 +222,23 @@ func TestScheduleDeletionLineNamesTheScheduleAlone(t *testing.T) {
 		t.Errorf("line = %q, want %q", got, want)
 	}
 }
+
+// A removal names the variable keys going with the schedule, which nothing else
+// in a plan mentions because the manifest holds no variables.
+func TestScheduleDeletionLineNamesTheVariableKeysDestroyedWithIt(t *testing.T) {
+	change := Change{Type: ChangeDelete, Field: fieldPipelineSchedules, Schedule: &ScheduleChange{
+		Description:  "nightly",
+		ID:           7,
+		VariableKeys: []string{"DEPLOY_TOKEN", "REGION"},
+	}}
+
+	got := change.String()
+	want := strings.Join([]string{
+		`- pipeline_schedule "nightly"`,
+		"    - variable: DEPLOY_TOKEN",
+		"    - variable: REGION",
+	}, "\n")
+	if got != want {
+		t.Errorf("line =\n%s\nwant\n%s", got, want)
+	}
+}
