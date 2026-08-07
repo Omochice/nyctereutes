@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0](https://github.com/Omochice/nyctereutes/compare/v0.3.0...v0.4.0) (2026-08-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **infra:** pipeline_schedules: [] used to be inert and now plans the removal of every schedule a project holds.
+* a manifest declaring `variables` on a pipeline schedule is rejected as carrying an unknown field. The block has to be removed, and a value already committed is exposed in the repository's history whether or not it is.
+
+### Features
+
+* apply the pipeline schedule changes a plan shows ([#78](https://github.com/Omochice/nyctereutes/issues/78)) ([00899ed](https://github.com/Omochice/nyctereutes/commit/00899edeaecd4383db126a604b1a85730d58816b))
+* describe and export a project's pipeline schedules ([#67](https://github.com/Omochice/nyctereutes/issues/67)) ([ee1617a](https://github.com/Omochice/nyctereutes/commit/ee1617a97580caafd49a1105feed504b824dbf3e))
+* describe and export a schedule's variables ([#68](https://github.com/Omochice/nyctereutes/issues/68)) ([7eceadd](https://github.com/Omochice/nyctereutes/commit/7eceadde3c5b33db4a368ce1ada6fceff19b6db0))
+* **infra:** plan the pipeline schedule changes a manifest declares ([#77](https://github.com/Omochice/nyctereutes/issues/77)) ([c47f70e](https://github.com/Omochice/nyctereutes/commit/c47f70e36f10e7e1937cc2d3e076025ee17d6f48))
+* read the shipped documentation with the doc command ([#71](https://github.com/Omochice/nyctereutes/issues/71)) ([ce8653b](https://github.com/Omochice/nyctereutes/commit/ce8653b2d5c6a7243356b4452b9c32596fa09553))
+* stop putting pipeline schedule variables in the manifest ([#74](https://github.com/Omochice/nyctereutes/issues/74)) ([f668618](https://github.com/Omochice/nyctereutes/commit/f668618587821f673d5e48864dd706bd1e82c476))
+
+
+### Bug Fixes
+
+* report a project whose pipeline schedule GitLab describes incompletely ([#69](https://github.com/Omochice/nyctereutes/issues/69)) ([b5d900a](https://github.com/Omochice/nyctereutes/commit/b5d900a5c6f1eccefcef64b67b2166a9b2e77e41))
+
 ## [0.3.0](https://github.com/Omochice/nyctereutes/compare/v0.2.0...v0.3.0) (2026-07-11)
 
 
