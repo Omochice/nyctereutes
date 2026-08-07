@@ -61,6 +61,19 @@ func readManifestFile(stderr io.Writer, path string) ([]*manifest.Repository, in
 	return repos, len(errs)
 }
 
+// The changes one declared project needs to match its manifest, with the number
+// of problems met on the way. Plan and apply share it so the plan shown before
+// the confirmation prompt is built exactly as the one apply then performs.
+func planRepo(
+	ctx context.Context, client *repository.Client, stderr io.Writer, repo *manifest.Repository,
+) ([]repository.Change, int) {
+	state, failures := fetchState(ctx, client, stderr, repo)
+	if state == nil {
+		return nil, failures
+	}
+	return repository.Diff(repo, state), failures
+}
+
 // Reads the live state one declared project is compared against. A failed read
 // is written to stderr and counted rather than returned, the way
 // [readManifestFile] treats an unparseable document, and a nil state is one
