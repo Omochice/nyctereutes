@@ -21,6 +21,8 @@ It follows an import, validate, plan, apply cycle so the manifests stay the sing
 
 A schedule is exported so a manifest describes the project as it stands, not so the manifest drives it. Reconciling one needs the live set to be knowable, and it is not: GitLab addresses a schedule by an id no manifest can hold, so a declared one is paired by its description, which GitLab neither keeps unique nor keeps stable when someone edits it in the web UI. Reading a schedule and writing it also need different permissions, so a plan can be correct and its apply refused.
 
+A schedule's variables are outside the manifest altogether. They are not exported, not declared and not checked, so a schedule in a manifest describes when a pipeline runs and not what it receives. GitLab requires a value to create a variable, and a manifest that is committed to version control is the wrong place to keep one, so a declared variable could never be created from the document that declares it.
+
 Whether schedules become manageable, and under what model, is an open question rather than a planned feature.
 
 ## Inspired by
