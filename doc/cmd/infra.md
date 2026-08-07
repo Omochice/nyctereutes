@@ -21,7 +21,7 @@ It follows an import, validate, plan, apply cycle so the manifests stay the sing
 
 A schedule is exported so a manifest describes the project as it stands, not so the manifest drives it. Reconciling one needs the live set to be knowable, and it is not: GitLab addresses a schedule by an id no manifest can hold, so a declared one is paired by its description, which GitLab neither keeps unique nor keeps stable when someone edits it in the web UI. Reading a schedule and writing it also need different permissions, so a plan can be correct and its apply refused.
 
-Whether schedules become manageable, and under what model, is an open question rather than a planned feature. See `doc/adr/adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md`.
+Whether schedules become manageable, and under what model, is an open question rather than a planned feature.
 
 ## Inspired by
 
