@@ -3,6 +3,7 @@
 package infra
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -58,6 +59,23 @@ func readManifestFile(stderr io.Writer, path string) ([]*manifest.Repository, in
 		_, _ = fmt.Fprintf(stderr, "%s: %v\n", path, parseErr)
 	}
 	return repos, len(errs)
+}
+
+// Reads the live state one declared project is compared against, reporting a
+// failed read to stderr and counting it rather than returning it, the way
+// [readManifestFile] treats a document that will not parse. A nil state is one
+// nothing can be said about; plan and apply share this so a project reads the
+// same either side of the confirmation prompt.
+func fetchState(
+	ctx context.Context, client *repository.Client, stderr io.Writer, repo *manifest.Repository,
+) (*repository.CurrentState, int) {
+	state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+	if err != nil {
+		// The error already carries "fetch project <owner>/<name>" context.
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
+		return nil, 1
+	}
+	return state, 0
 }
 
 // Expands one path argument into the manifest files it names: a file is
