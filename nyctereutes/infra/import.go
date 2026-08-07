@@ -91,26 +91,16 @@ func (c *importCommand) document(
 		c.reportf("project %s not found on GitLab\n", target)
 		return nil, false
 	}
-	// An exported document describes the whole project, so its schedules and
-	// their variables are always read; a command that only reconciles some
-	// settings need not. A read that fails costs them alone, because ending the
-	// export here would throw away every setting already read over one child
-	// resource.
-	schedules, err := client.FetchSchedules(ctx, owner, name, true)
+	// An exported document describes the whole project, so its schedules are
+	// always read; a command that only reconciles some settings need not. A read
+	// that fails costs them alone, because ending the export here would throw
+	// away every setting already read over one child resource.
+	schedules, err := client.FetchSchedules(ctx, owner, name)
 	if err != nil {
 		c.reportf("%v\n", err)
 		undescribed = true
 	} else {
 		state.PipelineSchedules = schedules
-		// GitLab hides a schedule's variables from a reader below Maintainer who
-		// does not own it. The document leaves them out, which says nothing about
-		// them rather than declaring a deletion, so the export is smaller but not
-		// wrong: the run says so and still succeeds. Failing here would cost a
-		// Developer every schedule over an attribute their role cannot read.
-		if missing := repository.SchedulesMissingVariables(schedules); len(missing) > 0 {
-			c.reportf("%s: variables not described for %s; the token cannot read them\n",
-				target, strings.Join(missing, ", "))
-		}
 	}
 	data, err = manifest.Marshal(repository.ToManifest(state))
 	if err != nil {
