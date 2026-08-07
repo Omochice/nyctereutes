@@ -21,6 +21,7 @@ import (
 type fakeApplyGlab struct {
 	projects   map[string]string // "owner/name" -> project JSON, absent means 404
 	catalog    map[string]bool   // "owner/name" -> catalog status, default false
+	schedules  map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
 	writes     []string          // joined args of each write call, in order
 	writeBody  []string          // parallel to writes: stdin body, "" for none
 	failWrites map[string]bool   // "owner/name" whose writes fail
@@ -35,6 +36,12 @@ func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	// recorded as one.
 	if path, ok := catalogRead(args); ok {
 		return catalogBody(f.catalog[path]), nil
+	}
+	// Nor is the schedule list. A nil map leaves it unanswered so a test
+	// asserting that no such read is made sees the call recorded as a write it
+	// did not expect, rather than absorbed.
+	if path, ok := scheduleRead(args); ok && f.schedules != nil {
+		return scheduleBody(f.schedules, path), nil
 	}
 	return f.recordWrite(nil, args)
 }
@@ -327,5 +334,80 @@ func TestInfraApplyExpandsDirectory(t *testing.T) {
 	}
 	if len(runner.writes) != 2 {
 		t.Errorf("writes = %v, want one per manifest in the directory", runner.writes)
+	}
+}
+
+// The schedule list of a project holding one nightly schedule, as GitLab
+// reports it.
+const nightlyScheduleJSON = `[{"id":7,"description":"nightly","ref":"refs/heads/main",` +
+	`"cron":"0 3 * * *","cron_timezone":"UTC","active":true}]`
+
+// An approved plan creates the declared schedule through the schedules
+// endpoint, so a manifest that declares one produces the schedule it names.
+func TestInfraApplyCreatesADeclaredSchedule(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planScheduleManifest)
+	runner := &fakeApplyGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{},
+	}
+
+	exit, _, stderr := runInfraApply("y\n", runner, "infra", "apply", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	want := "api projects/group%2Fproj/pipeline_schedules --method POST " +
+		"-f description=nightly -f ref=refs/heads/main -f cron=0 3 * * * " +
+		"-f cron_timezone=UTC -f active=true"
+	if len(runner.writes) != 1 || runner.writes[0] != want {
+		t.Errorf("writes = %q, want just %q", runner.writes, want)
+	}
+}
+
+// A live schedule an empty list leaves undeclared is deleted by its id.
+func TestInfraApplyDeletesAnUndeclaredSchedule(t *testing.T) {
+	manifest := strings.ReplaceAll(planManifest, "visibility: internal", "pipeline_schedules: []")
+	path := writeManifest(t, t.TempDir(), "a.yaml", manifest)
+	runner := &fakeApplyGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: nightlyScheduleJSON},
+	}
+
+	exit, _, stderr := runInfraApply("y\n", runner, "infra", "apply", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	want := "api projects/group%2Fproj/pipeline_schedules/7 --method DELETE"
+	if len(runner.writes) != 1 || runner.writes[0] != want {
+		t.Errorf("writes = %q, want just %q", runner.writes, want)
+	}
+}
+
+// Renaming a schedule removes the old one before creating the new one, because
+// an instance caps how many schedules a project may hold and a project at that
+// cap could not take the replacement first.
+func TestInfraApplyRemovesARenamedScheduleBeforeCreatingIt(t *testing.T) {
+	manifest := strings.ReplaceAll(planScheduleManifest, "description: nightly", "description: renamed")
+	path := writeManifest(t, t.TempDir(), "a.yaml", manifest)
+	runner := &fakeApplyGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{targetGroupProj: nightlyScheduleJSON},
+	}
+
+	exit, _, stderr := runInfraApply("y\n", runner, "infra", "apply", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d (stderr %q), want 0", exit, stderr)
+	}
+	if len(runner.writes) != 2 {
+		t.Fatalf("writes = %q, want a delete and a create", runner.writes)
+	}
+	if !strings.Contains(runner.writes[0], "--method DELETE") {
+		t.Errorf("writes[0] = %q, want the delete first", runner.writes[0])
+	}
+	if !strings.Contains(runner.writes[1], "--method POST") ||
+		!strings.Contains(runner.writes[1], "-f description=renamed") {
+		t.Errorf("writes[1] = %q, want the create of renamed second", runner.writes[1])
 	}
 }
