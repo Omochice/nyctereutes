@@ -173,7 +173,7 @@ func (c *Client) ScheduleVariableKeys(
 ### Positive
 
 1. **No credential is written to version control, once this is carried out**: the ordinary `infra import` path stops emitting values, so the file an operator commits cannot carry a token that a schedule holds. Until then the exposure described in the context is live: `infra import` on `main` writes the values today, and this record changes nothing on its own.
-2. **A plan that deletes nothing costs one request per project**: removing the per-schedule read removes the multiplication by schedule count. A plan that deletes schedules still pays one disclosure read for each of those, and `infra apply` never pays it, because the disclosure happens where the plan is rendered.
+2. **A project costs one request per read**: removing the per-schedule read removes the multiplication by schedule count. Once decision 3 is carried out a plan will pay one disclosure read per schedule it deletes, and `infra apply` will pay none, because the disclosure happens where the plan is rendered.
 3. **Three failure modes stop existing**: the permission-gated absence of the variables field, the mismatch between who may read and who may write them, and the distinction between "not read" and "read, none" all stop being states the code has to represent.
 4. **The document stops overstating itself**: a manifest no longer looks as though it describes a schedule's variables when applying it could not produce them.
 
@@ -181,23 +181,25 @@ func (c *Client) ScheduleVariableKeys(
 
 1. **Variables are managed outside this tool**: an operator declaring a schedule still has to create its variables by hand or with something else, and the manifest gives no sign that this is pending.
 2. **Drift in variables is invisible**: a variable added, changed or removed by hand never appears in a plan, so the manifest and the project can disagree without anyone noticing.
-3. **The plan gains a conditional read**: one code path reads a resource only when a deletion is planned, which is a special case a reader has to learn.
+3. **The plan will gain a conditional read**: once decision 3 is carried out, one code path reads a resource only when a deletion is planned, which is a special case a reader has to learn.
 
 ### Mitigations
 
 - `doc/cmd/infra.md` gains a note that schedule variables are outside the manifest, written when the field is removed rather than now, so an operator is not left inferring it from a field that has quietly stopped being accepted.
-- The deletion disclosure covers the case where invisible drift is destructive; the remaining invisible drift changes what a pipeline receives but destroys nothing.
-- The conditional read is named for what it is and justified where it happens, so it reads as a disclosure step rather than as part of reconciliation.
+- Nothing contains the destructive case today: no plan deletes a schedule, because [ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md) stops schedules being reconciled, so the disclosure decision 3 describes has nothing to attach to and is not written. It has to land with whatever record restores deletions, or that record reintroduces the silent destruction this one was written to prevent. The drift that stays invisible either way changes what a pipeline receives and destroys nothing.
+- The conditional read, when it is written, is named for what it is and justified where it happens, so it reads as a disclosure step rather than as part of reconciliation.
 
 ## Implementation Notes
 
 This reverts part of what is already on `main`. The `variables` block, the per-schedule read that fills it and the export that writes it were merged in PR #68, and they come back out: the schema type, `Client.FetchSchedules`'s `withVariables` parameter, `fetchScheduleVariables` and the fake support behind them. The schedule's own attributes stay, so the revert is partial rather than a reversal of the whole feature.
 
-What replaces the removed read is the disclosure call named in decision 3, not a narrowing of the old one. It is added rather than kept, because the property that makes it safe, a value never reaching the caller, is not something the old signature could be trimmed into.
+Nothing replaces the removed read yet. The disclosure call named in decision 3 is an addition rather than a narrowing of it, because the property that makes it safe, a value never reaching the caller, is not something the old signature could be trimmed into, so there is nothing to keep in the meantime.
 
 Removing a schema field is a breaking change for any manifest already written. A document still carrying `variables` reports it as an unknown field rather than being ignored, which the schema's strict decoding already does, so an operator learns the field is gone instead of watching it silently stop working. How existing manifests are migrated, and what is done about values already committed to a repository's history, are operational questions this record does not answer.
 
-Verification worth pinning: an export of a project whose schedule carries a variable contains neither the key nor the value; a plan deleting such a schedule names the key and not the value; a plan deleting a schedule whose variables the token may not read still shows the deletion and warns; a plan that deletes nothing issues one request per project.
+Verification worth pinning for decisions 1 and 2: an export of a project whose schedule carries a variable contains neither the key nor the value; a manifest still declaring one is refused rather than ignored; a project costs one request however many schedules it has.
+
+Verification for decision 3, when it is carried out: a plan deleting such a schedule names the key and not the value; a plan deleting a schedule whose variables the token may not read still shows the deletion and warns; a plan that deletes nothing pays no disclosure read.
 
 ## References
 
