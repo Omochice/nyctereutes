@@ -133,7 +133,7 @@
             pname = "nyctereutes";
             inherit version;
             src = self;
-            vendorHash = "sha256-yqxjfUe1bMeC8MdQZKMw293ikSfgH9MXc/8vCt3bF+c=";
+            vendorHash = "sha256-goZEFaJFfLvgACIbTy7hLlFOKnwFN12shlHhD5Jj3xo=";
             ldflags = [
               "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}"
             ];
