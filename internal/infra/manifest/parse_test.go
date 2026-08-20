@@ -299,3 +299,35 @@ func TestParseReportsFileLineNumbers(t *testing.T) {
 		t.Errorf("error %q does not point at file line %d", errs[0], wantLine)
 	}
 }
+
+// import heads every exported document with the schema modeline, and validate
+// must still read such a stream back. The stream is split here rather than by
+// goyaml, and an inline document after "---" is rejected, so a comment line
+// opening a fragment is not obviously tolerated.
+func TestParseReadsADocumentHeadedByTheSchemaModeline(t *testing.T) {
+	repos, errs := Parse([]byte(SchemaModeline("refs/heads/main") + validDoc))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want none", errs)
+	}
+	if len(repos) != 1 {
+		t.Fatalf("parsed %d documents, want 1", len(repos))
+	}
+	if repos[0].Metadata.Name != "proj" {
+		t.Errorf("name = %q, want %q", repos[0].Metadata.Name, "proj")
+	}
+}
+
+func TestParseReadsASchemaModelineFollowingASeparator(t *testing.T) {
+	modeline := SchemaModeline("refs/tags/v1.2.3")
+	second := strings.ReplaceAll(validDoc, "name: proj", "name: other")
+	repos, errs := Parse(joinDocs(modeline+validDoc, modeline+second))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want none", errs)
+	}
+	if len(repos) != 2 {
+		t.Fatalf("parsed %d documents, want 2", len(repos))
+	}
+	if repos[1].Metadata.Name != "other" {
+		t.Errorf("second document name = %q, want %q", repos[1].Metadata.Name, "other")
+	}
+}

@@ -32,3 +32,23 @@ func Schema() ([]byte, error) {
 	}
 	return append(schema, '\n'), nil
 }
+
+// Where the derived schema is published, split around the git ref so a document
+// can name the revision it was written by.
+const (
+	schemaURLPrefix = "https://raw.githubusercontent.com/Omochice/nyctereutes/"
+	schemaURLPath   = "/schema/repository.schema.json"
+)
+
+// The yaml-language-server modeline naming the schema committed at the given
+// git ref, as a whole comment line terminated by a newline so a caller can
+// write it straight ahead of a document. Pinning the ref rather than a moving
+// branch keeps the rules an editor applies to an emitted document those of the
+// revision that emitted it.
+//
+// An editor only reads the modeline out of a single document's leading comment
+// block, so a caller emitting a "---"-separated stream repeats the line for
+// every document instead of writing it once.
+func SchemaModeline(ref string) string {
+	return "# yaml-language-server: $schema=" + schemaURLPrefix + ref + schemaURLPath + "\n"
+}

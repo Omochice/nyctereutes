@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
@@ -19,14 +20,17 @@ var (
 )
 
 type importCommand struct {
-	inout  *cli.ProcInout
-	runner glab.Runner
+	inout     *cli.ProcInout
+	runner    glab.Runner
+	schemaRef string
 }
 
 // Fetches each named project's basic settings from GitLab and writes them as
-// YAML manifests to stdout, separated by "---". Missing projects are reported on
-// stderr and skipped; the run exits non-zero when any project failed, and also
-// when a project was exported with its schedules left undescribed.
+// YAML manifests to stdout, separated by "---" and each headed by the schema
+// modeline, so an editor validates and completes the export as it is edited.
+// Missing projects are reported on stderr and skipped; the run exits non-zero
+// when any project failed, and also when a project was exported with its
+// schedules left undescribed.
 func (c *importCommand) Execute(args []string) error {
 	if len(args) == 0 {
 		return errImportNeedsTarget
@@ -47,6 +51,10 @@ func (c *importCommand) Execute(args []string) error {
 		if emitted > 0 {
 			_, _ = fmt.Fprintln(c.inout.Stdout, "---")
 		}
+		// An editor reads the modeline out of one document's own leading
+		// comments and does not carry it across a separator, so every document
+		// in the stream needs its own.
+		_, _ = io.WriteString(c.inout.Stdout, manifest.SchemaModeline(c.schemaRef))
 		_, _ = c.inout.Stdout.Write(data)
 		emitted++
 	}

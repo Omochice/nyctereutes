@@ -222,3 +222,21 @@ func TestRuntimeErrorReportsNothingButTheError(t *testing.T) {
 		t.Errorf("runtime failure carries the documentation hint\n%s", stderr)
 	}
 }
+
+// A release sends a reader to the schema committed under its own tag, which
+// carries the "v" prefix the stamped version omits. An un-stamped build has no
+// tag of its own, so it falls back to the branch it was built off.
+func TestSchemaRefNamesTheRevisionTheBuildCameFrom(t *testing.T) {
+	stamped := version
+	t.Cleanup(func() { version = stamped })
+
+	version = develVersion
+	if got := schemaRef(); got != "refs/heads/main" {
+		t.Errorf("schemaRef() = %q, want %q for an un-stamped build", got, "refs/heads/main")
+	}
+
+	version = "1.2.3"
+	if got := schemaRef(); got != "refs/tags/v1.2.3" {
+		t.Errorf("schemaRef() = %q, want %q for a stamped build", got, "refs/tags/v1.2.3")
+	}
+}

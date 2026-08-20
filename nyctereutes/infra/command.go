@@ -30,14 +30,17 @@ type Command struct {
 }
 
 // Builds the tree with every subcommand wired to the given streams and glab
-// runner, so a caller can inject a fake runner instead of the real CLI.
-func New(inout *cli.ProcInout, runner glab.Runner) *Command {
+// runner, so a caller can inject a fake runner instead of the real CLI. The
+// schema ref names the revision an exported manifest sends an editor to; it
+// arrives as a parameter because it is derived from the build version, which
+// lives in the package that imports this one.
+func New(inout *cli.ProcInout, runner glab.Runner, schemaRef string) *Command {
 	// apply needs to stream a request body for topics, which only the
 	// stdin-capable runner provides; a runner without it leaves writer nil and
 	// apply reports that it cannot write.
 	writer, _ := runner.(repository.ProjectWriter)
 	return &Command{
-		Import:   &importCommand{inout: inout, runner: runner},
+		Import:   &importCommand{inout: inout, runner: runner, schemaRef: schemaRef},
 		Validate: &validateCommand{inout: inout},
 		Plan:     &planCommand{inout: inout, runner: runner},
 		Apply:    &applyCommand{inout: inout, writer: writer},

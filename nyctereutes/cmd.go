@@ -15,9 +15,23 @@ import (
 	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
+// Marks a build whose link-time stamp is absent.
+const develVersion = "(devel)"
+
 // Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
 // an un-stamped build.
-var version = "(devel)"
+var version = develVersion
+
+// The git ref holding the sources this build was made from, which is where a
+// command pointing a reader at a committed file has to point. An un-stamped
+// build has no revision of its own, so it falls back to the branch it was built
+// off; a release is stamped with the bare version and its tag carries the "v".
+func schemaRef() string {
+	if version == develVersion {
+		return "refs/heads/main"
+	}
+	return "refs/tags/v" + version
+}
 
 // Backs the "version" subcommand.
 type versionCommand struct {
@@ -86,7 +100,7 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:        dep.New(inout, runner),
-		Infra:      infra.New(inout, runner),
+		Infra:      infra.New(inout, runner, schemaRef()),
 		Doc:        doc.New(inout),
 		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
