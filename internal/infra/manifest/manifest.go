@@ -127,12 +127,16 @@ type Visibility string
 
 // Rejects values outside the visibility set at decode time.
 func (visibility *Visibility) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "visibility", valuePrivate, valueInternal, valuePublic)
+	value, err := enumValue(data, "visibility", visibility.allowedValues())
 	if err != nil {
 		return err
 	}
 	*visibility = Visibility(value)
 	return nil
+}
+
+func (*Visibility) allowedValues() []string {
+	return []string{valuePrivate, valueInternal, valuePublic}
 }
 
 // How far a project feature is opened up: "disabled", "private" or "enabled".
@@ -141,12 +145,16 @@ type AccessLevel string
 // Rejects values outside the access-level set at decode time; notably
 // "public", which only the public-capable toggles accept.
 func (level *AccessLevel) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "access level", valueDisabled, valuePrivate, valueEnabled)
+	value, err := enumValue(data, "access level", level.allowedValues())
 	if err != nil {
 		return err
 	}
 	*level = AccessLevel(value)
 	return nil
+}
+
+func (*AccessLevel) allowedValues() []string {
+	return []string{valueDisabled, valuePrivate, valueEnabled}
 }
 
 // An access level for the two toggles (pages, package_registry) that
@@ -157,12 +165,16 @@ type PublicAccessLevel string
 
 // Rejects values outside the public-capable access-level set at decode time.
 func (level *PublicAccessLevel) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "access level", valueDisabled, valuePrivate, valueEnabled, valuePublic)
+	value, err := enumValue(data, "access level", level.allowedValues())
 	if err != nil {
 		return err
 	}
 	*level = PublicAccessLevel(value)
 	return nil
+}
+
+func (*PublicAccessLevel) allowedValues() []string {
+	return []string{valueDisabled, valuePrivate, valueEnabled, valuePublic}
 }
 
 const (
@@ -178,7 +190,7 @@ type MergeMethod string
 
 // Rejects values outside the merge-method set at decode time.
 func (method *MergeMethod) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "merge method", valueMerge, valueRebaseMerge, valueFastForward)
+	value, err := enumValue(data, "merge method", method.allowedValues())
 	if err != nil {
 		return err
 	}
@@ -186,10 +198,14 @@ func (method *MergeMethod) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
+func (*MergeMethod) allowedValues() []string {
+	return []string{valueMerge, valueRebaseMerge, valueFastForward}
+}
+
 // Decodes a scalar enum value, rejecting anything outside allowed with an
 // error that lists the allowed values, so a typo in a hand-edited manifest
 // is self-explanatory.
-func enumValue(data []byte, kind string, allowed ...string) (string, error) {
+func enumValue(data []byte, kind string, allowed []string) (string, error) {
 	var value string
 	if err := goyaml.Unmarshal(data, &value); err != nil {
 		return "", fmt.Errorf("decode %s: %w", kind, err)
