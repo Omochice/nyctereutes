@@ -146,6 +146,12 @@
             vendorHash = "sha256-qQ/VZ2G5IE8t72CGSyrAJ9glhfirNvkUX+KY7oEKs+w=";
             ldflags = [
               "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}"
+              # The manifest version names the last release rather than this
+              # tree, so it cannot say where these sources are published. A
+              # clean tree is published at its own revision; a dirty one is
+              # published nowhere, and the branch it was built off is the
+              # closest honest answer.
+              "-X github.com/Omochice/nyctereutes/nyctereutes.sourceRef=${self.rev or "refs/heads/main"}"
             ];
           };
         # Run golangci-lint by reusing buildGoModule's module fetching so the

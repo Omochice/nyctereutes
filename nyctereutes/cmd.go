@@ -22,11 +22,25 @@ const develVersion = "(devel)"
 // an un-stamped build.
 var version = develVersion
 
+// Git ref publishing the sources this build was made from, stamped in at link
+// time via -ldflags "-X"; empty unless the build knew where its sources came
+// from, which only a build system reading the source tree can say.
+//
+//nolint:gochecknoglobals // the linker can only write package-level variables
+var sourceRef = ""
+
 // The git ref holding the sources this build was made from, which is where a
-// command pointing a reader at a committed file has to point. An un-stamped
-// build has no revision of its own, so it falls back to the branch it was built
-// off; a release is stamped with the bare version and its tag carries the "v".
+// command pointing a reader at a committed file has to point. The version alone
+// cannot answer this: it is read from the release manifest, so it names the last
+// release rather than the tree being built, and between releases it would send
+// the reader to the previous tag's files. A stamped ref therefore wins, being
+// the only stamp that names the tree itself; a stamped version without one
+// still identifies a release, whose tag carries the "v" the bare version omits;
+// an unstamped build falls back to the branch it was built off.
 func schemaRef() string {
+	if sourceRef != "" {
+		return sourceRef
+	}
 	if version == develVersion {
 		return "refs/heads/main"
 	}
