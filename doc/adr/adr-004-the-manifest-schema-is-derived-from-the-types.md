@@ -126,7 +126,7 @@ apiVersion: nyctereutes/v1
 kind: Repository
 ```
 
-The ref is `refs/tags/v` followed by the version stamped into the build at link time. An un-stamped build has no revision of its own and names `refs/heads/main` instead.
+The ref names where the sources the build was made from are published. A build that was told its own revision names that revision, a release build names `refs/tags/v` followed by the version stamped into it, and a build that knows neither names `refs/heads/main`. The version alone cannot answer the question, because it is read from the release manifest and so names the last release rather than the tree being built.
 
 **Rationale**: A schema nothing points at is a schema nobody applies, and the export is exactly the document that arrives without an editor knowing what it is. The line is repeated per document because an editor reads it out of one document's own leading comments and does not carry it across a separator, so writing it once at the top of the stream would leave every document but the first unhelped. The ref is pinned because the rules an editor applies to a document should be the rules of the build that produced it; naming a moving branch would apply whatever `main` holds today to a document written against something else.
 
@@ -146,7 +146,7 @@ This record is carried out, so what follows describes how the tool behaves rathe
 
 1. **One rule is stated twice**: the catalog prerequisite exists in `validate()` and in `RepositorySpec.JSONSchemaExtend`, and nothing checks that the two agree, so changing one leaves the other stating the old rule silently.
 2. **The schema is a weaker check than the parser**: the uniqueness of a schedule's description, which [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) makes the identity every plan and apply rests on, cannot be expressed in JSON Schema and is not attempted, so an editor can report a document clean that `infra validate` refuses.
-3. **An explicit null is flagged though the parser accepts it**: the optional spec fields are pointers and the reflector renders them as plain scalar types, so `description: null`, which decodes as the field being unset, is reported as a type error. Expressing it would mean a nullable union on every optional field.
+3. **An explicit null is flagged though the parser accepts it**: every optional field is typed concretely by the reflector, so a null written anywhere a value may be omitted is reported as a type error although it decodes as the field being unset. This covers the whole optional surface, `spec` and `topics` and `pipeline_schedules` alongside the scalar fields, and expressing it would mean a nullable union on each of them.
 4. **The lint configuration carries an exclusion for the generator's sake**: `recvcheck` is told to ignore `JSONSchema` and `JSONSchemaExtend`, because the library looks them up on the value type while the decoding methods on the same types need pointer receivers.
 5. **A committed document keeps pointing at the revision that produced it**: nothing rewrites the modeline, so a manifest maintained across releases is edited against the rules of the build that first exported it until someone re-imports or edits the line.
 
@@ -166,7 +166,7 @@ Three reflector settings are chosen rather than defaulted. Field names come from
 
 Only the document header and the metadata are marked required on a `Repository`, and only `description`, `ref` and `cron` on a schedule. A document carrying no `spec` parses, and a schedule may omit `cron_timezone` and `active` because `UnmarshalYAML` supplies a default for either, so demanding any of them would make the schema reject what the parser accepts.
 
-Verification worth pinning: the committed file matches what the types produce, which the test asserts on every run; a document declaring `ci_catalog: true` without a description is reported by the schema and by `validate()` alike; a value outside an enum is reported against the same list the decoder would name; and `infra import` writes the modeline ahead of every document in a multi-project export, with the tagged ref for a stamped build and `refs/heads/main` for an un-stamped one.
+Verification worth pinning: the committed file matches what the types produce, which the test asserts on every run; a document declaring `ci_catalog: true` without a description is reported by the schema and by `validate()` alike; a value outside an enum is reported against the same list the decoder would name; and `infra import` writes the modeline ahead of every document in a multi-project export, naming the revision a build was told it came from, the tag of a release build, or `refs/heads/main` for a build that knows neither.
 
 ## References
 
