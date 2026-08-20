@@ -15,6 +15,14 @@ It follows an import, validate, plan, apply cycle so the manifests stay the sing
 - `infra plan` shows the drift between manifests and live GitLab state.
 - `infra apply` applies manifests to live GitLab state after a confirmation prompt.
 
+## The manifest schema
+
+An exported manifest is meant to be hand-edited, so `infra import` heads every document it writes with a `yaml-language-server` modeline naming the JSON Schema this repository publishes. The line is repeated after each `---`, because an editor reads it out of a single document's own leading comments and does not carry it across a separator. An editor that understands the convention validates and completes the document as it is written: it offers the keys a manifest may hold and the values an enum accepts, and reports an unknown key, a wrong type or a missing required field before any command is run.
+
+The URL names the schema as it stood in the revision that emitted the document. A release build points at its own tag and a build carrying no version stamp points at `refs/heads/main`, so an editor applies the rules of the code that produced the export rather than whatever has been committed since. Nothing rewrites the line afterwards, so a manifest kept across releases keeps naming the revision it was exported from until someone imports it again.
+
+The schema is derived from the same Go types the commands parse with, so the rules an editor applies and the rules a command applies cannot drift apart. It is a weaker check rather than a replacement for `infra validate`: a rule relating one part of a document to another has no expression in JSON Schema, so a manifest declaring two schedules with the same description passes an editor unremarked and is still refused when it is validated. It is also stricter in one place, because an explicit `description: null` reads to the schema as a wrong type while the parser accepts it as the field being unset. A manifest is checked by running `infra validate` on it, and the modeline only moves part of that feedback earlier.
+
 ## Pipeline schedules
 
 A project's pipeline schedules are managed the way its own settings are: `infra import` exports them, `infra validate` checks them, and `infra plan` and `infra apply` create, change and remove them so the project matches what the manifest declares.
