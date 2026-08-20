@@ -10,9 +10,12 @@ import (
 // server-assigned id; the manifest identifies it by description instead, so no
 // server-assigned value enters the document.
 type PipelineSchedule struct {
-	Description  string `yaml:"description"`
-	Ref          Ref    `yaml:"ref"`
-	Cron         string `yaml:"cron"`
+	Description string `yaml:"description" jsonschema:"required"`
+	Ref         Ref    `yaml:"ref" jsonschema:"required"`
+	Cron        string `yaml:"cron" jsonschema:"required"`
+	// Both are optional despite lacking omitempty: the emitter always writes
+	// them, but UnmarshalYAML supplies a default for either, so a hand-written
+	// schedule may leave them out.
 	CronTimezone string `yaml:"cron_timezone"`
 	Active       bool   `yaml:"active"`
 }
@@ -20,8 +23,9 @@ type PipelineSchedule struct {
 // What GitLab stores when a schedule is created without a timezone.
 const defaultCronTimezone = "UTC"
 
-// The attribute names reported by the required-field check. They repeat the
-// struct tags because a tag cannot name a constant.
+// The manifest attribute names the required-field check reports and the
+// generated schema demands. They repeat the struct tags because a tag cannot
+// name a constant.
 const (
 	fieldDescription = "description"
 	fieldRef         = "ref"

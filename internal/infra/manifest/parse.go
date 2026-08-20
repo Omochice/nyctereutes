@@ -7,6 +7,7 @@ import (
 
 	goyaml "github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/invopop/jsonschema"
 )
 
 var (
@@ -189,6 +190,29 @@ func (repo *Repository) validate() error {
 		}
 	}
 	return validateSchedules(repo.Spec.PipelineSchedules)
+}
+
+// Pins the document header in the generated schema to the single version and
+// kind parseDocument accepts, so an editor reports a foreign document the way
+// the parser does. The receiver is a value because the schema generator only
+// looks the method up on the value type.
+func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
+	schema.Properties.Value("apiVersion").Const = APIVersion
+	schema.Properties.Value("kind").Const = KindRepository
+}
+
+// Restates the catalog prerequisite above as the conditional the generated
+// schema can express, so an editor flags the combination before an apply
+// reaches GitLab. It sits on the spec rather than on the document because the
+// rule only refers to sibling fields of the spec.
+func (RepositorySpec) JSONSchemaExtend(schema *jsonschema.Schema) {
+	catalogRequested := &jsonschema.Schema{
+		Properties: jsonschema.NewProperties(),
+		Required:   []string{"ci_catalog"},
+	}
+	catalogRequested.Properties.Set("ci_catalog", &jsonschema.Schema{Const: true})
+	schema.If = catalogRequested
+	schema.Then = &jsonschema.Schema{Required: []string{fieldDescription}}
 }
 
 // Signals two schedules in one document sharing a description.

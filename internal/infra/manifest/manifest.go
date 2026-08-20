@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	goyaml "github.com/goccy/go-yaml"
+	"github.com/invopop/jsonschema"
 )
 
 // Signals that no supported YAML encoding decodes back to the document.
@@ -100,18 +101,21 @@ const (
 	KindRepository = "Repository"
 )
 
-// A single GitLab project's desired state as a manifest document.
+// A single GitLab project's desired state as a manifest document. Only the
+// header and the metadata are marked required for the generated schema; a
+// document carrying no spec parses, so demanding one would reject a manifest
+// the parser accepts.
 type Repository struct {
-	APIVersion string             `yaml:"apiVersion"`
-	Kind       string             `yaml:"kind"`
-	Metadata   RepositoryMetadata `yaml:"metadata"`
+	APIVersion string             `yaml:"apiVersion" jsonschema:"required"`
+	Kind       string             `yaml:"kind" jsonschema:"required"`
+	Metadata   RepositoryMetadata `yaml:"metadata" jsonschema:"required"`
 	Spec       RepositorySpec     `yaml:"spec"`
 }
 
 // Identifies which GitLab project a [Repository] document targets.
 type RepositoryMetadata struct {
-	Name  string `yaml:"name"`
-	Owner string `yaml:"owner"`
+	Name  string `yaml:"name" jsonschema:"required"`
+	Owner string `yaml:"owner" jsonschema:"required"`
 }
 
 const (
@@ -135,6 +139,14 @@ func (visibility *Visibility) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
+// Reports the allowed values to the schema generator, which reaches a type
+// through this method rather than through UnmarshalYAML, so the generated
+// schema rejects what decoding rejects. The receiver is a value because the
+// generator only looks the method up on the value type.
+func (visibility Visibility) JSONSchema() *jsonschema.Schema {
+	return enumSchema(visibility.allowedValues())
+}
+
 func (*Visibility) allowedValues() []string {
 	return []string{valuePrivate, valueInternal, valuePublic}
 }
@@ -151,6 +163,14 @@ func (level *AccessLevel) UnmarshalYAML(data []byte) error {
 	}
 	*level = AccessLevel(value)
 	return nil
+}
+
+// Reports the allowed values to the schema generator, which reaches a type
+// through this method rather than through UnmarshalYAML, so the generated
+// schema rejects what decoding rejects. The receiver is a value because the
+// generator only looks the method up on the value type.
+func (level AccessLevel) JSONSchema() *jsonschema.Schema {
+	return enumSchema(level.allowedValues())
 }
 
 func (*AccessLevel) allowedValues() []string {
@@ -171,6 +191,14 @@ func (level *PublicAccessLevel) UnmarshalYAML(data []byte) error {
 	}
 	*level = PublicAccessLevel(value)
 	return nil
+}
+
+// Reports the allowed values to the schema generator, which reaches a type
+// through this method rather than through UnmarshalYAML, so the generated
+// schema rejects what decoding rejects. The receiver is a value because the
+// generator only looks the method up on the value type.
+func (level PublicAccessLevel) JSONSchema() *jsonschema.Schema {
+	return enumSchema(level.allowedValues())
 }
 
 func (*PublicAccessLevel) allowedValues() []string {
@@ -198,8 +226,26 @@ func (method *MergeMethod) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
+// Reports the allowed values to the schema generator, which reaches a type
+// through this method rather than through UnmarshalYAML, so the generated
+// schema rejects what decoding rejects. The receiver is a value because the
+// generator only looks the method up on the value type.
+func (method MergeMethod) JSONSchema() *jsonschema.Schema {
+	return enumSchema(method.allowedValues())
+}
+
 func (*MergeMethod) allowedValues() []string {
 	return []string{valueMerge, valueRebaseMerge, valueFastForward}
+}
+
+// Builds the schema of a manifest enum from its allowed values, so each enum
+// type states its values once, in the method decoding already consults.
+func enumSchema(allowed []string) *jsonschema.Schema {
+	values := make([]any, 0, len(allowed))
+	for _, value := range allowed {
+		values = append(values, value)
+	}
+	return &jsonschema.Schema{Type: "string", Enum: values}
 }
 
 // Decodes a scalar enum value, rejecting anything outside allowed with an

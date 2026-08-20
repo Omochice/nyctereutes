@@ -58,6 +58,16 @@
               "wsl_v5" # successor of wsl, same opinionated whitespace rules
               # keep-sorted end
             ];
+            # The schema generator looks these methods up on the value type
+            # only, so they cannot take the pointer receiver their type's
+            # decoding methods need. recvcheck ships the same exclusion for
+            # MarshalJSON and MarshalYAML, which are forced the same way.
+            settings.recvcheck.exclusions = [
+              # keep-sorted start
+              "*.JSONSchema"
+              "*.JSONSchemaExtend"
+              # keep-sorted end
+            ];
             exclusions.rules = [
               {
                 # Test fixtures state their data as literals on purpose; forcing
@@ -133,7 +143,7 @@
             pname = "nyctereutes";
             inherit version;
             src = self;
-            vendorHash = "sha256-QAoZJF2vAesTgqnTRxdNJVurttG98xadVgCkJ/4W4eE=";
+            vendorHash = "sha256-qQ/VZ2G5IE8t72CGSyrAJ9glhfirNvkUX+KY7oEKs+w=";
             ldflags = [
               "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}"
             ];
