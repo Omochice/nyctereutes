@@ -139,10 +139,8 @@ func (visibility *Visibility) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-// Reports the allowed values to the schema generator, which reaches a type
-// through this method rather than through UnmarshalYAML, so the generated
-// schema rejects what decoding rejects. The receiver is a value because the
-// generator only looks the method up on the value type.
+// Reports the visibilities to the schema generator, which cannot see through
+// UnmarshalYAML.
 func (visibility Visibility) JSONSchema() *jsonschema.Schema {
 	return enumSchema(visibility.allowedValues())
 }
@@ -165,10 +163,8 @@ func (level *AccessLevel) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-// Reports the allowed values to the schema generator, which reaches a type
-// through this method rather than through UnmarshalYAML, so the generated
-// schema rejects what decoding rejects. The receiver is a value because the
-// generator only looks the method up on the value type.
+// Reports the access levels to the schema generator, which cannot see through
+// UnmarshalYAML.
 func (level AccessLevel) JSONSchema() *jsonschema.Schema {
 	return enumSchema(level.allowedValues())
 }
@@ -193,10 +189,8 @@ func (level *PublicAccessLevel) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-// Reports the allowed values to the schema generator, which reaches a type
-// through this method rather than through UnmarshalYAML, so the generated
-// schema rejects what decoding rejects. The receiver is a value because the
-// generator only looks the method up on the value type.
+// Reports the public-capable access levels to the schema generator, which
+// cannot see through UnmarshalYAML.
 func (level PublicAccessLevel) JSONSchema() *jsonschema.Schema {
 	return enumSchema(level.allowedValues())
 }
@@ -226,10 +220,8 @@ func (method *MergeMethod) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-// Reports the allowed values to the schema generator, which reaches a type
-// through this method rather than through UnmarshalYAML, so the generated
-// schema rejects what decoding rejects. The receiver is a value because the
-// generator only looks the method up on the value type.
+// Reports the merge methods to the schema generator, which cannot see through
+// UnmarshalYAML.
 func (method MergeMethod) JSONSchema() *jsonschema.Schema {
 	return enumSchema(method.allowedValues())
 }

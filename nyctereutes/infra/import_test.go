@@ -236,10 +236,8 @@ func TestInfraImportReportsDuplicateSchedulesAndContinues(t *testing.T) {
 	}
 }
 
-// The modeline up to the ref, which the dispatcher resolves from the build
-// stamps: a release build stamps them in, so a test driving the dispatcher
-// cannot name the ref it will see. The ref itself is asserted below, where the
-// test supplies it.
+// The modeline up to the ref, which a test driving the dispatcher cannot name
+// because a release build stamps a different one in.
 const modelineHead = "# yaml-language-server: $schema=" +
 	"https://raw.githubusercontent.com/Omochice/nyctereutes/"
 
@@ -285,10 +283,8 @@ func TestInfraImportRepeatsTheSchemaModelineForEveryDocument(t *testing.T) {
 	}
 }
 
-// The schema an export points at is the one committed at the revision that
-// wrote it, so the ref the tree is built with has to reach the output. The tree
-// is built here rather than through the dispatcher, which derives the ref from
-// the build stamps and so hands over a different one to a stamped build.
+// The tree is built here rather than through the dispatcher, which resolves the
+// ref from the build stamps and so hands a stamped build a different one.
 func TestInfraImportPointsAtTheSchemaOfTheGivenRef(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	inout := &cli.ProcInout{

@@ -30,13 +30,11 @@ var version = develVersion
 var sourceRef = ""
 
 // The git ref holding the sources this build was made from, which is where a
-// command pointing a reader at a committed file has to point. The version alone
-// cannot answer this: it is read from the release manifest, so it names the last
-// release rather than the tree being built, and between releases it would send
-// the reader to the previous tag's files. A stamped ref therefore wins, being
-// the only stamp that names the tree itself; a stamped version without one
-// still identifies a release, whose tag carries the "v" the bare version omits;
-// an unstamped build falls back to the branch it was built off.
+// command pointing a reader at a committed file has to point. The stamped ref
+// wins because the version is read from the release manifest and so names the
+// last release rather than the tree being built, which between releases would
+// send the reader to the previous tag's files. Falling back to the version
+// still reaches a release, whose tag carries the "v" the bare version omits.
 func schemaRef() string {
 	if sourceRef != "" {
 		return sourceRef

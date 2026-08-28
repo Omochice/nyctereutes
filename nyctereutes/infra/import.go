@@ -51,9 +51,7 @@ func (c *importCommand) Execute(args []string) error {
 		if emitted > 0 {
 			_, _ = fmt.Fprintln(c.inout.Stdout, "---")
 		}
-		// An editor reads the modeline out of one document's own leading
-		// comments and does not carry it across a separator, so every document
-		// in the stream needs its own.
+		// Written per document for the reason [manifest.SchemaModeline] gives.
 		_, _ = io.WriteString(c.inout.Stdout, manifest.SchemaModeline(c.schemaRef))
 		_, _ = c.inout.Stdout.Write(data)
 		emitted++

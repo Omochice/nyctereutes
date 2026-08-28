@@ -300,10 +300,9 @@ func TestParseReportsFileLineNumbers(t *testing.T) {
 	}
 }
 
-// import heads every exported document with the schema modeline, and validate
-// must still read such a stream back. The stream is split here rather than by
-// goyaml, and an inline document after "---" is rejected, so a comment line
-// opening a fragment is not obviously tolerated.
+// The stream is split here rather than by goyaml, and an inline document after
+// "---" is rejected, so a comment line opening a fragment is not obviously
+// tolerated.
 func TestParseReadsADocumentHeadedByTheSchemaModeline(t *testing.T) {
 	repos, errs := Parse([]byte(SchemaModeline("refs/heads/main") + validDoc))
 	if len(errs) > 0 {

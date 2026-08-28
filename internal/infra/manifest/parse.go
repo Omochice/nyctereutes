@@ -194,8 +194,7 @@ func (repo *Repository) validate() error {
 
 // Pins the document header in the generated schema to the single version and
 // kind parseDocument accepts, so an editor reports a foreign document the way
-// the parser does. The receiver is a value because the schema generator only
-// looks the method up on the value type.
+// the parser does.
 func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
 	schema.Properties.Value("apiVersion").Const = APIVersion
 	schema.Properties.Value("kind").Const = KindRepository

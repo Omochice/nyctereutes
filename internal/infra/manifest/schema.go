@@ -12,18 +12,18 @@ import (
 // hand-written schema is what keeps the rules an editor applies and the rules
 // the parser applies from drifting apart.
 func Schema() ([]byte, error) {
+	// This reflector looks the JSONSchema and JSONSchemaExtend hooks up on the
+	// value type, which is why every such method in this package takes a value
+	// receiver while the decoding methods beside them take a pointer.
 	reflector := jsonschema.Reflector{
-		// The document keys come from the yaml tags; the types carry no json
-		// tags at all, so the default would name every field after its Go
-		// identifier.
+		// The types carry no json tags at all, so the default would name every
+		// document key after its Go identifier.
 		FieldNameTag: "yaml",
-		// Required is stated explicitly rather than inferred from omitempty:
-		// several optional fields deliberately omit it so the emitter always
-		// writes them, and inference would turn those into demands.
+		// Several optional fields omit omitempty so the emitter always writes
+		// them; inferring required from omitempty would turn those into demands.
 		RequiredFromJSONSchemaTags: true,
-		// The generated $id would be the Go import path of this package, an
-		// internal detail that is neither the schema's published location nor
-		// resolvable.
+		// The generated $id would be this package's Go import path, which is
+		// neither the schema's published location nor resolvable.
 		Anonymous: true,
 	}
 	schema, err := json.MarshalIndent(reflector.Reflect(&Repository{}), "", "  ")
