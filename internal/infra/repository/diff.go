@@ -57,6 +57,9 @@ type Change struct {
 	// every other field. Typed rather than held in OldValue and NewValue, which
 	// would make both the plan line and the write assert for it.
 	Schedule *ScheduleChange
+	// The protected branch a [fieldProtectedBranches] change acts on, nil for
+	// every other field, and typed for the same reason.
+	ProtectedBranch *ProtectedBranchChange
 }
 
 // Renders one plan line. The project header already carries the name, so
@@ -64,6 +67,9 @@ type Change struct {
 func (c Change) String() string {
 	if c.Schedule != nil {
 		return c.Schedule.line(c.Type)
+	}
+	if c.ProtectedBranch != nil {
+		return c.ProtectedBranch.line(c.Type)
 	}
 	switch c.Type {
 	case ChangeCreate:
@@ -157,6 +163,10 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	// seen; the command that made the read is what reports why.
 	if spec.PipelineSchedules != nil && current.PipelineSchedules != nil {
 		changes = append(changes, diffSchedules(name, spec.PipelineSchedules, current.PipelineSchedules)...)
+	}
+	// The branches follow the same rule, for the same reasons.
+	if spec.ProtectedBranches != nil && current.ProtectedBranches != nil {
+		changes = append(changes, diffProtectedBranches(name, spec.ProtectedBranches, current.ProtectedBranches)...)
 	}
 	return changes
 }
