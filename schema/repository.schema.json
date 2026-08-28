@@ -10,6 +10,15 @@
         "enabled"
       ]
     },
+    "BranchAccessLevel": {
+      "type": "string",
+      "enum": [
+        "no_one",
+        "developer",
+        "maintainer",
+        "admin"
+      ]
+    },
     "MergeMethod": {
       "type": "string",
       "enum": [
@@ -42,6 +51,27 @@
         "description",
         "ref",
         "cron"
+      ]
+    },
+    "ProtectedBranch": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "push_access_level": {
+          "$ref": "#/$defs/BranchAccessLevel"
+        },
+        "merge_access_level": {
+          "$ref": "#/$defs/BranchAccessLevel"
+        },
+        "allow_force_push": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
       ]
     },
     "PublicAccessLevel": {
@@ -257,6 +287,12 @@
         "pipeline_schedules": {
           "items": {
             "$ref": "#/$defs/PipelineSchedule"
+          },
+          "type": "array"
+        },
+        "protected_branches": {
+          "items": {
+            "$ref": "#/$defs/ProtectedBranch"
           },
           "type": "array"
         }

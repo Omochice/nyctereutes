@@ -22,6 +22,10 @@ func TestEnumValuesAcceptAllowedValues(t *testing.T) {
 		{"merge_method_merge", "merge_method: merge"},
 		{"merge_method_rebase_merge", "merge_method: rebase_merge"},
 		{"merge_method_ff", "merge_method: ff"},
+		{"branch_access_level_no_one", "protected_branches:\n  - name: main\n    push_access_level: no_one"},
+		{"branch_access_level_developer", "protected_branches:\n  - name: main\n    push_access_level: developer"},
+		{"branch_access_level_maintainer", "protected_branches:\n  - name: main\n    push_access_level: maintainer"},
+		{"branch_access_level_admin", "protected_branches:\n  - name: main\n    push_access_level: admin"},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {
@@ -43,6 +47,11 @@ func TestEnumValuesRejectUnknownValues(t *testing.T) {
 		{"public_access_level_rejects_unknown", "features:\n  pages: open", "disabled, private, enabled, public"},
 		{"visibility_rejects_unknown", "visibility: hidden", "private, internal, public"},
 		{"merge_method_rejects_unknown", "merge_method: squash", "merge, rebase_merge, ff"},
+		{
+			"branch_access_level_rejects_unknown",
+			"protected_branches:\n  - name: main\n    push_access_level: owner",
+			"no_one, developer, maintainer, admin",
+		},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {
