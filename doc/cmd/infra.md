@@ -1,5 +1,5 @@
 ---
-description: Manage GitLab project settings declaratively through YAML manifests, following an import, validate, plan, apply cycle. Read this before answering questions about the infra command, the manifest schema, or a plan that reports drift nobody expected.
+description: Manage GitLab project settings declaratively through YAML manifests, following an import, validate, plan, apply cycle. Read this before answering questions about the infra command, the manifest schema, the pipeline schedules or protected branches it manages, or a plan that reports drift nobody expected.
 ---
 
 # infra
@@ -40,6 +40,22 @@ A schedule's variables are outside the manifest. They are not exported, and a ma
 Removing a schedule destroys its variables, and nothing else in a plan would mention them, so a planned removal lists the keys of the variables going with it. Only their keys are read, never their values. GitLab answers a variables read with the field left out for a reader who is neither Maintainer, Owner, nor the schedule's creator; that is reported as a warning and the removal is still shown, because performing it does not depend on the answer.
 
 Writing a schedule needs more than reading one. Reading a project's schedules needs only the access that reads the project, while every write is refused unless the token both holds the Maintainer or Owner role and belongs to the user who created that schedule. A plan can therefore be correct and its apply refused, which the apply error says explicitly rather than blaming the role alone.
+
+## Protected branches
+
+A project's protected branches are managed the way its pipeline schedules are: `infra import` exports them, `infra validate` checks them, and `infra plan` and `infra apply` create, change and remove them so the project matches what the manifest declares.
+
+A protection is identified by its name, which is also how GitLab addresses one. Unlike a schedule, no server-assigned id stands between the manifest and the API, and GitLab refuses a second protection of a name a project already holds, so the pairing rests on a rule GitLab enforces rather than one this tool has to defend. The name may be a wildcard pattern such as `release/*`, and it need not match a branch that exists; GitLab accepts both, and nothing here checks the name against the repository.
+
+The `protected_branches` key follows the same rule as `topics`. A manifest that omits the key says nothing about the protections and leaves every live one alone. A manifest that carries the key with an empty list declares that the project holds none, so applying it unprotects every branch. This matters more here than elsewhere, because GitLab protects a project's default branch when it creates the project: `infra import` writes a `protected_branches` entry for nearly every project, and committing a document with that key emptied is a declaration that no branch may be protected.
+
+A role names a floor rather than an exact role. `developer` is GitLab's access level 30, which it displays as "Developers + Maintainers", so declaring it admits maintainers too. The four values are `no_one`, `developer`, `maintainer` and `admin`, the last being an instance administrator and therefore only meaningful on a self-managed instance. An omitted role takes what GitLab grants on create, which is `maintainer`, and an omitted `allow_force_push` is false.
+
+Only what GitLab CE reports back is described. `unprotect_access_level` and `code_owner_approval_required` are Premium: CE accepts both on create and then answers every read without them. A setting that can be written but not read cannot be reconciled, because a plan could never say whether it had drifted, so neither is a manifest key.
+
+A protection GitLab grants to anything the manifest cannot name is refused rather than read as the role beside it. That covers a grant to a user, a group, a custom role or a deploy key, and a protection inherited from a group. A deploy key with push access is the one such shape a project on the free tier can reach, and a document written from a flattened read would revoke that grant the moment it was applied. The refusal costs the project its protections rather than the project: its other settings are still planned and applied.
+
+Changing a role removes the protection and creates it again, so the branch is unprotected between the two calls. GitLab's PATCH accepts a changed access level, answers success and changes nothing, which is why it is not used; the reasoning is recorded in [ADR-005](../adr/adr-005-a-protected-branch-is-reconciled-by-recreating-it.md). An apply whose second call fails reports that the branch was left unprotected, because nothing else in the report would mention it.
 
 ## Inspired by
 
