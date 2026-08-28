@@ -35,6 +35,8 @@ var sourceRef = ""
 // last release rather than the tree being built, which between releases would
 // send the reader to the previous tag's files. Falling back to the version
 // still reaches a release, whose tag carries the "v" the bare version omits.
+// A build carrying neither stamp names refs/heads/main, having no revision of
+// its own to offer.
 func schemaRef() string {
 	if sourceRef != "" {
 		return sourceRef

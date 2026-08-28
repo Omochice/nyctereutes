@@ -225,7 +225,7 @@ func TestRuntimeErrorReportsNothingButTheError(t *testing.T) {
 
 // A release sends a reader to the schema committed under its own tag, which
 // carries the "v" prefix the stamped version omits. An un-stamped build has no
-// tag of its own, so it falls back to the branch it was built off. Every case
+// tag of its own and names refs/heads/main instead. Every case
 // sets both stamps, because the release build stamps this test binary too and
 // an inherited stamp would decide the outcome instead of the case.
 func TestSchemaRefNamesWhereTheBuiltSourcesArePublished(t *testing.T) {
@@ -253,7 +253,7 @@ func TestSchemaRefNamesWhereTheBuiltSourcesArePublished(t *testing.T) {
 			want:      "refs/tags/v1.2.3",
 		},
 		{
-			name:      "a build that knows neither falls back to the branch",
+			name:      "a build that knows neither names refs/heads/main",
 			version:   develVersion,
 			sourceRef: "",
 			want:      "refs/heads/main",
