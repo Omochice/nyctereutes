@@ -21,17 +21,17 @@ func (a *Applier) applySchedule(ctx context.Context, change Change) error {
 	field := scheduleField(schedule.Description)
 	switch change.Type {
 	case ChangeCreate:
-		args := append([]string{"api", collection, "--method", "POST"}, scheduleForm(schedule.Desired)...)
+		args := append([]string{glabAPI, collection, glabMethod, "POST"}, scheduleForm(schedule.Desired)...)
 		_, err := a.writer.Run(ctx, args...)
 		return wrapWrite(err, change.Name, field)
 	case ChangeUpdate:
 		one := collection + "/" + strconv.Itoa(schedule.ID)
-		args := append([]string{"api", one, "--method", "PUT"}, scheduleForm(schedule.Desired)...)
+		args := append([]string{glabAPI, one, glabMethod, "PUT"}, scheduleForm(schedule.Desired)...)
 		_, err := a.writer.Run(ctx, args...)
 		return wrapWrite(err, change.Name, field)
 	case ChangeDelete:
 		one := collection + "/" + strconv.Itoa(schedule.ID)
-		_, err := a.writer.Run(ctx, "api", one, "--method", "DELETE")
+		_, err := a.writer.Run(ctx, glabAPI, one, glabMethod, "DELETE")
 		return wrapWrite(err, change.Name, field)
 	default:
 		return fmt.Errorf("%w: %s is not a schedule change", errUnexpectedValueType, change.Type)

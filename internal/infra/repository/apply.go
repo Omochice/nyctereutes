@@ -59,12 +59,13 @@ var errProtectedBranchWriteUnsupported = errors.New("applying a protected branch
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
-	// Taken first: a schedule is created through its own endpoint while a project
-	// cannot be created at all, and the scalar PUT below would send a schedule's
-	// attributes to the project.
-	if change.Field == fieldPipelineSchedules {
-		return a.applySchedule(ctx, change)
+	// Taken first: a child resource is created through its own endpoint while a
+	// project cannot be created at all, and the scalar PUT below would send a
+	// child resource's attributes to the project.
+	if write := a.childResourceWriter(change.Field); write != nil {
+		return write(ctx, change)
 	}
+
 	if err := unsupported(change); err != nil {
 		return err
 	}
@@ -102,6 +103,24 @@ func unsupported(change Change) error {
 	return nil
 }
 
+// Names the write a child-resource field goes through, or nil when the field is
+// a setting of the project itself.
+func (a *Applier) childResourceWriter(field string) func(context.Context, Change) error {
+	switch field {
+	case fieldPipelineSchedules:
+		return a.applySchedule
+	default:
+		return nil
+	}
+}
+
+// The glab subcommand and the flag naming an HTTP method, spelled once because
+// every write below repeats them.
+const (
+	glabAPI    = "api"
+	glabMethod = "--method"
+)
+
 // Archives or unarchives a project. Unlike other settings the archived state is
 // a POST to a dedicated action endpoint rather than a field on the project.
 func (a *Applier) setArchived(ctx context.Context, project string, archived bool) error {
@@ -109,7 +128,7 @@ func (a *Applier) setArchived(ctx context.Context, project string, archived bool
 	if archived {
 		action = "archive"
 	}
-	_, err := a.writer.Run(ctx, "api", "projects/"+glab.EncodePath(project)+"/"+action, "--method", "POST")
+	_, err := a.writer.Run(ctx, glabAPI, "projects/"+glab.EncodePath(project)+"/"+action, glabMethod, "POST")
 	return wrapWrite(err, project, fieldArchived)
 }
 
@@ -138,7 +157,7 @@ func (a *Applier) setCatalogResource(ctx context.Context, project string, enable
 	if enabled {
 		query, field = catalogResourceCreateMutation, "catalogResourcesCreate"
 	}
-	out, err := a.writer.Run(ctx, "api", "graphql",
+	out, err := a.writer.Run(ctx, glabAPI, "graphql",
 		"-f", "query="+query,
 		"-f", "projectPath="+project)
 	if err != nil {
@@ -225,8 +244,8 @@ func apiParam(field string) string {
 func (a *Applier) putField(ctx context.Context, project, planField, value string) error {
 	_, err := a.writer.Run(
 		ctx,
-		"api", "projects/"+glab.EncodePath(project),
-		"--method", "PUT",
+		glabAPI, "projects/"+glab.EncodePath(project),
+		glabMethod, "PUT",
 		"-f", apiParam(planField)+"="+value,
 	)
 	return wrapWrite(err, project, planField)
@@ -246,8 +265,8 @@ func (a *Applier) applyTopics(ctx context.Context, project string, topics []stri
 	}
 	_, err = a.writer.RunWithStdin(
 		ctx, body,
-		"api", "projects/"+glab.EncodePath(project),
-		"--method", "PUT",
+		glabAPI, "projects/"+glab.EncodePath(project),
+		glabMethod, "PUT",
 		"--header", "Content-Type: application/json",
 		"--input", "-",
 	)
