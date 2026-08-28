@@ -222,3 +222,49 @@ func TestRuntimeErrorReportsNothingButTheError(t *testing.T) {
 		t.Errorf("runtime failure carries the documentation hint\n%s", stderr)
 	}
 }
+
+// A release sends a reader to the schema committed under its own tag, which
+// carries the "v" prefix the stamped version omits. An un-stamped build has no
+// tag of its own and names refs/heads/main instead. Every case
+// sets both stamps, because the release build stamps this test binary too and
+// an inherited stamp would decide the outcome instead of the case.
+func TestSchemaRefNamesWhereTheBuiltSourcesArePublished(t *testing.T) {
+	stampedVersion, stampedSourceRef := version, sourceRef
+	t.Cleanup(func() { version, sourceRef = stampedVersion, stampedSourceRef })
+
+	for _, testCase := range []struct {
+		name      string
+		version   string
+		sourceRef string
+		want      string
+	}{
+		{
+			// The version names the last release, so a build made after it
+			// would otherwise point at a tag that predates its own sources.
+			name:      "a known source ref outranks the release it follows",
+			version:   "1.2.3",
+			sourceRef: "0123456789abcdef0123456789abcdef01234567",
+			want:      "0123456789abcdef0123456789abcdef01234567",
+		},
+		{
+			name:      "a release without a source ref names its own tag",
+			version:   "1.2.3",
+			sourceRef: "",
+			want:      "refs/tags/v1.2.3",
+		},
+		{
+			name:      "a build that knows neither names refs/heads/main",
+			version:   develVersion,
+			sourceRef: "",
+			want:      "refs/heads/main",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			version, sourceRef = testCase.version, testCase.sourceRef
+
+			if got := schemaRef(); got != testCase.want {
+				t.Errorf("schemaRef() = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}

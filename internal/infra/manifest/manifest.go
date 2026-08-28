@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	goyaml "github.com/goccy/go-yaml"
+	"github.com/invopop/jsonschema"
 )
 
 // Signals that no supported YAML encoding decodes back to the document.
@@ -22,7 +23,9 @@ var errLossyEncoding = errors.New("decoded document differs from the source")
 var errInvalidValue = errors.New("invalid value")
 
 // Encodes a manifest document to YAML. Every emitter goes through this
-// function so the document encoding style has a single owner. Multiline
+// function so the document encoding style has a single owner; what precedes a
+// document, the schema modeline and the stream separator, belongs to whoever
+// assembles the stream. Multiline
 // values become literal blocks, which requires the LF-normalized values the
 // import produces: a literal block cannot carry a bare CR.
 //
@@ -100,18 +103,34 @@ const (
 	KindRepository = "Repository"
 )
 
-// A single GitLab project's desired state as a manifest document.
+// The manifest keys that have to be spelled out rather than reached through a
+// struct field: the required-field checks report them and the schema hooks name
+// them, and a struct tag cannot name a constant. A key spelled alike on two
+// types is one entry, because these name the key rather than the field.
+const (
+	fieldAPIVersion  = "apiVersion"
+	fieldCICatalog   = "ci_catalog"
+	fieldCron        = "cron"
+	fieldDescription = "description"
+	fieldKind        = "kind"
+	fieldRef         = "ref"
+)
+
+// A single GitLab project's desired state as a manifest document. Only the
+// header and the metadata are marked required for the generated schema; a
+// document carrying no spec parses, so demanding one would reject a manifest
+// the parser accepts.
 type Repository struct {
-	APIVersion string             `yaml:"apiVersion"`
-	Kind       string             `yaml:"kind"`
-	Metadata   RepositoryMetadata `yaml:"metadata"`
+	APIVersion string             `yaml:"apiVersion" jsonschema:"required"`
+	Kind       string             `yaml:"kind" jsonschema:"required"`
+	Metadata   RepositoryMetadata `yaml:"metadata" jsonschema:"required"`
 	Spec       RepositorySpec     `yaml:"spec"`
 }
 
 // Identifies which GitLab project a [Repository] document targets.
 type RepositoryMetadata struct {
-	Name  string `yaml:"name"`
-	Owner string `yaml:"owner"`
+	Name  string `yaml:"name" jsonschema:"required"`
+	Owner string `yaml:"owner" jsonschema:"required"`
 }
 
 const (
@@ -127,12 +146,22 @@ type Visibility string
 
 // Rejects values outside the visibility set at decode time.
 func (visibility *Visibility) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "visibility", valuePrivate, valueInternal, valuePublic)
+	value, err := enumValue(data, "visibility", visibility.allowedValues())
 	if err != nil {
 		return err
 	}
 	*visibility = Visibility(value)
 	return nil
+}
+
+// Reports the visibilities to the schema generator, which cannot see through
+// UnmarshalYAML.
+func (visibility Visibility) JSONSchema() *jsonschema.Schema {
+	return enumSchema(visibility.allowedValues())
+}
+
+func (*Visibility) allowedValues() []string {
+	return []string{valuePrivate, valueInternal, valuePublic}
 }
 
 // How far a project feature is opened up: "disabled", "private" or "enabled".
@@ -141,12 +170,22 @@ type AccessLevel string
 // Rejects values outside the access-level set at decode time; notably
 // "public", which only the public-capable toggles accept.
 func (level *AccessLevel) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "access level", valueDisabled, valuePrivate, valueEnabled)
+	value, err := enumValue(data, "access level", level.allowedValues())
 	if err != nil {
 		return err
 	}
 	*level = AccessLevel(value)
 	return nil
+}
+
+// Reports the access levels to the schema generator, which cannot see through
+// UnmarshalYAML.
+func (level AccessLevel) JSONSchema() *jsonschema.Schema {
+	return enumSchema(level.allowedValues())
+}
+
+func (*AccessLevel) allowedValues() []string {
+	return []string{valueDisabled, valuePrivate, valueEnabled}
 }
 
 // An access level for the two toggles (pages, package_registry) that
@@ -157,12 +196,22 @@ type PublicAccessLevel string
 
 // Rejects values outside the public-capable access-level set at decode time.
 func (level *PublicAccessLevel) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "access level", valueDisabled, valuePrivate, valueEnabled, valuePublic)
+	value, err := enumValue(data, "access level", level.allowedValues())
 	if err != nil {
 		return err
 	}
 	*level = PublicAccessLevel(value)
 	return nil
+}
+
+// Reports the public-capable access levels to the schema generator, which
+// cannot see through UnmarshalYAML.
+func (level PublicAccessLevel) JSONSchema() *jsonschema.Schema {
+	return enumSchema(level.allowedValues())
+}
+
+func (*PublicAccessLevel) allowedValues() []string {
+	return []string{valueDisabled, valuePrivate, valueEnabled, valuePublic}
 }
 
 const (
@@ -178,7 +227,7 @@ type MergeMethod string
 
 // Rejects values outside the merge-method set at decode time.
 func (method *MergeMethod) UnmarshalYAML(data []byte) error {
-	value, err := enumValue(data, "merge method", valueMerge, valueRebaseMerge, valueFastForward)
+	value, err := enumValue(data, "merge method", method.allowedValues())
 	if err != nil {
 		return err
 	}
@@ -186,10 +235,30 @@ func (method *MergeMethod) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
+// Reports the merge methods to the schema generator, which cannot see through
+// UnmarshalYAML.
+func (method MergeMethod) JSONSchema() *jsonschema.Schema {
+	return enumSchema(method.allowedValues())
+}
+
+func (*MergeMethod) allowedValues() []string {
+	return []string{valueMerge, valueRebaseMerge, valueFastForward}
+}
+
+// Builds the schema of a manifest enum from its allowed values, so each enum
+// type states its values once, in the method decoding already consults.
+func enumSchema(allowed []string) *jsonschema.Schema {
+	values := make([]any, 0, len(allowed))
+	for _, value := range allowed {
+		values = append(values, value)
+	}
+	return &jsonschema.Schema{Type: "string", Enum: values}
+}
+
 // Decodes a scalar enum value, rejecting anything outside allowed with an
 // error that lists the allowed values, so a typo in a hand-edited manifest
 // is self-explanatory.
-func enumValue(data []byte, kind string, allowed ...string) (string, error) {
+func enumValue(data []byte, kind string, allowed []string) (string, error) {
 	var value string
 	if err := goyaml.Unmarshal(data, &value); err != nil {
 		return "", fmt.Errorf("decode %s: %w", kind, err)

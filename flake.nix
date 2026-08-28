@@ -58,6 +58,14 @@
               "wsl_v5" # successor of wsl, same opinionated whitespace rules
               # keep-sorted end
             ];
+            # Found only on the value type, while the decoding methods on the
+            # same types need pointers.
+            settings.recvcheck.exclusions = [
+              # keep-sorted start
+              "*.JSONSchema"
+              "*.JSONSchemaExtend"
+              # keep-sorted end
+            ];
             exclusions.rules = [
               {
                 # Test fixtures state their data as literals on purpose; forcing
@@ -133,9 +141,13 @@
             pname = "nyctereutes";
             inherit version;
             src = self;
-            vendorHash = "sha256-QAoZJF2vAesTgqnTRxdNJVurttG98xadVgCkJ/4W4eE=";
+            vendorHash = "sha256-qQ/VZ2G5IE8t72CGSyrAJ9glhfirNvkUX+KY7oEKs+w=";
             ldflags = [
               "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}"
+              # The version names the last release, not this tree, so where
+              # these sources are published is stamped separately. A dirty
+              # tree is published nowhere.
+              "-X github.com/Omochice/nyctereutes/nyctereutes.sourceRef=${self.rev or "refs/heads/main"}"
             ];
           };
         # Run golangci-lint by reusing buildGoModule's module fetching so the

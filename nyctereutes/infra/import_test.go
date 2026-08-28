@@ -1,8 +1,14 @@
 package infra_test
 
 import (
+	"bytes"
+	"io"
 	"strings"
 	"testing"
+
+	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
+	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
 func TestInfraImportEmitsYAML(t *testing.T) {
@@ -228,5 +234,76 @@ func TestInfraImportReportsDuplicateSchedulesAndContinues(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "name: proj") {
 		t.Errorf("the settings of the project with the repeated description are still describable\n%s", stdout)
+	}
+}
+
+// The modeline up to the ref, which a test driving the dispatcher cannot name
+// because a release build stamps a different one in.
+const modelineHead = "# yaml-language-server: $schema=" +
+	"https://raw.githubusercontent.com/Omochice/nyctereutes/"
+
+// The rest of the modeline, which every ref shares.
+const modelineTail = "/schema/repository.schema.json\n"
+
+func TestInfraImportHeadsTheDocumentWithTheSchemaModeline(t *testing.T) {
+	runner := importFake(map[string]string{targetGroupProj: projJSON})
+	exit, stdout, _ := runWithRunner(runner, "infra", "import", targetGroupProj)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	if !strings.HasPrefix(stdout, modelineHead) {
+		t.Errorf("stdout does not open with the schema modeline\n%s", stdout)
+	}
+	firstLine, _, _ := strings.Cut(stdout, "\n")
+	if !strings.HasSuffix(firstLine+"\n", modelineTail) {
+		t.Errorf("the modeline does not name the schema file, got %q", firstLine)
+	}
+}
+
+// An editor reads the modeline out of a single document's leading comments, so
+// writing it once would leave every document after the first unvalidated.
+func TestInfraImportRepeatsTheSchemaModelineForEveryDocument(t *testing.T) {
+	runner := importFake(map[string]string{
+		"group/a": projJSON,
+		"group/b": projJSON,
+	})
+	exit, stdout, _ := runWithRunner(runner, "infra", "import", "group/a", "group/b")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0", exit)
+	}
+	if count := strings.Count(stdout, modelineHead); count != 2 {
+		t.Errorf("the modeline appears %d times, want one per document\n%s", count, stdout)
+	}
+	if !strings.HasPrefix(stdout, modelineHead) {
+		t.Errorf("the first document is not headed by the modeline\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "---\n"+modelineHead) {
+		t.Errorf("the second document is not headed by the modeline\n%s", stdout)
+	}
+}
+
+// The tree is built here rather than through the dispatcher, which resolves the
+// ref from the build stamps and so hands a stamped build a different one.
+func TestInfraImportPointsAtTheSchemaOfTheGivenRef(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inout := &cli.ProcInout{
+		Stdin:  strings.NewReader(""),
+		Stdout: stdout,
+		Stderr: io.Discard,
+	}
+	runner := importFake(map[string]string{targetGroupProj: projJSON})
+
+	const ref = "refs/tags/v1.2.3"
+	if err := infra.New(inout, runner, ref).Import.Execute(
+		[]string{targetGroupProj},
+	); err != nil {
+		t.Fatalf("import error = %v", err)
+	}
+
+	want := manifest.SchemaModeline(ref)
+	if !strings.HasPrefix(stdout.String(), want) {
+		t.Errorf("stdout does not open with %q\n%s", want, stdout.String())
 	}
 }

@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/Repository",
+  "$defs": {
+    "AccessLevel": {
+      "type": "string",
+      "enum": [
+        "disabled",
+        "private",
+        "enabled"
+      ]
+    },
+    "MergeMethod": {
+      "type": "string",
+      "enum": [
+        "merge",
+        "rebase_merge",
+        "ff"
+      ]
+    },
+    "PipelineSchedule": {
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "cron": {
+          "type": "string"
+        },
+        "cron_timezone": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "description",
+        "ref",
+        "cron"
+      ]
+    },
+    "PublicAccessLevel": {
+      "type": "string",
+      "enum": [
+        "disabled",
+        "private",
+        "enabled",
+        "public"
+      ]
+    },
+    "Repository": {
+      "properties": {
+        "apiVersion": {
+          "type": "string",
+          "const": "nyctereutes/v1"
+        },
+        "kind": {
+          "type": "string",
+          "const": "Repository"
+        },
+        "metadata": {
+          "$ref": "#/$defs/RepositoryMetadata"
+        },
+        "spec": {
+          "$ref": "#/$defs/RepositorySpec"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata"
+      ]
+    },
+    "RepositoryFeatures": {
+      "properties": {
+        "issues": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "repository": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "merge_requests": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "forking": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "ci": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "container_registry": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "analytics": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "requirements": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "security_and_compliance": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "wiki": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "snippets": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "package_registry": {
+          "$ref": "#/$defs/PublicAccessLevel"
+        },
+        "model_experiments": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "model_registry": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "pages": {
+          "$ref": "#/$defs/PublicAccessLevel"
+        },
+        "monitor": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "environments": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "feature_flags": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "infrastructure": {
+          "$ref": "#/$defs/AccessLevel"
+        },
+        "releases": {
+          "$ref": "#/$defs/AccessLevel"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "RepositoryMetadata": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "owner"
+      ]
+    },
+    "RepositorySpec": {
+      "if": {
+        "properties": {
+          "ci_catalog": {
+            "const": true
+          }
+        },
+        "required": [
+          "ci_catalog"
+        ]
+      },
+      "then": {
+        "required": [
+          "description"
+        ]
+      },
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Visibility"
+        },
+        "request_access_enabled": {
+          "type": "boolean"
+        },
+        "enforce_auth_checks_on_uploads": {
+          "type": "boolean"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "ci_catalog": {
+          "type": "boolean"
+        },
+        "topics": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "default_branch": {
+          "type": "string"
+        },
+        "merge_method": {
+          "$ref": "#/$defs/MergeMethod"
+        },
+        "only_allow_merge_if_pipeline_succeeds": {
+          "type": "boolean"
+        },
+        "allow_merge_on_skipped_pipeline": {
+          "type": "boolean"
+        },
+        "only_allow_merge_if_all_discussions_are_resolved": {
+          "type": "boolean"
+        },
+        "merge_commit_template": {
+          "type": "string"
+        },
+        "squash_commit_template": {
+          "type": "string"
+        },
+        "merge_requests_template": {
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/$defs/RepositoryFeatures"
+        },
+        "pipeline_schedules": {
+          "items": {
+            "$ref": "#/$defs/PipelineSchedule"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Visibility": {
+      "type": "string",
+      "enum": [
+        "private",
+        "internal",
+        "public"
+      ]
+    }
+  }
+}

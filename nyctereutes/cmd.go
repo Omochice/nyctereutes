@@ -15,9 +15,37 @@ import (
 	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
+// Marks a build whose link-time stamp is absent.
+const develVersion = "(devel)"
+
 // Build version, stamped in at link time via -ldflags "-X"; the sentinel marks
 // an un-stamped build.
-var version = "(devel)"
+var version = develVersion
+
+// Git ref publishing the sources this build was made from, stamped in at link
+// time via -ldflags "-X"; empty unless the build knew where its sources came
+// from, which only a build system reading the source tree can say.
+//
+//nolint:gochecknoglobals // the linker can only write package-level variables
+var sourceRef = ""
+
+// The git ref holding the sources this build was made from, which is where a
+// command pointing a reader at a committed file has to point. The stamped ref
+// wins because the version is read from the release manifest and so names the
+// last release rather than the tree being built, which between releases would
+// send the reader to the previous tag's files. Falling back to the version
+// still reaches a release, whose tag carries the "v" the bare version omits.
+// A build carrying neither stamp names refs/heads/main, having no revision of
+// its own to offer.
+func schemaRef() string {
+	if sourceRef != "" {
+		return sourceRef
+	}
+	if version == develVersion {
+		return "refs/heads/main"
+	}
+	return "refs/tags/v" + version
+}
 
 // Backs the "version" subcommand.
 type versionCommand struct {
@@ -86,7 +114,7 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
 		Dep:        dep.New(inout, runner),
-		Infra:      infra.New(inout, runner),
+		Infra:      infra.New(inout, runner, schemaRef()),
 		Doc:        doc.New(inout),
 		Help:       &helpCommand{inout: inout, runner: runner},
 		VersionCmd: &versionCommand{inout: inout},
