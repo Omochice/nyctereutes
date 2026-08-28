@@ -52,9 +52,6 @@ var errUnexpectedValueType = errors.New("change value has unexpected type")
 // only updates, so a create is reported rather than performed.
 var errCreateUnsupported = errors.New("creating a project is not supported yet")
 
-// Refused rather than left to the scalar PUT, which would send the change to the project endpoint.
-var errProtectedBranchWriteUnsupported = errors.New("applying a protected branch is not supported yet")
-
 // Translates one change into its glab call. A create is reported unsupported;
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
@@ -65,9 +62,8 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 	if write := a.childResourceWriter(change.Field); write != nil {
 		return write(ctx, change)
 	}
-
-	if err := unsupported(change); err != nil {
-		return err
+	if change.Type == ChangeCreate {
+		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
 	}
 	switch change.Field {
 	case fieldArchived:
@@ -93,22 +89,14 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 	}
 }
 
-func unsupported(change Change) error {
-	if change.Field == fieldProtectedBranches {
-		return fmt.Errorf("%w: %s on %s", errProtectedBranchWriteUnsupported, change.ProtectedBranch.Name, change.Name)
-	}
-	if change.Type == ChangeCreate {
-		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
-	}
-	return nil
-}
-
 // Names the write a child-resource field goes through, or nil when the field is
 // a setting of the project itself.
 func (a *Applier) childResourceWriter(field string) func(context.Context, Change) error {
 	switch field {
 	case fieldPipelineSchedules:
 		return a.applySchedule
+	case fieldProtectedBranches:
+		return a.applyProtectedBranch
 	default:
 		return nil
 	}
