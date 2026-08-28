@@ -33,20 +33,34 @@ type LiveBranchAccess struct {
 	Inherited    *bool `json:"inherited"`
 }
 
-// Reads every protected branch a project owns.
-// The endpoint pages, confirmed against GitLab CE 19.2.1.
-func (c *Client) FetchProtectedBranches(ctx context.Context, owner, name string) ([]LiveProtectedBranch, error) {
+// Reads every protected branch a project owns, already described the way a
+// manifest would. The endpoint pages the way the schedules one does, confirmed
+// against GitLab CE 19.2.1, so glab is asked to follow the pages rather than the
+// project being described by its first page.
+//
+// Unlike [Client.FetchSchedules], which answers with the reported form because a
+// write needs the id GitLab assigns, nothing downstream has any use for the
+// reported form: a protection is addressed by its name, which the manifest holds
+// already. Describing here rather than at each caller is what keeps the failure
+// modes of a read in the one place a read is made.
+func (c *Client) FetchProtectedBranches(
+	ctx context.Context, owner, name string,
+) ([]manifest.ProtectedBranch, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
 		"projects/"+glab.EncodePath(owner+"/"+name)+"/protected_branches")
 	if err != nil {
 		return nil, fmt.Errorf("fetch protected branches %s/%s: %w", owner, name, err)
 	}
-	branches, err := decodePages[LiveProtectedBranch](out, errNoProtectedBranchPage)
+	live, err := decodePages[LiveProtectedBranch](out, errNoProtectedBranchPage)
 	if err != nil {
 		return nil, fmt.Errorf("parse protected branches %s/%s: %w", owner, name, err)
 	}
-	if err := rejectIndescribableBranches(branches); err != nil {
+	if err := rejectIndescribableBranches(live); err != nil {
 		return nil, fmt.Errorf("read protected branches %s/%s: %w", owner, name, err)
+	}
+	branches, err := toManifestProtectedBranches(live)
+	if err != nil {
+		return nil, fmt.Errorf("describe protected branches %s/%s: %w", owner, name, err)
 	}
 	return branches, nil
 }

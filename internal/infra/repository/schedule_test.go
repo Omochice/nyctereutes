@@ -113,7 +113,7 @@ func TestToManifestSortsSchedulesByDescription(t *testing.T) {
 		},
 	}
 
-	got := mustManifest(t, state).Spec.PipelineSchedules
+	got := ToManifest(state).Spec.PipelineSchedules
 	descriptions := make([]string, 0, len(got))
 	for _, schedule := range got {
 		descriptions = append(descriptions, schedule.Description)

@@ -129,12 +129,7 @@ func (c *importCommand) document(
 	} else {
 		state.ProtectedBranches = branches
 	}
-	doc, err := repository.ToManifest(state)
-	if err != nil {
-		c.reportf("%v\n", err)
-		return nil, unread
-	}
-	data, err = manifest.Marshal(doc)
+	data, err = manifest.Marshal(repository.ToManifest(state))
 	if err != nil {
 		c.reportf("marshal %s: %v\n", target, err)
 		return nil, unread

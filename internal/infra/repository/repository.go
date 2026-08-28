@@ -28,8 +28,10 @@ type CurrentState struct {
 	// The schedules the project owns, read from their own endpoint because the
 	// projects response does not carry them.
 	PipelineSchedules []LiveSchedule
-	// The branch protections the project owns, read from their own endpoint for the same reason.
-	ProtectedBranches []LiveProtectedBranch
+	// The branch protections the project owns, read from their own endpoint for
+	// the same reason. Held already described, because [Client.FetchProtectedBranches]
+	// answers in that form.
+	ProtectedBranches []manifest.ProtectedBranch
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -201,13 +203,12 @@ func parseProject(out []byte) (*CurrentState, error) {
 }
 
 // Converts current state into a Repository manifest document.
-// A child resource that was never read leaves its key out of the document.
-// A role GitLab reports that no manifest names is an error rather than written as a role it is not.
-func ToManifest(state *CurrentState) (*manifest.Repository, error) {
-	branches, err := toManifestProtectedBranches(state.ProtectedBranches)
-	if err != nil {
-		return nil, fmt.Errorf("describe protected branches %s/%s: %w", state.Owner, state.Name, err)
-	}
+// The document carries the GitLab basic settings and the child resources the state holds.
+//
+// A child resource that was never read leaves its key out of the document,
+// which the field on [manifest.RepositorySpec] defines as saying nothing about
+// it.
+func ToManifest(state *CurrentState) *manifest.Repository {
 	return &manifest.Repository{
 		APIVersion: manifest.APIVersion,
 		Kind:       manifest.KindRepository,
@@ -234,9 +235,9 @@ func ToManifest(state *CurrentState) (*manifest.Repository, error) {
 			MergeRequestsTemplate:                     (*string)(state.MergeRequestsTemplate),
 			Features:                                  toFeatures(state),
 			PipelineSchedules:                         toManifestSchedules(state.PipelineSchedules),
-			ProtectedBranches:                         branches,
+			ProtectedBranches:                         state.ProtectedBranches,
 		},
-	}, nil
+	}
 }
 
 // Builds the features block, or nil when no access level was reported so the
