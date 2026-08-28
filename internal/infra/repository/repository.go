@@ -28,6 +28,9 @@ type CurrentState struct {
 	// The schedules the project owns, read from their own endpoint because the
 	// projects response does not carry them.
 	PipelineSchedules []LiveSchedule
+	// The branch protections the project owns, read from their own endpoint for
+	// the same reason.
+	ProtectedBranches []LiveProtectedBranch
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -199,12 +202,20 @@ func parseProject(out []byte) (*CurrentState, error) {
 }
 
 // Converts current state into a Repository manifest document: the GitLab basic
-// settings and the pipeline schedules the state carries.
+// settings and the child resources the state carries.
 //
-// A state whose schedules were never read leaves the key out of the document,
+// A child resource that was never read leaves its key out of the document,
 // which the field on [manifest.RepositorySpec] defines as saying nothing about
-// them.
-func ToManifest(state *CurrentState) *manifest.Repository {
+// it.
+//
+// Only the branches can fail the conversion: a role GitLab reports that no
+// manifest names has to be reported rather than written into a document as one
+// of the roles it is not.
+func ToManifest(state *CurrentState) (*manifest.Repository, error) {
+	branches, err := toManifestProtectedBranches(state.ProtectedBranches)
+	if err != nil {
+		return nil, fmt.Errorf("describe protected branches %s/%s: %w", state.Owner, state.Name, err)
+	}
 	return &manifest.Repository{
 		APIVersion: manifest.APIVersion,
 		Kind:       manifest.KindRepository,
@@ -231,8 +242,9 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			MergeRequestsTemplate:                     (*string)(state.MergeRequestsTemplate),
 			Features:                                  toFeatures(state),
 			PipelineSchedules:                         toManifestSchedules(state.PipelineSchedules),
+			ProtectedBranches:                         branches,
 		},
-	}
+	}, nil
 }
 
 // Builds the features block, or nil when no access level was reported so the

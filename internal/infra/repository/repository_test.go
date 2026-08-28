@@ -185,6 +185,18 @@ func TestFetchRepositoryUnclassifiedErrorSurfaces(t *testing.T) {
 	}
 }
 
+// Describes state, failing the test rather than the assertion when the
+// conversion refuses: only a role no manifest names can make it fail, and a
+// test that did not set one up has nothing to say about that.
+func mustManifest(t *testing.T, state *CurrentState) *manifest.Repository {
+	t.Helper()
+	doc, err := ToManifest(state)
+	if err != nil {
+		t.Fatalf("describe state: %v", err)
+	}
+	return doc
+}
+
 func TestToManifest(t *testing.T) {
 	state := &CurrentState{
 		Owner: ownerGroup,
@@ -199,7 +211,7 @@ func TestToManifest(t *testing.T) {
 		},
 	}
 
-	doc := ToManifest(state)
+	doc := mustManifest(t, state)
 
 	if doc.APIVersion != manifest.APIVersion {
 		t.Errorf("apiVersion = %q, want %q", doc.APIVersion, manifest.APIVersion)
@@ -238,7 +250,7 @@ func TestToManifestExportsAutomaticRebaseOnlyWhereItTakesEffect(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(string(testCase.method), func(t *testing.T) {
-			doc := ToManifest(&CurrentState{
+			doc := mustManifest(t, &CurrentState{
 				rawProject: rawProject{MergeMethod: testCase.method, AutomaticRebaseEnabled: &enabled},
 			})
 			if got := doc.Spec.AutomaticRebaseEnabled != nil; got != testCase.exported {
@@ -252,7 +264,7 @@ func TestToManifestExportsAutomaticRebaseOnlyWhereItTakesEffect(t *testing.T) {
 // for both states rather than omitting it the way an absent REST boolean is.
 func TestToManifestEmitsCatalogResource(t *testing.T) {
 	for _, want := range []bool{true, false} {
-		doc := ToManifest(&CurrentState{
+		doc := mustManifest(t, &CurrentState{
 			Owner:           ownerGroup,
 			Name:            nameProj,
 			CatalogResource: want,
@@ -265,7 +277,7 @@ func TestToManifestEmitsCatalogResource(t *testing.T) {
 }
 
 func TestToManifestOmitsFeaturesWhenAllEmpty(t *testing.T) {
-	doc := ToManifest(&CurrentState{
+	doc := mustManifest(t, &CurrentState{
 		Owner:      ownerGroup,
 		Name:       nameProj,
 		rawProject: rawProject{Visibility: visibilityPrivate},
@@ -317,7 +329,7 @@ func exportYAML(t *testing.T, projectJSON string) string {
 		t.Fatalf("FetchRepository: %v", err)
 	}
 
-	out, err := manifest.Marshal(ToManifest(state))
+	out, err := manifest.Marshal(mustManifest(t, state))
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
@@ -357,7 +369,7 @@ func TestFetchRepositoryMapsEachFeatureAccessLevel(t *testing.T) {
 // this value must survive untouched rather than being restricted to the
 // three-value set the others use.
 func TestToManifestPreservesPublicAccessLevel(t *testing.T) {
-	doc := ToManifest(&CurrentState{
+	doc := mustManifest(t, &CurrentState{
 		Owner: ownerGroup,
 		Name:  nameProj,
 		rawProject: rawProject{
