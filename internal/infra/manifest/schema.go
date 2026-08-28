@@ -12,9 +12,9 @@ import (
 // hand-written schema is what keeps the rules an editor applies and the rules
 // the parser applies from drifting apart.
 func Schema() ([]byte, error) {
-	// This reflector looks the JSONSchema and JSONSchemaExtend hooks up on the
-	// value type, which is why every such method in this package takes a value
-	// receiver while the decoding methods beside them take a pointer.
+	// The reflector finds the JSONSchema and JSONSchemaExtend hooks on the value
+	// type only, which is why they take value receivers beside pointer-receiver
+	// decoding methods.
 	reflector := jsonschema.Reflector{
 		// The types carry no json tags at all, so the default would name every
 		// document key after its Go identifier.
@@ -33,19 +33,13 @@ func Schema() ([]byte, error) {
 	return append(schema, '\n'), nil
 }
 
-// Where the derived schema is published, with the git ref a document names left
-// to the caller.
 const schemaURLFormat = "https://raw.githubusercontent.com/Omochice/nyctereutes/%s/schema/repository.schema.json"
 
 // The yaml-language-server modeline naming the schema committed at the given
-// git ref, as a whole comment line terminated by a newline so a caller can
-// write it straight ahead of a document. Pinning the ref rather than a moving
-// branch keeps the rules an editor applies to an emitted document those of the
-// revision that emitted it.
-//
-// An editor only reads the modeline out of a single document's leading comment
-// block, so a caller emitting a "---"-separated stream repeats the line for
-// every document instead of writing it once.
+// git ref, terminated by a newline so a caller can write it straight ahead of a
+// document. An editor reads the modeline out of a single document's leading
+// comment block, so a caller emitting a "---"-separated stream repeats the line
+// for every document instead of writing it once.
 func SchemaModeline(ref string) string {
 	return fmt.Sprintf("# yaml-language-server: $schema="+schemaURLFormat+"\n", ref)
 }
