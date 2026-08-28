@@ -23,15 +23,6 @@ type PipelineSchedule struct {
 // What GitLab stores when a schedule is created without a timezone.
 const defaultCronTimezone = "UTC"
 
-// The manifest attribute names the required-field check reports and the
-// generated schema demands. They repeat the struct tags because a tag cannot
-// name a constant.
-const (
-	fieldDescription = "description"
-	fieldRef         = "ref"
-	fieldCron        = "cron"
-)
-
 // Decodes a schedule, filling the attributes GitLab defaults on create. The
 // defaults are seeded before decoding so a declared value overwrites them,
 // which is what keeps a schedule paused in the manifest from coming back on.

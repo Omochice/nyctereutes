@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 	"github.com/Omochice/nyctereutes/nyctereutes/infra"
 )
 
@@ -301,7 +302,7 @@ func TestInfraImportPointsAtTheSchemaOfTheGivenRef(t *testing.T) {
 		t.Fatalf("import error = %v", err)
 	}
 
-	want := modelineHead + ref + modelineTail
+	want := manifest.SchemaModeline(ref)
 	if !strings.HasPrefix(stdout.String(), want) {
 		t.Errorf("stdout does not open with %q\n%s", want, stdout.String())
 	}

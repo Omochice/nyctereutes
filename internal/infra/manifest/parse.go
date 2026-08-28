@@ -196,8 +196,8 @@ func (repo *Repository) validate() error {
 // kind parseDocument accepts, so an editor reports a foreign document the way
 // the parser does.
 func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
-	schema.Properties.Value("apiVersion").Const = APIVersion
-	schema.Properties.Value("kind").Const = KindRepository
+	schema.Properties.Value(fieldAPIVersion).Const = APIVersion
+	schema.Properties.Value(fieldKind).Const = KindRepository
 }
 
 // Restates the catalog prerequisite above as the conditional the generated
@@ -207,9 +207,9 @@ func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
 func (RepositorySpec) JSONSchemaExtend(schema *jsonschema.Schema) {
 	catalogRequested := &jsonschema.Schema{
 		Properties: jsonschema.NewProperties(),
-		Required:   []string{"ci_catalog"},
+		Required:   []string{fieldCICatalog},
 	}
-	catalogRequested.Properties.Set("ci_catalog", &jsonschema.Schema{Const: true})
+	catalogRequested.Properties.Set(fieldCICatalog, &jsonschema.Schema{Const: true})
 	schema.If = catalogRequested
 	schema.Then = &jsonschema.Schema{Required: []string{fieldDescription}}
 }

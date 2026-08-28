@@ -23,7 +23,9 @@ var errLossyEncoding = errors.New("decoded document differs from the source")
 var errInvalidValue = errors.New("invalid value")
 
 // Encodes a manifest document to YAML. Every emitter goes through this
-// function so the document encoding style has a single owner. Multiline
+// function so the document encoding style has a single owner; what precedes a
+// document, the schema modeline and the stream separator, belongs to whoever
+// assembles the stream. Multiline
 // values become literal blocks, which requires the LF-normalized values the
 // import produces: a literal block cannot carry a bare CR.
 //
@@ -99,6 +101,19 @@ const (
 
 	// KindRepository tags a document describing a single GitLab project.
 	KindRepository = "Repository"
+)
+
+// The manifest keys that have to be spelled out rather than reached through a
+// struct field: the required-field checks report them and the schema hooks name
+// them, and a struct tag cannot name a constant. A key spelled alike on two
+// types is one entry, because these name the key rather than the field.
+const (
+	fieldAPIVersion  = "apiVersion"
+	fieldCICatalog   = "ci_catalog"
+	fieldCron        = "cron"
+	fieldDescription = "description"
+	fieldKind        = "kind"
+	fieldRef         = "ref"
 )
 
 // A single GitLab project's desired state as a manifest document. Only the

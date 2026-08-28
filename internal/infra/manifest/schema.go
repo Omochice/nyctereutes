@@ -33,12 +33,9 @@ func Schema() ([]byte, error) {
 	return append(schema, '\n'), nil
 }
 
-// Where the derived schema is published, split around the git ref so a document
-// can name the revision it was written by.
-const (
-	schemaURLPrefix = "https://raw.githubusercontent.com/Omochice/nyctereutes/"
-	schemaURLPath   = "/schema/repository.schema.json"
-)
+// Where the derived schema is published, with the git ref a document names left
+// to the caller.
+const schemaURLFormat = "https://raw.githubusercontent.com/Omochice/nyctereutes/%s/schema/repository.schema.json"
 
 // The yaml-language-server modeline naming the schema committed at the given
 // git ref, as a whole comment line terminated by a newline so a caller can
@@ -50,5 +47,5 @@ const (
 // block, so a caller emitting a "---"-separated stream repeats the line for
 // every document instead of writing it once.
 func SchemaModeline(ref string) string {
-	return "# yaml-language-server: $schema=" + schemaURLPrefix + ref + schemaURLPath + "\n"
+	return fmt.Sprintf("# yaml-language-server: $schema="+schemaURLFormat+"\n", ref)
 }
