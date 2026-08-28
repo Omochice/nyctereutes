@@ -58,10 +58,8 @@
               "wsl_v5" # successor of wsl, same opinionated whitespace rules
               # keep-sorted end
             ];
-            # The schema generator looks these methods up on the value type
-            # only, so they cannot take the pointer receiver their type's
-            # decoding methods need. recvcheck ships the same exclusion for
-            # MarshalJSON and MarshalYAML, which are forced the same way.
+            # Found only on the value type, while the decoding methods on the
+            # same types need pointers.
             settings.recvcheck.exclusions = [
               # keep-sorted start
               "*.JSONSchema"
