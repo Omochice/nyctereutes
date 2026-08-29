@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -15,9 +16,25 @@ func declaringBranches(branches []manifest.ProtectedBranch) *manifest.Repository
 	}
 }
 
-// A nil slice is a project whose protections were not read.
+// Live state holding the given protections, read from an instance that reports
+// no unprotect access level, which is what a Community Edition build answers. A
+// nil slice is a project whose protections were not read at all.
 func holdingBranches(branches []manifest.ProtectedBranch) *CurrentState {
-	return &CurrentState{Owner: ownerGroup, Name: nameProj, ProtectedBranches: branches}
+	if branches == nil {
+		return &CurrentState{Owner: ownerGroup, Name: nameProj}
+	}
+	return &CurrentState{
+		Owner: ownerGroup, Name: nameProj,
+		ProtectedBranches: &ProtectedBranches{Branches: branches},
+	}
+}
+
+// The same, read from an instance that does report them.
+func holdingBranchesOnEnterprise(branches []manifest.ProtectedBranch) *CurrentState {
+	return &CurrentState{
+		Owner: ownerGroup, Name: nameProj,
+		ProtectedBranches: &ProtectedBranches{Branches: branches, ReportsUnprotectLevels: true},
+	}
 }
 
 func branch(name string, push manifest.BranchAccessLevel) manifest.ProtectedBranch {
@@ -164,7 +181,7 @@ func TestDiffLeavesALiveUnprotectLevelAloneWhenTheDocumentIsSilent(t *testing.T)
 
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
-		holdingBranches([]manifest.ProtectedBranch{live}),
+		holdingBranchesOnEnterprise([]manifest.ProtectedBranch{live}),
 	)
 
 	if len(changes) != 0 {
@@ -182,7 +199,7 @@ func TestDiffUpdatesADeclaredUnprotectLevel(t *testing.T) {
 
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{want}),
-		holdingBranches([]manifest.ProtectedBranch{live}),
+		holdingBranchesOnEnterprise([]manifest.ProtectedBranch{live}),
 	)
 
 	change := onlyBranchChange(t, changes)
@@ -203,5 +220,57 @@ func TestDiffOmitsAnUnstatedUnprotectLevelFromACreation(t *testing.T) {
 	change := onlyBranchChange(t, changes)
 	if strings.Contains(change.String(), "unprotect_access_level") {
 		t.Errorf("line = %q, want it to leave the unstated level out", change.String())
+	}
+}
+
+// A CE build never reports an unprotect level, so a manifest declaring one
+// against such an instance must not be planned as drift: the apply would
+// recreate the branch, the next read would report nothing again, and the plan
+// would say the same thing forever while reopening the branch each time.
+func TestDiffPlansNothingForAnUnprotectLevelTheInstanceCannotReport(t *testing.T) {
+	want := branch("main", roleMaintainer)
+	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))
+
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{want}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+	)
+
+	if len(changes) != 0 {
+		t.Errorf("changes = %+v, want none against an instance that cannot confirm the level", changes)
+	}
+}
+
+// An Enterprise build reports an empty unprotect list for a protection created
+// with its project, so a declared level there is drift the apply can settle: the
+// recreate sends it and the next read reports it back.
+func TestDiffUpdatesAnUnprotectLevelTheInstanceReportsAsUnset(t *testing.T) {
+	want := branch("main", roleMaintainer)
+	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
+
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{want}),
+		holdingBranchesOnEnterprise([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+	)
+
+	change := onlyBranchChange(t, changes)
+	if !strings.Contains(change.String(), "unprotect_access_level: (none) → admin") {
+		t.Errorf("line = %q, want it to read as a change from nothing", change.String())
+	}
+}
+
+// A declaration the instance cannot confirm is named, so a plan can say the key
+// is being left alone rather than show nothing for a key the operator wrote.
+func TestUnconfirmableUnprotectLevelsNamesTheBranchesItIgnores(t *testing.T) {
+	want := branch("main", roleMaintainer)
+	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))
+	declared := declaringBranches([]manifest.ProtectedBranch{want, branch("develop", roleMaintainer)})
+	live := []manifest.ProtectedBranch{branch("main", roleMaintainer), branch("develop", roleMaintainer)}
+
+	if got := UnconfirmableUnprotectLevels(declared, holdingBranches(live)); !slices.Equal(got, []string{"main"}) {
+		t.Errorf("ignored = %v, want the branch declaring a level the instance cannot report", got)
+	}
+	if got := UnconfirmableUnprotectLevels(declared, holdingBranchesOnEnterprise(live)); got != nil {
+		t.Errorf("ignored = %v, want none where the instance reports the field", got)
 	}
 }

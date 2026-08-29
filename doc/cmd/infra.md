@@ -55,6 +55,8 @@ Who may lift a protection is a key only where GitLab reports one. A Community Ed
 
 Because the key exists on one kind of instance and not the other, silence about it means "leave it as it is" rather than "clear it". A document exported from a Community Edition instance therefore plans no drift when it is pointed at an Enterprise one, and an update carries the live value through the recreate rather than letting GitLab's create default replace it.
 
+A declaration pointed the other way, at an instance that reports nothing, is left alone rather than applied. Such a value could never be confirmed: applying it would recreate the branch, the next read would report nothing again, and every run would repeat the same change while reopening the branch for the length of it. Whether an instance answers with the field is not knowable from the document, so `infra validate` cannot catch this; `infra plan` says on stderr which branches carry a level it is ignoring.
+
 `code_owner_approval_required` is not a key at all. An Enterprise build reports the field and then refuses to set it without a licence, so it can be neither declared nor reconciled.
 
 A protection GitLab grants to anything the manifest cannot name is refused rather than read as the role beside it. That covers a grant to a user, a group, a custom role or a deploy key, on any of the three access lists, and a protection inherited from a group. A deploy key with push access is the one such shape a project on the free tier can reach, and a document written from a flattened read would revoke that grant the moment it was applied. The refusal costs the project its protections rather than the project: its other settings are still planned and applied.

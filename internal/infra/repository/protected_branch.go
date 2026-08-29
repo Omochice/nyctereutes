@@ -46,7 +46,7 @@ type LiveBranchAccess struct {
 // Described here rather than at each caller, so a read fails in the one place a read is made.
 func (c *Client) FetchProtectedBranches(
 	ctx context.Context, owner, name string,
-) ([]manifest.ProtectedBranch, error) {
+) (*ProtectedBranches, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
 		"projects/"+glab.EncodePath(owner+"/"+name)+"/protected_branches")
 	if err != nil {
@@ -63,7 +63,25 @@ func (c *Client) FetchProtectedBranches(
 	if err != nil {
 		return nil, fmt.Errorf("describe protected branches %s/%s: %w", owner, name, err)
 	}
-	return branches, nil
+	enterprise, err := c.isEnterprise(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read protected branches %s/%s: %w", owner, name, err)
+	}
+	return &ProtectedBranches{Branches: branches, ReportsUnprotectLevels: enterprise}, nil
+}
+
+// The protections a project holds, together with what the instance was able to
+// say about them. The capability below is a property of the build rather than
+// of any one branch, so it is held once here instead of being repeated on every
+// described protection.
+type ProtectedBranches struct {
+	Branches []manifest.ProtectedBranch
+	// Whether the instance reports unprotect access levels at all. A Community
+	// Edition build omits the field from every response, so a declared level
+	// could never be confirmed against one; an Enterprise build reports it even
+	// for a protection that holds no such grant. Read from the edition rather
+	// than from the protections above, which a project may not hold yet.
+	ReportsUnprotectLevels bool
 }
 
 var errNoProtectedBranchPage = errors.New("response carries no protected branch list")

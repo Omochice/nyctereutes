@@ -164,8 +164,9 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 		changes = append(changes, diffSchedules(name, spec.PipelineSchedules, current.PipelineSchedules)...)
 	}
 	if spec.ProtectedBranches != nil && current.ProtectedBranches != nil {
-		changes = append(changes, diffProtectedBranches(name, spec.ProtectedBranches, current.ProtectedBranches)...)
+		changes = append(changes, diffProtectedBranches(name, spec.ProtectedBranches, *current.ProtectedBranches)...)
 	}
+
 	return changes
 }
 

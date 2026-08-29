@@ -24,15 +24,15 @@ type ProtectedBranchChange struct {
 
 // Deletions come first for the reason [diffSchedules] gives, and because an update recreates the branch.
 // A run that created before deleting would meet a name GitLab still holds.
-func diffProtectedBranches(name string, desired, live []manifest.ProtectedBranch) []Change {
+func diffProtectedBranches(name string, desired []manifest.ProtectedBranch, live ProtectedBranches) []Change {
 	declared := make(map[string]struct{}, len(desired))
 	for _, want := range desired {
 		declared[want.Name] = struct{}{}
 	}
 
-	changes := make([]Change, 0, len(desired)+len(live))
-	byName := make(map[string]manifest.ProtectedBranch, len(live))
-	for _, have := range live {
+	changes := make([]Change, 0, len(desired)+len(live.Branches))
+	byName := make(map[string]manifest.ProtectedBranch, len(live.Branches))
+	for _, have := range live.Branches {
 		byName[have.Name] = have
 		if _, kept := declared[have.Name]; !kept {
 			changes = append(changes, protectedBranchChange(ChangeDelete, name, ProtectedBranchChange{
@@ -43,6 +43,15 @@ func diffProtectedBranches(name string, desired, live []manifest.ProtectedBranch
 	}
 
 	for _, want := range desired {
+		// A level the instance cannot report is dropped from the declaration
+		// rather than compared, shown or sent. Against such a build it could never
+		// be confirmed: the apply would recreate the branch, the next read would
+		// report nothing again, and the plan would report the same drift forever
+		// while reopening the branch each time. [UnconfirmableUnprotectLevels] is
+		// what names the dropped declaration to the operator instead.
+		if !live.ReportsUnprotectLevels {
+			want.UnprotectAccessLevel = nil
+		}
 		have, exists := byName[want.Name]
 		switch {
 		case !exists:
@@ -71,8 +80,27 @@ func describesTheSame(have, want manifest.ProtectedBranch) bool {
 		have.AllowForcePush != want.AllowForcePush {
 		return false
 	}
-	return want.UnprotectAccessLevel == nil ||
-		(have.UnprotectAccessLevel != nil && *have.UnprotectAccessLevel == *want.UnprotectAccessLevel)
+	if want.UnprotectAccessLevel == nil {
+		return true
+	}
+	return have.UnprotectAccessLevel != nil && *have.UnprotectAccessLevel == *want.UnprotectAccessLevel
+}
+
+// Names the branches whose declared unprotect level this instance could never
+// confirm, so a plan can say that the key is being ignored rather than leave the
+// operator believing it was applied. Empty for a build that reports the field,
+// and for a document that declares no level.
+func UnconfirmableUnprotectLevels(desired *manifest.Repository, current *CurrentState) []string {
+	if current.ProtectedBranches == nil || current.ProtectedBranches.ReportsUnprotectLevels {
+		return nil
+	}
+	var names []string
+	for _, want := range desired.Spec.ProtectedBranches {
+		if want.UnprotectAccessLevel != nil {
+			names = append(names, want.Name)
+		}
+	}
+	return names
 }
 
 func protectedBranchChange(kind ChangeType, name string, branch ProtectedBranchChange) Change {
@@ -113,6 +141,15 @@ func unprotectAttribute(branch manifest.ProtectedBranch) string {
 	return string(*branch.UnprotectAccessLevel)
 }
 
+// What a plan shows for a live attribute the instance reports no value for, so
+// the line reads as a change from nothing rather than from a blank.
+func stated(value string) string {
+	if value == "" {
+		return "(none)"
+	}
+	return value
+}
+
 func (b *ProtectedBranchChange) line(kind ChangeType) string {
 	header := fmt.Sprintf("%s %q", protectedBranchPrefix, b.Name)
 	switch kind {
@@ -139,7 +176,7 @@ func (b *ProtectedBranchChange) line(kind ChangeType) string {
 				continue
 			}
 			if live[index].value != want.value {
-				lines = append(lines, fmt.Sprintf("    ~ %s: %s → %s", want.field, live[index].value, want.value))
+				lines = append(lines, fmt.Sprintf("    ~ %s: %s → %s", want.field, stated(live[index].value), want.value))
 			}
 		}
 		return strings.Join(lines, "\n")

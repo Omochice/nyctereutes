@@ -5,10 +5,10 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
@@ -34,30 +34,55 @@ func isProtectedBranchCall(args []string) bool {
 	})
 }
 
-func protectedBranchRunner(listJSON string, record *[]string) glab.RunnerFunc {
-	return func(_ context.Context, args ...string) ([]byte, error) {
-		switch {
-		case len(args) > 1 && args[1] == "graphql":
-			return []byte(graphqlCatalogJSON(false)), nil
-		case isProtectedBranchCall(args):
-			if record != nil {
-				*record = args
-			}
-			return []byte(listJSON), nil
-		default:
-			return []byte(sampleProjectJSON), nil
+// Answers the calls a fetch makes: the GraphQL catalog query, the instance
+// version, the branch list from list, and the project itself. The args of the
+// branch call go to called when one is given, which is what the test about
+// paging asserts on.
+type protectedBranchGlab struct {
+	list       string
+	enterprise bool
+	versionErr error
+	called     *[]string
+}
+
+func (g protectedBranchGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	switch {
+	case len(args) > 1 && args[1] == "graphql":
+		return []byte(graphqlCatalogJSON(false)), nil
+	case len(args) == 2 && args[1] == "version":
+		if g.versionErr != nil {
+			return nil, g.versionErr
 		}
+		return []byte(`{"version":"19.5.3","enterprise":` + strconv.FormatBool(g.enterprise) + `}`), nil
+	case isProtectedBranchCall(args):
+		if g.called != nil {
+			*g.called = args
+		}
+		return []byte(g.list), nil
+	default:
+		return []byte(sampleProjectJSON), nil
 	}
+}
+
+func protectedBranchRunner(listJSON string, record *[]string) protectedBranchGlab {
+	return protectedBranchGlab{list: listJSON, called: record}
 }
 
 func fetchBranches(t *testing.T, listJSON string) []manifest.ProtectedBranch {
 	t.Helper()
-	branches, err := NewClient(protectedBranchRunner(listJSON, nil)).
+	return fetchProtections(t, listJSON).Branches
+}
+
+// The whole read, for the assertions that are about what the instance could say
+// rather than about the protections themselves.
+func fetchProtections(t *testing.T, listJSON string) *ProtectedBranches {
+	t.Helper()
+	read, err := NewClient(protectedBranchRunner(listJSON, nil)).
 		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
 	if err != nil {
 		t.Fatalf("fetch protected branches: %v", err)
 	}
-	return branches
+	return read
 }
 
 // A project holding more protections than one page carries would otherwise be described by its first page alone.
@@ -246,5 +271,52 @@ func TestFetchProtectedBranchesRejectsAnUnprotectGrantNoManifestCanHold(t *testi
 	}
 	if !strings.Contains(err.Error(), "unprotect_access_levels") {
 		t.Errorf("error = %q, want it to name the list it read", err)
+	}
+}
+
+// Whether the instance answers with unprotect access levels is a property of
+// the edition, so it is read from the instance rather than from the
+// protections: a project holding none yet says nothing about it, and an
+// Enterprise build with such a project would otherwise be taken for a
+// Community one and have its declared level dropped.
+func TestTheReadSaysWhetherTheInstanceReportsUnprotectLevels(t *testing.T) {
+	for _, testCase := range []struct {
+		name, listJSON string
+		enterprise     bool
+	}{
+		{
+			name: "community edition omits the field",
+			listJSON: `[{"id":1,"name":"main",
+			  "push_access_levels":[{"id":1,"access_level":40}],
+			  "merge_access_levels":[{"id":1,"access_level":40}]}]`,
+			enterprise: false,
+		},
+		{
+			name:       "enterprise protecting nothing yet",
+			listJSON:   `[]`,
+			enterprise: true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			read, err := NewClient(protectedBranchGlab{list: testCase.listJSON, enterprise: testCase.enterprise}).
+				FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+			if err != nil {
+				t.Fatalf("fetch protected branches: %v", err)
+			}
+			if read.ReportsUnprotectLevels != testCase.enterprise {
+				t.Errorf("reports unprotect levels = %t, want %t", read.ReportsUnprotectLevels, testCase.enterprise)
+			}
+		})
+	}
+}
+
+// The edition decides what a declared unprotect level means, so a read that
+// cannot learn it fails rather than guessing Community.
+func TestFetchProtectedBranchesFailsWhenTheVersionCannotBeRead(t *testing.T) {
+	versionErr := errors.New("version unavailable")
+	_, err := NewClient(protectedBranchGlab{list: protectedBranchListJSON, versionErr: versionErr}).
+		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+	if !errors.Is(err, versionErr) {
+		t.Errorf("err = %v, want the version failure", err)
 	}
 }

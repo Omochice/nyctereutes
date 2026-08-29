@@ -521,3 +521,28 @@ func TestInfraPlanReportsAnUnreadableBranchListAndPlansTheRest(t *testing.T) {
 		t.Errorf("the settings that could be read must still be planned\n%s", stdout)
 	}
 }
+
+// Whether an instance answers with an unprotect access level is not knowable
+// from the document, so validate cannot catch a declaration it will ignore.
+// The plan says so, because it would otherwise show nothing at all for a key
+// the operator wrote and the branch would never converge.
+func TestInfraPlanSaysADeclaredUnprotectLevelIsBeingIgnored(t *testing.T) {
+	const manifestWithUnprotect = planBranchManifest + "    unprotect_access_level: admin\n"
+	path := writeManifest(t, t.TempDir(), "a.yaml", manifestWithUnprotect)
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		branches: map[string]string{targetGroupProj: defaultBranchProtectionJSON},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0\n%s", exit, stderr)
+	}
+	if !strings.Contains(stderr, "unprotect access level") || !strings.Contains(stderr, "main") {
+		t.Errorf("stderr should name the ignored declaration\n%s", stderr)
+	}
+	if strings.Contains(stdout, "unprotect_access_level") {
+		t.Errorf("an unconfirmable level must not be planned as drift\n%s", stdout)
+	}
+}

@@ -64,6 +64,8 @@ An update is one `ChangeUpdate` on the plan, naming the attributes that differ. 
 
 `unprotect_access_level` is a key only where GitLab reports one, so a document written against CE is silent about it. Silence means "leave it as it is", and `carryUnstatedUnprotect` puts the live value onto the `POST` so the recreate restores what it removed. Without that the recreate would be exactly the silent change this ADR set out to avoid, and the plan would show nothing.
 
+A declaration the instance cannot report is dropped from the comparison instead, and named on stderr by `UnconfirmableUnprotectLevels`. Keeping it would not preserve anything: the recreate would send a value the build never echoes, the next read would report nothing again, and the plan would repeat the change on every run while reopening the branch each time. A key that is silently ignored is bad; a key that reopens a protected branch forever is worse, and the plan says which it is doing.
+
 The one state that cannot survive is the empty list EE reports for a protection created with its project. Nothing distinguishes it from an unstated level, and the `POST` has no way to ask for no unprotect grant at all, so recreating such a protection gives it GitLab's default. Both grant maintainers the same thing, and the change is visible in a later export.
 
 ### 5. Removals are planned before creations
