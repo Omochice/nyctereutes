@@ -50,7 +50,7 @@ func diffProtectedBranches(name string, desired, live []manifest.ProtectedBranch
 				Name:    want.Name,
 				Desired: want,
 			}))
-		case have != want:
+		case !describesTheSame(have, want):
 			changes = append(changes, protectedBranchChange(ChangeUpdate, name, ProtectedBranchChange{
 				Name:    want.Name,
 				Desired: want,
@@ -61,16 +61,31 @@ func diffProtectedBranches(name string, desired, live []manifest.ProtectedBranch
 	return changes
 }
 
+// Reports whether the live protection already is what the declaration asks for.
+// Not a struct comparison, because the unprotect level is a pointer whose nil
+// says nothing about the live value rather than demanding it be absent, and
+// because comparing pointers would compare addresses.
+func describesTheSame(have, want manifest.ProtectedBranch) bool {
+	if have.PushAccessLevel != want.PushAccessLevel ||
+		have.MergeAccessLevel != want.MergeAccessLevel ||
+		have.AllowForcePush != want.AllowForcePush {
+		return false
+	}
+	return want.UnprotectAccessLevel == nil ||
+		(have.UnprotectAccessLevel != nil && *have.UnprotectAccessLevel == *want.UnprotectAccessLevel)
+}
+
 func protectedBranchChange(kind ChangeType, name string, branch ProtectedBranchChange) Change {
 	return Change{Type: kind, Name: name, Field: fieldProtectedBranches, ProtectedBranch: &branch}
 }
 
 // Repeats the manifest keys, because a struct tag cannot name a constant.
 const (
-	fieldName             = "name"
-	fieldPushAccessLevel  = "push_access_level"
-	fieldMergeAccessLevel = "merge_access_level"
-	fieldAllowForcePush   = "allow_force_push"
+	fieldName                 = "name"
+	fieldPushAccessLevel      = "push_access_level"
+	fieldMergeAccessLevel     = "merge_access_level"
+	fieldAllowForcePush       = "allow_force_push"
+	fieldUnprotectAccessLevel = "unprotect_access_level"
 )
 
 type protectedBranchAttribute struct {
@@ -84,7 +99,18 @@ func protectedBranchAttributes(branch manifest.ProtectedBranch) []protectedBranc
 		{field: fieldPushAccessLevel, value: string(branch.PushAccessLevel)},
 		{field: fieldMergeAccessLevel, value: string(branch.MergeAccessLevel)},
 		{field: fieldAllowForcePush, value: strconv.FormatBool(branch.AllowForcePush)},
+		{field: fieldUnprotectAccessLevel, value: unprotectAttribute(branch)},
 	}
+}
+
+// What a plan line shows for an unprotect level nobody stated. The empty string
+// is what keeps such a line out of an update, because the comparison against the
+// live side is by rendered value and an unstated level renders alike on both.
+func unprotectAttribute(branch manifest.ProtectedBranch) string {
+	if branch.UnprotectAccessLevel == nil {
+		return ""
+	}
+	return string(*branch.UnprotectAccessLevel)
 }
 
 func (b *ProtectedBranchChange) line(kind ChangeType) string {
@@ -95,6 +121,11 @@ func (b *ProtectedBranchChange) line(kind ChangeType) string {
 		lines := make([]string, 0, len(declared)+1)
 		lines = append(lines, "+ "+header)
 		for _, want := range declared {
+			// An attribute nobody stated is left off rather than shown empty: the
+			// create takes whatever GitLab grants, which the plan cannot name.
+			if want.value == "" {
+				continue
+			}
 			lines = append(lines, fmt.Sprintf("    + %s: %s", want.field, want.value))
 		}
 		return strings.Join(lines, "\n")
@@ -103,6 +134,10 @@ func (b *ProtectedBranchChange) line(kind ChangeType) string {
 		lines := make([]string, 0, len(live)+1)
 		lines = append(lines, "~ "+header)
 		for index, want := range protectedBranchAttributes(b.Desired) {
+			// Silence about an attribute is not a demand that it be cleared.
+			if want.value == "" {
+				continue
+			}
 			if live[index].value != want.value {
 				lines = append(lines, fmt.Sprintf("    ~ %s: %s → %s", want.field, live[index].value, want.value))
 			}

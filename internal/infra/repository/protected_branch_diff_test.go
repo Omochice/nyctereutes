@@ -153,3 +153,55 @@ func TestDiffPairsAWildcardBranchByItsName(t *testing.T) {
 		t.Errorf("changes = %+v, want none", changes)
 	}
 }
+
+// A declaration silent about the unprotect level is not a demand that it be
+// cleared, so a live one is left alone rather than planned as drift. Without
+// this a document exported from a CE build would report perpetual drift the
+// moment it was pointed at an Enterprise one.
+func TestDiffLeavesALiveUnprotectLevelAloneWhenTheDocumentIsSilent(t *testing.T) {
+	live := branch("main", roleMaintainer)
+	live.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
+
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		holdingBranches([]manifest.ProtectedBranch{live}),
+	)
+
+	if len(changes) != 0 {
+		t.Errorf("changes = %+v, want none", changes)
+	}
+}
+
+// A declared unprotect level that differs is drift like any other attribute,
+// and the plan names it.
+func TestDiffUpdatesADeclaredUnprotectLevel(t *testing.T) {
+	want := branch("main", roleMaintainer)
+	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
+	live := branch("main", roleMaintainer)
+	live.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))
+
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{want}),
+		holdingBranches([]manifest.ProtectedBranch{live}),
+	)
+
+	change := onlyBranchChange(t, changes)
+	if !strings.Contains(change.String(), "unprotect_access_level: maintainer") {
+		t.Errorf("line = %q, want it to name the unprotect level", change.String())
+	}
+}
+
+// A creation lists only what the declaration states. An unprotect level nobody
+// wrote takes whatever GitLab grants, which the plan cannot name, so showing it
+// empty would claim knowledge the tool does not have.
+func TestDiffOmitsAnUnstatedUnprotectLevelFromACreation(t *testing.T) {
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		holdingBranches([]manifest.ProtectedBranch{}),
+	)
+
+	change := onlyBranchChange(t, changes)
+	if strings.Contains(change.String(), "unprotect_access_level") {
+		t.Errorf("line = %q, want it to leave the unstated level out", change.String())
+	}
+}

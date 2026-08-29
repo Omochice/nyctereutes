@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -79,7 +80,7 @@ func TestProtectedBranchesAreDescribedByNameAndRole(t *testing.T) {
 		{Name: "main", PushAccessLevel: "maintainer", MergeAccessLevel: "maintainer"},
 		{Name: "release/1.x", PushAccessLevel: "no_one", MergeAccessLevel: "developer", AllowForcePush: true},
 	}
-	if !slices.Equal(got, want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("branches = %+v, want %+v", got, want)
 	}
 }
@@ -179,5 +180,71 @@ func TestFetchProtectedBranchesRejectsAResponseWithNoPage(t *testing.T) {
 
 	if !errors.Is(err, errNoProtectedBranchPage) {
 		t.Errorf("err = %v, want the empty-response sentinel", err)
+	}
+}
+
+// A CE build leaves unprotect_access_levels out of the response, so there is
+// nothing to describe and the manifest key is omitted. An Enterprise build
+// reports an empty list for a protection created with the project, which states
+// no role either and describes the same way.
+func TestAnUnreportedUnprotectLevelIsNotDescribed(t *testing.T) {
+	for _, testCase := range []struct{ name, listJSON string }{
+		{
+			name: "community edition omits the field",
+			listJSON: `[{"id":1,"name":"main",
+			  "push_access_levels":[{"id":1,"access_level":40}],
+			  "merge_access_levels":[{"id":1,"access_level":40}]}]`,
+		},
+		{
+			name: "enterprise reports an empty list",
+			listJSON: `[{"id":1,"name":"main",
+			  "push_access_levels":[{"id":1,"access_level":40}],
+			  "merge_access_levels":[{"id":1,"access_level":40}],
+			  "unprotect_access_levels":[]}]`,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			branches := fetchBranches(t, testCase.listJSON)
+			if level := branches[0].UnprotectAccessLevel; level != nil {
+				t.Errorf("unprotect level = %v, want nil (nothing to describe)", *level)
+			}
+		})
+	}
+}
+
+// An Enterprise build reports the role that may lift the protection, and the
+// manifest holds it so that reconciling the branch does not change it.
+func TestAnEnterpriseUnprotectLevelIsDescribed(t *testing.T) {
+	const eeJSON = `[{"id":1,"name":"main",
+	  "push_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
+	  "merge_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
+	  "unprotect_access_levels":[{"id":1,"access_level":60,"user_id":null,"group_id":null}],
+	  "code_owner_approval_required":false,"inherited":false}]`
+
+	branches := fetchBranches(t, eeJSON)
+
+	level := branches[0].UnprotectAccessLevel
+	if level == nil || *level != "admin" {
+		t.Errorf("unprotect level = %v, want admin", level)
+	}
+}
+
+// An unprotect grant naming a user or a group is refused like a push one: the
+// manifest cannot hold it, and recreating the protection from a document that
+// dropped it would revoke it.
+func TestFetchProtectedBranchesRejectsAnUnprotectGrantNoManifestCanHold(t *testing.T) {
+	const grantedJSON = `[{"id":1,"name":"main",
+	  "push_access_levels":[{"id":1,"access_level":40}],
+	  "merge_access_levels":[{"id":1,"access_level":40}],
+	  "unprotect_access_levels":[{"id":1,"access_level":40,"group_id":3}]}]`
+
+	_, err := NewClient(protectedBranchRunner(grantedJSON, nil)).
+		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+
+	if !errors.Is(err, errIndescribableBranch) {
+		t.Fatalf("err = %v, want an indescribable branch", err)
+	}
+	if !strings.Contains(err.Error(), "unprotect_access_levels") {
+		t.Errorf("error = %q, want it to name the list it read", err)
 	}
 }

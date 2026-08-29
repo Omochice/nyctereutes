@@ -19,6 +19,14 @@
         "admin"
       ]
     },
+    "BranchUnprotectAccessLevel": {
+      "type": "string",
+      "enum": [
+        "developer",
+        "maintainer",
+        "admin"
+      ]
+    },
     "MergeMethod": {
       "type": "string",
       "enum": [
@@ -66,6 +74,9 @@
         },
         "allow_force_push": {
           "type": "boolean"
+        },
+        "unprotect_access_level": {
+          "$ref": "#/$defs/BranchUnprotectAccessLevel"
         }
       },
       "additionalProperties": false,
