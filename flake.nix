@@ -44,6 +44,7 @@
               # keep-sorted start
               "depguard" # requires an explicit import policy to be useful
               "exhaustruct" # test fixtures and go-flags structs init only some fields
+              "exhaustruct_v5" # successor of exhaustruct, flags the same partial inits
               "godoclint" # forces godoc comments to restate the symbol name
               "gomodguard" # deprecated in v2.12, superseded by gomodguard_v2
               "nlreturn" # blank-line-before-return style, overlaps wsl
