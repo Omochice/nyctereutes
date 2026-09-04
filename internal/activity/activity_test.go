@@ -104,3 +104,21 @@ func TestCountCommentOnIssueIsNotCodeReview(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{})
 }
+
+func TestPercentIsWholeNumberOverTotal(t *testing.T) {
+	counts := Counts{Commits: 5, MergeRequests: 1, Issues: 0, CodeReview: 1}
+
+	if got := counts.Total(); got != 7 {
+		t.Errorf("Total() = %d, want 7", got)
+	}
+	want := Percents{Commits: 71, MergeRequests: 14, Issues: 0, CodeReview: 14}
+	if got := counts.Percent(); got != want {
+		t.Errorf("Percent() = %+v, want %+v", got, want)
+	}
+}
+
+func TestPercentIsAllZeroWithoutEvents(t *testing.T) {
+	if got := (Counts{}).Percent(); got != (Percents{}) {
+		t.Errorf("Percent() = %+v, want all zero", got)
+	}
+}
