@@ -60,7 +60,7 @@ func WriteSVG(out io.Writer, percents Percents) error {
 	data := struct {
 		Percents
 
-		Points                                                          string
+		Points                                                         string
 		CommitsLabel, MergeRequestsLabel, IssuesLabel, CodeReviewLabel string
 	}{
 		Percents:           percents,
