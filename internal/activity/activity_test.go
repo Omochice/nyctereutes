@@ -50,3 +50,9 @@ func TestCountOpenedMergeRequestCountsOneMergeRequest(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{MergeRequests: 1})
 }
+
+func TestCountOpenedIssueCountsOneIssue(t *testing.T) {
+	events := []Event{{ActionName: "opened", TargetType: "Issue", TargetID: 1770}}
+
+	assertCounts(t, Count(events), Counts{Issues: 1})
+}
