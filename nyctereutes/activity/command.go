@@ -40,7 +40,7 @@ func New(inout *cli.ProcInout, runner glab.Runner) *Command {
 
 // Reported when --since names a later day than --until, a period that could
 // only chart nothing.
-var ErrEmptyPeriod = errors.New("--since is later than --until")
+var errEmptyPeriod = errors.New("--since is later than --until")
 
 // How far back the period reaches when --since is not given.
 const defaultPeriodMonths = 12
@@ -107,7 +107,7 @@ func (c *Command) window() (since, until time.Time, err error) {
 	}
 	if since.After(until) {
 		return since, until, fmt.Errorf("%w: %s > %s",
-			ErrEmptyPeriod, since.Format(time.DateOnly), until.Format(time.DateOnly))
+			errEmptyPeriod, since.Format(time.DateOnly), until.Format(time.DateOnly))
 	}
 	return since, until, nil
 }

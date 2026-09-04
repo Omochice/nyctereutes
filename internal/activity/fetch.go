@@ -14,7 +14,7 @@ import (
 
 // Reported when "glab api user" answers without a username, which would
 // otherwise become an empty path segment in the events request.
-var ErrNoUsername = errors.New("activity: current user has no username")
+var errNoUsername = errors.New("activity: current user has no username")
 
 // Resolves the username of the account glab is logged in as, for reporting
 // one's own activity without naming oneself.
@@ -30,7 +30,7 @@ func CurrentUser(ctx context.Context, runner glab.Runner) (string, error) {
 		return "", fmt.Errorf("failed to parse current user: %w", err)
 	}
 	if user.Username == "" {
-		return "", ErrNoUsername
+		return "", errNoUsername
 	}
 	return user.Username, nil
 }
