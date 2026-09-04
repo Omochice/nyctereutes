@@ -7,6 +7,13 @@ package activity
 // push event.
 const pushActionRemoved = "removed"
 
+// The event action names and target types the counting rules match on, as
+// GitLab spells them in the events API.
+const (
+	actionOpened       = "opened"
+	targetMergeRequest = "MergeRequest"
+)
+
 // The subset of a GitLab push_data payload the counting rules look at. The
 // JSON tags are snake_case because they mirror GitLab's API.
 type PushData struct {
@@ -41,6 +48,9 @@ func Count(events []Event) Counts {
 	for _, event := range events {
 		if event.PushData != nil {
 			counts.Commits += commitsOf(event.PushData)
+		}
+		if event.ActionName == actionOpened && event.TargetType == targetMergeRequest {
+			counts.MergeRequests++
 		}
 	}
 	return counts
