@@ -22,30 +22,53 @@ type Command struct {
 
 	inout  *cli.ProcInout
 	runner glab.Runner
+	// Supplies "today" for the default period; it is a field so tests can pin
+	// the day instead of depending on when they run.
+	now func() time.Time
 }
 
 // Builds the command wired to the given streams and glab runner, so a caller
 // can inject a fake runner instead of the real CLI.
 func New(inout *cli.ProcInout, runner glab.Runner) *Command {
-	return &Command{inout: inout, runner: runner}
+	return &Command{inout: inout, runner: runner, now: time.Now}
 }
 
 // Reported when --since names a later day than --until, a period that could
 // only chart nothing.
 var ErrEmptyPeriod = errors.New("--since is later than --until")
 
-// Parses the period flags into inclusive date-only bounds.
-func (c *Command) window() (since, until time.Time, err error) {
-	since, err = time.Parse(time.DateOnly, c.Since)
-	if err != nil {
-		return since, until, fmt.Errorf("invalid --since: %w", err)
+// How far back the period reaches when --since is not given.
+const defaultPeriodMonths = 12
+
+// Parses a period flag, or falls back to the given day when the flag was
+// not set.
+func parseDay(flag, value string, fallback time.Time) (time.Time, error) {
+	if value == "" {
+		return fallback, nil
 	}
-	until, err = time.Parse(time.DateOnly, c.Until)
+	day, err := time.Parse(time.DateOnly, value)
 	if err != nil {
-		return since, until, fmt.Errorf("invalid --until: %w", err)
+		return day, fmt.Errorf("invalid %s: %w", flag, err)
+	}
+	return day, nil
+}
+
+// Resolves the period flags into inclusive date-only bounds. Today is taken
+// in UTC so the same invocation yields the same period in every time zone.
+func (c *Command) window() (since, until time.Time, err error) {
+	now := c.now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	since, err = parseDay("--since", c.Since, today.AddDate(0, -defaultPeriodMonths, 0))
+	if err != nil {
+		return since, until, err
+	}
+	until, err = parseDay("--until", c.Until, today)
+	if err != nil {
+		return since, until, err
 	}
 	if since.After(until) {
-		return since, until, fmt.Errorf("%w: %s > %s", ErrEmptyPeriod, c.Since, c.Until)
+		return since, until, fmt.Errorf("%w: %s > %s",
+			ErrEmptyPeriod, since.Format(time.DateOnly), until.Format(time.DateOnly))
 	}
 	return since, until, nil
 }
