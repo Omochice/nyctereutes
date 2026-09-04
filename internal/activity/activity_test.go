@@ -34,3 +34,13 @@ func TestCountBulkPushCountsAsOneCommit(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{Commits: 1})
 }
+
+func TestCountBranchDeletionCountsNothing(t *testing.T) {
+	refCount := 2
+	events := []Event{
+		pushEvent("removed", 5, nil),
+		pushEvent("removed", 0, &refCount),
+	}
+
+	assertCounts(t, Count(events), Counts{})
+}
