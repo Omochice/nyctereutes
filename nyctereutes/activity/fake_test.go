@@ -3,9 +3,7 @@ package activity_test
 import (
 	"bytes"
 	"context"
-	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
@@ -13,19 +11,16 @@ import (
 )
 
 // Scripts the two glab calls the command makes: "api user" answers with a
-// fixed username, and the first events page answers with events, every later
-// page with nothing. The requested paths are recorded so a test can inspect
-// the query the command built.
+// fixed username and the events request with the scripted events. The
+// requested paths are recorded so a test can inspect the query the command
+// built.
 type fakeGlab struct {
-	mu     sync.Mutex
 	events string
 	err    error
 	paths  []string
 }
 
 func (fake *fakeGlab) Run(_ context.Context, args ...string) ([]byte, error) {
-	fake.mu.Lock()
-	defer fake.mu.Unlock()
 	if fake.err != nil {
 		return nil, fake.err
 	}
@@ -34,14 +29,7 @@ func (fake *fakeGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if path == "user" {
 		return []byte(`{"id":42,"username":"me"}`), nil
 	}
-	parsed, err := url.Parse(path)
-	if err != nil {
-		return nil, err
-	}
-	if parsed.Query().Get("page") == "1" {
-		return []byte(fake.events), nil
-	}
-	return []byte(`[]`), nil
+	return []byte(fake.events), nil
 }
 
 // Drives the whole command tree with an injected glab runner, so the exit code
