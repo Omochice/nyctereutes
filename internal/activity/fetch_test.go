@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,5 +47,35 @@ func TestFetchWidensTheRangeAroundGitLabsExclusiveBounds(t *testing.T) {
 	}
 	if got := parsed.Query(); got.Encode() != want.Encode() {
 		t.Errorf("query = %v, want %v", got, want)
+	}
+}
+
+func TestFetchReadsPagesUntilAnEmptyOne(t *testing.T) {
+	pages := map[string]string{
+		"1": `[{"action_name":"opened","target_type":"MergeRequest","target_id":1}]`,
+		"2": `[{"action_name":"approved","target_type":"MergeRequest","target_id":2}]`,
+		"3": `[]`,
+	}
+	var requested []string
+	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
+		parsed, err := url.Parse(args[len(args)-1])
+		if err != nil {
+			return nil, err
+		}
+		page := parsed.Query().Get("page")
+		requested = append(requested, page)
+		return []byte(pages[page]), nil
+	})
+
+	events, err := Fetch(t.Context(), runner, "alice", day("2025-09-01"), day("2026-09-01"))
+	if err != nil {
+		t.Fatalf("Fetch() error = %v", err)
+	}
+
+	if len(events) != 2 || events[0].TargetID != 1 || events[1].TargetID != 2 {
+		t.Errorf("events = %+v, want the two events in page order", events)
+	}
+	if got := strings.Join(requested, ","); got != "1,2,3" {
+		t.Errorf("requested pages = %s, want 1,2,3", got)
 	}
 }
