@@ -3,6 +3,7 @@ package activity_test
 import (
 	"bytes"
 	"context"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -30,10 +31,14 @@ func (fake *fakeGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	path := args[len(args)-1]
 	fake.paths = append(fake.paths, path)
-	switch {
-	case path == "user":
+	if path == "user" {
 		return []byte(`{"id":42,"username":"me"}`), nil
-	case strings.Contains(path, "page=1"):
+	}
+	parsed, err := url.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+	if parsed.Query().Get("page") == "1" {
 		return []byte(fake.events), nil
 	}
 	return []byte(`[]`), nil
