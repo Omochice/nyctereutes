@@ -59,9 +59,6 @@
               "wsl_v5" # successor of wsl, same opinionated whitespace rules
               # keep-sorted end
             ];
-            # GitLab's events API spells the commented-on object "noteable", and
-            # the JSON tags and field names have to match it.
-            settings.misspell.ignore-rules = [ "noteable" ];
             # Found only on the value type, while the decoding methods on the
             # same types need pointers.
             settings.recvcheck.exclusions = [
@@ -83,6 +80,12 @@
                   "wrapcheck"
                   # keep-sorted end
                 ];
+              }
+              {
+                # GitLab's wire format spells the commented-on object "noteable".
+                path = "internal/activity/";
+                linters = [ "misspell" ];
+                text = "noteable";
               }
             ];
           };
