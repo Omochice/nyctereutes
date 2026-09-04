@@ -3,6 +3,10 @@
 // activity command visualizes. It only reads events through the glab CLI.
 package activity
 
+// A push whose action is "removed" deletes a ref; GitLab still emits it as a
+// push event.
+const pushActionRemoved = "removed"
+
 // The subset of a GitLab push_data payload the counting rules look at. The
 // JSON tags are snake_case because they mirror GitLab's API.
 type PushData struct {
@@ -43,8 +47,12 @@ func Count(events []Event) Counts {
 }
 
 // A bulk push carries no commit total, only the number of refs, so it is
-// counted as a single contribution rather than as zero commits.
+// counted as a single contribution rather than as zero commits. Removal is
+// checked first because a bulk deletion also carries a ref count.
 func commitsOf(push *PushData) int {
+	if push.Action == pushActionRemoved {
+		return 0
+	}
 	if push.RefCount != nil {
 		return 1
 	}
