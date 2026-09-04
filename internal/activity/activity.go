@@ -36,8 +36,17 @@ func Count(events []Event) Counts {
 	var counts Counts
 	for _, event := range events {
 		if event.PushData != nil {
-			counts.Commits += event.PushData.CommitCount
+			counts.Commits += commitsOf(event.PushData)
 		}
 	}
 	return counts
+}
+
+// A bulk push carries no commit total, only the number of refs, so it is
+// counted as a single contribution rather than as zero commits.
+func commitsOf(push *PushData) int {
+	if push.RefCount != nil {
+		return 1
+	}
+	return push.CommitCount
 }
