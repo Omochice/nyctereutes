@@ -3,6 +3,7 @@ package activity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -29,16 +30,32 @@ func New(inout *cli.ProcInout, runner glab.Runner) *Command {
 	return &Command{inout: inout, runner: runner}
 }
 
+// Reported when --since names a later day than --until, a period that could
+// only chart nothing.
+var ErrEmptyPeriod = errors.New("--since is later than --until")
+
+// Parses the period flags into inclusive date-only bounds.
+func (c *Command) window() (since, until time.Time, err error) {
+	since, err = time.Parse(time.DateOnly, c.Since)
+	if err != nil {
+		return since, until, fmt.Errorf("invalid --since: %w", err)
+	}
+	until, err = time.Parse(time.DateOnly, c.Until)
+	if err != nil {
+		return since, until, fmt.Errorf("invalid --until: %w", err)
+	}
+	if since.After(until) {
+		return since, until, fmt.Errorf("%w: %s > %s", ErrEmptyPeriod, c.Since, c.Until)
+	}
+	return since, until, nil
+}
+
 // Fetches the user's events for the period and writes the chart.
 func (c *Command) Execute(_ []string) error {
 	ctx := context.Background()
-	since, err := time.Parse(time.DateOnly, c.Since)
+	since, until, err := c.window()
 	if err != nil {
-		return fmt.Errorf("invalid --since: %w", err)
-	}
-	until, err := time.Parse(time.DateOnly, c.Until)
-	if err != nil {
-		return fmt.Errorf("invalid --until: %w", err)
+		return err
 	}
 
 	user := c.Args.Username
