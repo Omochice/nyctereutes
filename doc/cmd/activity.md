@@ -47,4 +47,5 @@ The events GitLab reports are also the events the logged-in account may see, so 
 ## Colors
 
 The SVG names no color of its own: every line and label is drawn with `currentColor`, and the polygon is filled with `currentColor` at reduced opacity.
-The page embedding the chart therefore decides its color, so the same file suits a light and a dark GitHub README.
+When the SVG is inlined into a page, it takes the text color of the surrounding element, so it follows the page's theme.
+When it is embedded as an image, for example through an `<img>` tag in a GitHub README, `currentColor` resolves to the browser's default text color, which is black, regardless of the page's theme.

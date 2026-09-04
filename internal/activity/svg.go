@@ -17,8 +17,8 @@ const (
 
 // The chart is drawn with a radius of 100 so every vertex offset equals its
 // percentage and the template needs nothing but integers. Only currentColor
-// is used, letting the host page (a light or dark GitHub README, for
-// instance) decide the color.
+// is used, so an inlined chart takes the surrounding text color; embedded as
+// an image it falls back to the browser's default, black.
 const svgTemplate = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 280" width="400" height="280"
   font-family="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif"
   font-size="12" fill="currentColor">
