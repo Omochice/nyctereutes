@@ -12,6 +12,7 @@ const pushActionRemoved = "removed"
 const (
 	actionOpened       = "opened"
 	actionApproved     = "approved"
+	actionCommented    = "commented on"
 	targetMergeRequest = "MergeRequest"
 	targetIssue        = "Issue"
 )
@@ -26,6 +27,14 @@ type PushData struct {
 	RefCount *int `json:"ref_count"`
 }
 
+// The subset of a GitLab note payload the counting rules look at. A comment
+// event's target_type names the note kind, so the commented-on object is only
+// known through the note itself.
+type Note struct {
+	NoteableType string `json:"noteable_type"`
+	NoteableID   int    `json:"noteable_id"`
+}
+
 // The subset of a GitLab user event the counting rules look at. Payload
 // objects that only some event kinds carry are pointers so their absence is
 // distinguishable from zero values.
@@ -34,6 +43,7 @@ type Event struct {
 	TargetType string    `json:"target_type"`
 	TargetID   int       `json:"target_id"`
 	PushData   *PushData `json:"push_data"`
+	Note       *Note     `json:"note"`
 }
 
 // The four contribution axes of one user over one period.
@@ -62,6 +72,10 @@ func Count(events []Event) Counts {
 			}
 		case actionApproved:
 			reviewed[event.TargetID] = struct{}{}
+		case actionCommented:
+			if event.Note != nil && event.Note.NoteableType == targetMergeRequest {
+				reviewed[event.Note.NoteableID] = struct{}{}
+			}
 		}
 	}
 	counts.CodeReview = len(reviewed)
