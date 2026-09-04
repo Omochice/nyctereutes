@@ -79,3 +79,33 @@ func TestFetchReadsPagesUntilAnEmptyOne(t *testing.T) {
 		t.Errorf("requested pages = %s, want 1,2,3", got)
 	}
 }
+
+func TestCurrentUserResolvesThroughGlabAPIUser(t *testing.T) {
+	var calls [][]string
+	runner := glab.RunnerFunc(func(_ context.Context, args ...string) ([]byte, error) {
+		calls = append(calls, args)
+		return []byte(`{"id":42,"username":"alice","name":"Alice"}`), nil
+	})
+
+	user, err := CurrentUser(t.Context(), runner)
+	if err != nil {
+		t.Fatalf("CurrentUser() error = %v", err)
+	}
+
+	if user != "alice" {
+		t.Errorf("CurrentUser() = %q, want alice", user)
+	}
+	if len(calls) != 1 || strings.Join(calls[0], " ") != "api user" {
+		t.Errorf("calls = %v, want a single [api user]", calls)
+	}
+}
+
+func TestCurrentUserRejectsAResponseWithoutUsername(t *testing.T) {
+	runner := glab.RunnerFunc(func(_ context.Context, _ ...string) ([]byte, error) {
+		return []byte(`{"id":42}`), nil
+	})
+
+	if _, err := CurrentUser(t.Context(), runner); err == nil {
+		t.Error("CurrentUser() error = nil, want an error for a missing username")
+	}
+}
