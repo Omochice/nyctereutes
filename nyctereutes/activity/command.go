@@ -57,7 +57,7 @@ func parseDay(flag, value string, fallback time.Time) (time.Time, error) {
 	}
 	day, err := time.Parse(time.DateOnly, value)
 	if err != nil {
-		return day, fmt.Errorf("invalid %s: %w", flag, err)
+		return time.Time{}, fmt.Errorf("invalid %s: %w", flag, err)
 	}
 	return day, nil
 }
@@ -112,22 +112,22 @@ func (c *Command) window() (since, until time.Time, err error) {
 	return since, until, nil
 }
 
-// Delivers the rendered document to stdout or to the --output file. The
-// document is rendered in memory first so a rendering failure never leaves a
-// truncated file behind.
+// Delivers the rendered document to stdout or to the --output file.
 func (c *Command) write(render func(io.Writer) error) error {
-	var document bytes.Buffer
-	if err := render(&document); err != nil {
-		return fmt.Errorf("render output: %w", err)
-	}
 	if c.Output == "" {
-		if _, err := c.inout.Stdout.Write(document.Bytes()); err != nil {
-			return fmt.Errorf("write output: %w", err)
+		if err := render(c.inout.Stdout); err != nil {
+			return fmt.Errorf("write stdout: %w", err)
 		}
 		return nil
 	}
+	// The file is rendered in memory first so a rendering failure never
+	// leaves a truncated file behind.
+	var document bytes.Buffer
+	if err := render(&document); err != nil {
+		return fmt.Errorf("render %s: %w", c.Output, err)
+	}
 	if err := os.WriteFile(c.Output, document.Bytes(), outputMode); err != nil {
-		return fmt.Errorf("write output: %w", err)
+		return fmt.Errorf("write %s: %w", c.Output, err)
 	}
 	return nil
 }
