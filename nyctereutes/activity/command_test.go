@@ -35,7 +35,8 @@ func TestActivityWithNoArgumentsWritesTheCurrentUsersChart(t *testing.T) {
 func TestActivityWithAUsernameReportsThatUser(t *testing.T) {
 	fake := &fakeGlab{events: somePushes}
 
-	exit, stdout, stderr := runWithRunner(fake, "activity", "someone/else", "--since", "2025-09-01", "--until", "2026-09-01")
+	exit, stdout, stderr := runWithRunner(fake,
+		"activity", "someone/else", "--since", "2025-09-01", "--until", "2026-09-01")
 
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
@@ -109,7 +110,7 @@ func TestActivityOutputWritesToTheFileInsteadOfStdout(t *testing.T) {
 	if stdout != "" {
 		t.Errorf("stdout = %q, want nothing when a file is named", stdout)
 	}
-	written, err := os.ReadFile(path)
+	written, err := os.ReadFile(path) //nolint:gosec // G304: the test's own temporary file
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
@@ -128,7 +129,7 @@ func TestActivityOutputWithJSONWritesTheSummaryToTheFile(t *testing.T) {
 	if exit != 0 {
 		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
 	}
-	written, err := os.ReadFile(path)
+	written, err := os.ReadFile(path) //nolint:gosec // G304: the test's own temporary file
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}

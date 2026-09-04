@@ -58,26 +58,6 @@ func parseDay(flag, value string, fallback time.Time) (time.Time, error) {
 	return day, nil
 }
 
-// Resolves the period flags into inclusive date-only bounds. Today is taken
-// in UTC so the same invocation yields the same period in every time zone.
-func (c *Command) window() (since, until time.Time, err error) {
-	now := c.now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	since, err = parseDay("--since", c.Since, today.AddDate(0, -defaultPeriodMonths, 0))
-	if err != nil {
-		return since, until, err
-	}
-	until, err = parseDay("--until", c.Until, today)
-	if err != nil {
-		return since, until, err
-	}
-	if since.After(until) {
-		return since, until, fmt.Errorf("%w: %s > %s",
-			ErrEmptyPeriod, since.Format(time.DateOnly), until.Format(time.DateOnly))
-	}
-	return since, until, nil
-}
-
 // Fetches the user's events for the period and writes the chart.
 func (c *Command) Execute(_ []string) error {
 	ctx := context.Background()
@@ -100,6 +80,26 @@ func (c *Command) Execute(_ []string) error {
 	return c.write(core.NewSummary(user, since, until, core.Count(events)))
 }
 
+// Resolves the period flags into inclusive date-only bounds. Today is taken
+// in UTC so the same invocation yields the same period in every time zone.
+func (c *Command) window() (since, until time.Time, err error) {
+	now := c.now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	since, err = parseDay("--since", c.Since, today.AddDate(0, -defaultPeriodMonths, 0))
+	if err != nil {
+		return since, until, err
+	}
+	until, err = parseDay("--until", c.Until, today)
+	if err != nil {
+		return since, until, err
+	}
+	if since.After(until) {
+		return since, until, fmt.Errorf("%w: %s > %s",
+			ErrEmptyPeriod, since.Format(time.DateOnly), until.Format(time.DateOnly))
+	}
+	return since, until, nil
+}
+
 // Delivers the rendered summary to stdout or to the --output file. The
 // document is rendered in memory first so a rendering failure never leaves a
 // truncated file behind.
@@ -116,7 +116,8 @@ func (c *Command) write(summary core.Summary) error {
 	}
 	// The file is meant to be committed and served, so it is created
 	// world-readable like any other source file.
-	if err := os.WriteFile(c.Output, document.Bytes(), 0o644); err != nil { //nolint:gosec // G304,G306: user-chosen output file
+	err := os.WriteFile(c.Output, document.Bytes(), 0o644) //nolint:gosec // G304,G306: user-chosen output file
+	if err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
 	return nil

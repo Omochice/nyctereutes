@@ -25,8 +25,8 @@ const svgTemplate = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 28
   <polygon points="200,40 300,140 200,240 100,140" fill="none" stroke="currentColor" stroke-opacity="0.4"/>
   <line x1="200" y1="40" x2="200" y2="240" stroke="currentColor" stroke-opacity="0.4"/>
   <line x1="100" y1="140" x2="300" y2="140" stroke="currentColor" stroke-opacity="0.4"/>
-  <polygon points="200,{{sub 140 .CodeReview}} {{add 200 .Issues}},140 200,{{add 140 .MergeRequests}} {{sub 200 .Commits}},140"
-    fill="currentColor" fill-opacity="0.2" stroke="currentColor"/>
+  <polygon fill="currentColor" fill-opacity="0.2" stroke="currentColor"
+    points="200,{{sub 140 .CodeReview}} {{add 200 .Issues}},140 200,{{add 140 .MergeRequests}} {{sub 200 .Commits}},140"/>
   <text x="200" y="28" text-anchor="middle">{{.CodeReviewLabel}} {{.CodeReview}}%</text>
   <text x="310" y="144" text-anchor="start">{{.IssuesLabel}} {{.Issues}}%</text>
   <text x="200" y="262" text-anchor="middle">{{.MergeRequestsLabel}} {{.MergeRequests}}%</text>
@@ -46,6 +46,7 @@ func WriteSVG(out io.Writer, percents Percents) error {
 	}
 	data := struct {
 		Percents
+
 		CommitsLabel, MergeRequestsLabel, IssuesLabel, CodeReviewLabel string
 	}{
 		Percents:           percents,
