@@ -3,6 +3,7 @@ package activity_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -133,6 +134,37 @@ func TestActivityOutputWithJSONWritesTheSummaryToTheFile(t *testing.T) {
 	}
 	if !json.Valid(written) {
 		t.Errorf("file is not JSON\n%s", written)
+	}
+}
+
+func TestActivityReportsAGlabFailureOnStderr(t *testing.T) {
+	fake := &fakeGlab{err: errors.New("glab api user: exit status 1\nHTTP 401 Unauthorized")}
+
+	exit, stdout, stderr := runWithRunner(fake, "activity")
+
+	if exit != 1 {
+		t.Fatalf("exit = %d, want 1", exit)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, want no chart after a failure", stdout)
+	}
+	if !strings.Contains(stderr, "HTTP 401 Unauthorized") {
+		t.Errorf("stderr = %q, want glab's own diagnostic kept", stderr)
+	}
+}
+
+func TestActivityWithNoEventsStillWritesAnEmptyChart(t *testing.T) {
+	fake := &fakeGlab{events: `[]`}
+
+	exit, stdout, stderr := runWithRunner(fake, "activity", "--since", "2025-09-01", "--until", "2026-09-01")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
+	}
+	for _, want := range []string{"<svg", "Commits 0%", "Code review 0%"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
 	}
 }
 
