@@ -12,6 +12,7 @@ const pushActionRemoved = "removed"
 const (
 	actionOpened       = "opened"
 	targetMergeRequest = "MergeRequest"
+	targetIssue        = "Issue"
 )
 
 // The subset of a GitLab push_data payload the counting rules look at. The
@@ -49,8 +50,13 @@ func Count(events []Event) Counts {
 		if event.PushData != nil {
 			counts.Commits += commitsOf(event.PushData)
 		}
-		if event.ActionName == actionOpened && event.TargetType == targetMergeRequest {
-			counts.MergeRequests++
+		if event.ActionName == actionOpened {
+			switch event.TargetType {
+			case targetMergeRequest:
+				counts.MergeRequests++
+			case targetIssue:
+				counts.Issues++
+			}
 		}
 	}
 	return counts
