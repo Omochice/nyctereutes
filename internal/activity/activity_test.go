@@ -67,3 +67,9 @@ func TestCountMergedAndClosedEventsCountNothing(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{})
 }
+
+func TestCountApprovedMergeRequestCountsOneCodeReview(t *testing.T) {
+	events := []Event{{ActionName: "approved", TargetType: "MergeRequest", TargetID: 444342411}}
+
+	assertCounts(t, Count(events), Counts{CodeReview: 1})
+}
