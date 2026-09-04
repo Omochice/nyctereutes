@@ -54,7 +54,7 @@ func TestActivityDefaultsToTheTwelveMonthsEndingToday(t *testing.T) {
 	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
 	cmd := activity.New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: errBuf}, fake)
 	activity.SetNow(cmd, func() time.Time {
-		return time.Date(2026, time.September, 4, 23, 30, 0, 0, time.FixedZone("JST", 9*60*60))
+		return time.Date(2026, time.September, 5, 5, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	})
 
 	if err := cmd.Execute(nil); err != nil {
@@ -70,10 +70,10 @@ func TestActivityDefaultsToTheTwelveMonthsEndingToday(t *testing.T) {
 	}
 	query := parsed.Query()
 	if got := query.Get("after"); got != "2025-09-03" {
-		t.Errorf("after = %s, want 2025-09-03 (the day before 12 months ago, in UTC)", got)
+		t.Errorf("after = %s, want 2025-09-03 (the day before 12 months ago, dated in UTC where it is still the 4th)", got)
 	}
 	if got := query.Get("before"); got != "2026-09-05" {
-		t.Errorf("before = %s, want 2026-09-05 (the day after today, in UTC)", got)
+		t.Errorf("before = %s, want 2026-09-05 (the day after today, dated in UTC where it is still the 4th)", got)
 	}
 }
 
