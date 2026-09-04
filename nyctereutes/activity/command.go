@@ -2,10 +2,12 @@
 package activity
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/Omochice/nyctereutes/cli"
@@ -17,8 +19,9 @@ import (
 type Command struct {
 	Since string `long:"since" value-name:"YYYY-MM-DD" description:"First day of the period (default: 12 months ago)"`
 	Until string `long:"until" value-name:"YYYY-MM-DD" description:"Last day of the period (default: today)"`
-	JSON  bool   `long:"json" description:"Write the JSON summary instead of the SVG chart"`
-	Args  struct {
+	JSON   bool   `long:"json" description:"Write the JSON summary instead of the SVG chart"`
+	Output string `short:"o" long:"output" value-name:"PATH" description:"Write to this file instead of stdout"`
+	Args   struct {
 		Username string `positional-arg-name:"username" description:"GitLab username (default: the logged-in user)"`
 	} `positional-args:"yes"`
 
@@ -94,7 +97,29 @@ func (c *Command) Execute(_ []string) error {
 	if err != nil {
 		return fmt.Errorf("fetch events: %w", err)
 	}
-	return c.render(c.inout.Stdout, core.NewSummary(user, since, until, core.Count(events)))
+	return c.write(core.NewSummary(user, since, until, core.Count(events)))
+}
+
+// Delivers the rendered summary to stdout or to the --output file. The
+// document is rendered in memory first so a rendering failure never leaves a
+// truncated file behind.
+func (c *Command) write(summary core.Summary) error {
+	var document bytes.Buffer
+	if err := c.render(&document, summary); err != nil {
+		return err
+	}
+	if c.Output == "" {
+		if _, err := c.inout.Stdout.Write(document.Bytes()); err != nil {
+			return fmt.Errorf("write output: %w", err)
+		}
+		return nil
+	}
+	// The file is meant to be committed and served, so it is created
+	// world-readable like any other source file.
+	if err := os.WriteFile(c.Output, document.Bytes(), 0o644); err != nil { //nolint:gosec // G304,G306: user-chosen output file
+		return fmt.Errorf("write output: %w", err)
+	}
+	return nil
 }
 
 // Writes the summary in the form the flags selected.
