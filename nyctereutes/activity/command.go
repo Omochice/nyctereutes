@@ -118,8 +118,7 @@ func (c *Command) write(summary core.Summary) error {
 		}
 		return nil
 	}
-	err := os.WriteFile(c.Output, document.Bytes(), outputMode) //nolint:gosec // G304,G306: user-chosen output file
-	if err != nil {
+	if err := os.WriteFile(c.Output, document.Bytes(), outputMode); err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}
 	return nil
