@@ -87,3 +87,14 @@ func TestCountCommentOnMergeRequestCountsOneCodeReview(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{CodeReview: 1})
 }
+
+func TestCountSameMergeRequestReviewedSeveralTimesCountsOnce(t *testing.T) {
+	events := []Event{
+		commentEvent("DiscussionNote", "MergeRequest", 444342411),
+		commentEvent("DiffNote", "MergeRequest", 444342411),
+		{ActionName: "approved", TargetType: "MergeRequest", TargetID: 444342411},
+		commentEvent("Note", "MergeRequest", 444342412),
+	}
+
+	assertCounts(t, Count(events), Counts{CodeReview: 2})
+}
