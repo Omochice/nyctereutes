@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -11,7 +12,30 @@ import (
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
+// Reported when "glab api user" answers without a username, which would
+// otherwise become an empty path segment in the events request.
+var ErrNoUsername = errors.New("activity: current user has no username")
+
 const perPage = 100
+
+// Resolves the username of the account glab is logged in as, for reporting
+// one's own activity without naming oneself.
+func CurrentUser(ctx context.Context, runner glab.Runner) (string, error) {
+	out, err := runner.Run(ctx, "api", "user")
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch current user: %w", err)
+	}
+	var user struct {
+		Username string `json:"username"`
+	}
+	if err := json.Unmarshal(out, &user); err != nil {
+		return "", fmt.Errorf("failed to parse current user: %w", err)
+	}
+	if user.Username == "" {
+		return "", ErrNoUsername
+	}
+	return user.Username, nil
+}
 
 // GitLab's after and before parameters exclude the named day, so an inclusive
 // range has to be widened by one day on each side.
