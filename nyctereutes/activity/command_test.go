@@ -1,8 +1,14 @@
 package activity_test
 
 import (
+	"bytes"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/Omochice/nyctereutes/cli"
+	"github.com/Omochice/nyctereutes/nyctereutes/activity"
 )
 
 func TestActivityWithNoArgumentsWritesTheCurrentUsersChart(t *testing.T) {
@@ -34,6 +40,34 @@ func TestActivityWithAUsernameReportsThatUser(t *testing.T) {
 	}
 	if len(fake.paths) == 0 || !strings.HasPrefix(fake.paths[0], "users/someone%2Felse/events?") {
 		t.Errorf("paths = %v, want the named user's events fetched first, without resolving the current user", fake.paths)
+	}
+}
+
+func TestActivityDefaultsToTheTwelveMonthsEndingToday(t *testing.T) {
+	fake := &fakeGlab{events: somePushes}
+	outBuf, errBuf := &bytes.Buffer{}, &bytes.Buffer{}
+	cmd := activity.New(&cli.ProcInout{Stdin: strings.NewReader(""), Stdout: outBuf, Stderr: errBuf}, fake)
+	activity.SetNow(cmd, func() time.Time {
+		return time.Date(2026, time.September, 4, 23, 30, 0, 0, time.FixedZone("JST", 9*60*60))
+	})
+
+	if err := cmd.Execute(nil); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if len(fake.paths) < 2 {
+		t.Fatalf("paths = %v, want an events request", fake.paths)
+	}
+	parsed, err := url.Parse(fake.paths[1])
+	if err != nil {
+		t.Fatalf("path %q does not parse: %v", fake.paths[1], err)
+	}
+	query := parsed.Query()
+	if got := query.Get("after"); got != "2025-09-03" {
+		t.Errorf("after = %s, want 2025-09-03 (the day before 12 months ago, in UTC)", got)
+	}
+	if got := query.Get("before"); got != "2026-09-05" {
+		t.Errorf("before = %s, want 2026-09-05 (the day after today, in UTC)", got)
 	}
 }
 
