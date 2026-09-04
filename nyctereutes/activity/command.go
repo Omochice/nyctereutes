@@ -45,6 +45,10 @@ var ErrEmptyPeriod = errors.New("--since is later than --until")
 // How far back the period reaches when --since is not given.
 const defaultPeriodMonths = 12
 
+// The --output file is meant to be committed and served, so it is created
+// world-readable like any other source file.
+const outputMode = 0o644
+
 // Parses a period flag, or falls back to the given day when the flag was
 // not set.
 func parseDay(flag, value string, fallback time.Time) (time.Time, error) {
@@ -114,9 +118,7 @@ func (c *Command) write(summary core.Summary) error {
 		}
 		return nil
 	}
-	// The file is meant to be committed and served, so it is created
-	// world-readable like any other source file.
-	err := os.WriteFile(c.Output, document.Bytes(), 0o644) //nolint:gosec // G304,G306: user-chosen output file
+	err := os.WriteFile(c.Output, document.Bytes(), outputMode) //nolint:gosec // G304,G306: user-chosen output file
 	if err != nil {
 		return fmt.Errorf("write output: %w", err)
 	}

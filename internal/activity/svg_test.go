@@ -31,7 +31,7 @@ func TestWriteSVGLabelsEachAxisWithItsPercent(t *testing.T) {
 func TestWriteSVGUsesOnlyCurrentColor(t *testing.T) {
 	svg := renderSVG(t, Percents{Commits: 25, MergeRequests: 25, Issues: 25, CodeReview: 25})
 
-	if !strings.Contains(svg, `<polygon fill="currentColor" fill-opacity="0.2" stroke="currentColor"`) {
+	if !strings.Contains(svg, `fill="currentColor" fill-opacity="0.2" stroke="currentColor" points="`) {
 		t.Errorf("svg does not fill the polygon with translucent currentColor\n%s", svg)
 	}
 	for _, attribute := range []string{"fill=", "stroke="} {
