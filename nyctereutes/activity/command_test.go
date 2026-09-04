@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -90,6 +92,47 @@ func TestActivityJSONWritesTheSummaryInsteadOfTheChart(t *testing.T) {
 	}
 	if summary.Axes.Commits.Count != 3 || summary.Axes.MergeRequests.Percent != 25 {
 		t.Errorf("axes = %+v, want 3 commits and a 25%% merge request share", summary.Axes)
+	}
+}
+
+func TestActivityOutputWritesToTheFileInsteadOfStdout(t *testing.T) {
+	fake := &fakeGlab{events: somePushes}
+	path := filepath.Join(t.TempDir(), "activity.svg")
+
+	exit, stdout, stderr := runWithRunner(fake,
+		"activity", "--output", path, "--since", "2025-09-01", "--until", "2026-09-01")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, want nothing when a file is named", stdout)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if !strings.HasPrefix(string(written), "<svg") {
+		t.Errorf("file is not the chart\n%s", written)
+	}
+}
+
+func TestActivityOutputWithJSONWritesTheSummaryToTheFile(t *testing.T) {
+	fake := &fakeGlab{events: somePushes}
+	path := filepath.Join(t.TempDir(), "activity.json")
+
+	exit, _, stderr := runWithRunner(fake,
+		"activity", "--json", "--output", path, "--since", "2025-09-01", "--until", "2026-09-01")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if !json.Valid(written) {
+		t.Errorf("file is not JSON\n%s", written)
 	}
 }
 
