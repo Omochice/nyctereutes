@@ -17,8 +17,8 @@ import (
 
 // The command go-flags parses "activity" into.
 type Command struct {
-	Since string `long:"since" value-name:"YYYY-MM-DD" description:"First day of the period (default: 12 months ago)"`
-	Until string `long:"until" value-name:"YYYY-MM-DD" description:"Last day of the period (default: today)"`
+	Since  string `long:"since" value-name:"YYYY-MM-DD" description:"First day of the period (default: 12 months ago)"`
+	Until  string `long:"until" value-name:"YYYY-MM-DD" description:"Last day of the period (default: today)"`
 	JSON   bool   `long:"json" description:"Write the JSON summary instead of the SVG chart"`
 	Output string `short:"o" long:"output" value-name:"PATH" description:"Write to this file instead of stdout"`
 	Args   struct {
