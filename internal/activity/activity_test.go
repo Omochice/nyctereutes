@@ -11,9 +11,17 @@ func assertCounts(t *testing.T, got, want Counts) {
 	}
 }
 
+// GitLab pairs each push_data.action with its own action_name; mirroring the
+// pairing keeps the fixtures shaped like real responses.
+var pushActionNames = map[string]string{
+	"created": "pushed new",
+	"pushed":  "pushed to",
+	"removed": "deleted",
+}
+
 func pushEvent(action string, commitCount int, refCount *int) Event {
 	return Event{
-		ActionName: "pushed to",
+		ActionName: pushActionNames[action],
 		TargetType: "Project",
 		PushData:   &PushData{Action: action, CommitCount: commitCount, RefCount: refCount},
 	}
