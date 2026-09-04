@@ -47,6 +47,17 @@ func NewSummary(user string, since, until time.Time, counts Counts) Summary {
 	return summary
 }
 
+// Extracts the per-axis shares, so a chart can be drawn from the same summary
+// the JSON form reports without recounting.
+func (s Summary) Percents() Percents {
+	return Percents{
+		Commits:       s.Axes.Commits.Percent,
+		MergeRequests: s.Axes.MergeRequests.Percent,
+		Issues:        s.Axes.Issues.Percent,
+		CodeReview:    s.Axes.CodeReview.Percent,
+	}
+}
+
 // Writes summary as indented JSON followed by a newline, so the output ends
 // cleanly whether it lands in a terminal or a file.
 func WriteJSON(out io.Writer, summary Summary) error {

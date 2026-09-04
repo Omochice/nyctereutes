@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/Omochice/nyctereutes/cli"
@@ -16,6 +17,7 @@ import (
 type Command struct {
 	Since string `long:"since" value-name:"YYYY-MM-DD" description:"First day of the period (default: 12 months ago)"`
 	Until string `long:"until" value-name:"YYYY-MM-DD" description:"Last day of the period (default: today)"`
+	JSON  bool   `long:"json" description:"Write the JSON summary instead of the SVG chart"`
 	Args  struct {
 		Username string `positional-arg-name:"username" description:"GitLab username (default: the logged-in user)"`
 	} `positional-args:"yes"`
@@ -92,7 +94,18 @@ func (c *Command) Execute(_ []string) error {
 	if err != nil {
 		return fmt.Errorf("fetch events: %w", err)
 	}
-	if err := core.WriteSVG(c.inout.Stdout, core.Count(events).Percent()); err != nil {
+	return c.render(c.inout.Stdout, core.NewSummary(user, since, until, core.Count(events)))
+}
+
+// Writes the summary in the form the flags selected.
+func (c *Command) render(out io.Writer, summary core.Summary) error {
+	if c.JSON {
+		if err := core.WriteJSON(out, summary); err != nil {
+			return fmt.Errorf("write summary: %w", err)
+		}
+		return nil
+	}
+	if err := core.WriteSVG(out, summary.Percents()); err != nil {
 		return fmt.Errorf("write chart: %w", err)
 	}
 	return nil
