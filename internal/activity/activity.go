@@ -11,6 +11,7 @@ const pushActionRemoved = "removed"
 // GitLab spells them in the events API.
 const (
 	actionOpened       = "opened"
+	actionApproved     = "approved"
 	targetMergeRequest = "MergeRequest"
 	targetIssue        = "Issue"
 )
@@ -46,19 +47,24 @@ type Counts struct {
 // Folds events into the four axes.
 func Count(events []Event) Counts {
 	var counts Counts
+	reviewed := make(map[int]struct{})
 	for _, event := range events {
 		if event.PushData != nil {
 			counts.Commits += commitsOf(event.PushData)
 		}
-		if event.ActionName == actionOpened {
+		switch event.ActionName {
+		case actionOpened:
 			switch event.TargetType {
 			case targetMergeRequest:
 				counts.MergeRequests++
 			case targetIssue:
 				counts.Issues++
 			}
+		case actionApproved:
+			reviewed[event.TargetID] = struct{}{}
 		}
 	}
+	counts.CodeReview = len(reviewed)
 	return counts
 }
 
