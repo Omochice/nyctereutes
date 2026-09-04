@@ -98,3 +98,9 @@ func TestCountSameMergeRequestReviewedSeveralTimesCountsOnce(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{CodeReview: 2})
 }
+
+func TestCountCommentOnIssueIsNotCodeReview(t *testing.T) {
+	events := []Event{commentEvent("Note", "Issue", 1770)}
+
+	assertCounts(t, Count(events), Counts{})
+}
