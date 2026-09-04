@@ -17,8 +17,7 @@ const (
 	targetIssue        = "Issue"
 )
 
-// The subset of a GitLab push_data payload the counting rules look at. The
-// JSON tags are snake_case because they mirror GitLab's API.
+// The subset of a GitLab push_data payload the counting rules look at.
 type PushData struct {
 	CommitCount int    `json:"commit_count"`
 	Action      string `json:"action"`

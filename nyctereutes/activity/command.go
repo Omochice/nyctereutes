@@ -42,15 +42,12 @@ func New(inout *cli.ProcInout, runner glab.Runner) *Command {
 // only chart nothing.
 var errEmptyPeriod = errors.New("--since is later than --until")
 
-// How far back the period reaches when --since is not given.
 const defaultPeriodMonths = 12
 
 // The --output file is meant to be committed and served, so it is created
 // world-readable like any other source file.
 const outputMode = 0o644
 
-// Parses a period flag, or falls back to the given day when the flag was
-// not set.
 func parseDay(flag, value string, fallback time.Time) (time.Time, error) {
 	if value == "" {
 		return fallback, nil
@@ -62,7 +59,7 @@ func parseDay(flag, value string, fallback time.Time) (time.Time, error) {
 	return day, nil
 }
 
-// Fetches the user's events for the period and writes the chart.
+// Fetches the user's events for the period and writes the requested form.
 func (c *Command) Execute(_ []string) error {
 	ctx := context.Background()
 	since, until, err := c.window()
