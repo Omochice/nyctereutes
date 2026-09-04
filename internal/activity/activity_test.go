@@ -44,3 +44,9 @@ func TestCountBranchDeletionCountsNothing(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{})
 }
+
+func TestCountOpenedMergeRequestCountsOneMergeRequest(t *testing.T) {
+	events := []Event{{ActionName: "opened", TargetType: "MergeRequest", TargetID: 444342411}}
+
+	assertCounts(t, Count(events), Counts{MergeRequests: 1})
+}
