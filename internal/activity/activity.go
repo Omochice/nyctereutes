@@ -54,6 +54,37 @@ type Counts struct {
 	CodeReview    int
 }
 
+// Each axis as a whole-number share of the total, for labeling the chart.
+type Percents struct {
+	Commits       int
+	MergeRequests int
+	Issues        int
+	CodeReview    int
+}
+
+const percentBase = 100
+
+// Sums the four axes.
+func (c Counts) Total() int {
+	return c.Commits + c.MergeRequests + c.Issues + c.CodeReview
+}
+
+// Converts the axes into integer percentages of the total. An empty period
+// yields all zeros instead of a division by zero.
+func (c Counts) Percent() Percents {
+	total := c.Total()
+	if total == 0 {
+		return Percents{}
+	}
+	share := func(count int) int { return count * percentBase / total }
+	return Percents{
+		Commits:       share(c.Commits),
+		MergeRequests: share(c.MergeRequests),
+		Issues:        share(c.Issues),
+		CodeReview:    share(c.CodeReview),
+	}
+}
+
 // Folds events into the four axes.
 func Count(events []Event) Counts {
 	var counts Counts
