@@ -2,12 +2,14 @@ package activity_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/Omochice/nyctereutes/cli"
+	core "github.com/Omochice/nyctereutes/internal/activity"
 	"github.com/Omochice/nyctereutes/nyctereutes/activity"
 )
 
@@ -68,6 +70,26 @@ func TestActivityDefaultsToTheTwelveMonthsEndingToday(t *testing.T) {
 	}
 	if got := query.Get("before"); got != "2026-09-05" {
 		t.Errorf("before = %s, want 2026-09-05 (the day after today, in UTC)", got)
+	}
+}
+
+func TestActivityJSONWritesTheSummaryInsteadOfTheChart(t *testing.T) {
+	fake := &fakeGlab{events: somePushes}
+
+	exit, stdout, stderr := runWithRunner(fake, "activity", "--json", "--since", "2025-09-01", "--until", "2026-09-01")
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0 (stderr=%q)", exit, stderr)
+	}
+	var summary core.Summary
+	if err := json.Unmarshal([]byte(stdout), &summary); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
+	}
+	if summary.User != "me" || summary.Since != "2025-09-01" || summary.Until != "2026-09-01" || summary.Total != 4 {
+		t.Errorf("summary = %+v, want user me over 2025-09-01..2026-09-01 with 4 contributions", summary)
+	}
+	if summary.Axes.Commits.Count != 3 || summary.Axes.MergeRequests.Percent != 25 {
+		t.Errorf("axes = %+v, want 3 commits and a 25%% merge request share", summary.Axes)
 	}
 }
 
