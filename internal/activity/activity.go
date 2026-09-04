@@ -55,12 +55,7 @@ type Counts struct {
 }
 
 // Each axis as a whole-number share of the total, for labeling the chart.
-type Percents struct {
-	Commits       int
-	MergeRequests int
-	Issues        int
-	CodeReview    int
-}
+type Percents Counts
 
 const percentBase = 100
 

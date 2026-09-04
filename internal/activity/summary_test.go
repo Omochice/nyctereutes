@@ -31,11 +31,15 @@ func TestWriteJSONCarriesUserPeriodTotalAndEveryAxis(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
 		t.Fatalf("output is not JSON: %v\n%s", err, out.String())
 	}
-	want := Summary{User: "alice", Since: "2025-09-01", Until: "2026-09-01", Total: 7}
-	want.Axes.Commits = Axis{Count: 5, Percent: 71}
-	want.Axes.MergeRequests = Axis{Count: 1, Percent: 14}
-	want.Axes.Issues = Axis{Count: 0, Percent: 0}
-	want.Axes.CodeReview = Axis{Count: 1, Percent: 14}
+	want := Summary{
+		User: "alice", Since: "2025-09-01", Until: "2026-09-01", Total: 7,
+		Axes: Axes{
+			Commits:       Axis{Count: 5, Percent: 71},
+			MergeRequests: Axis{Count: 1, Percent: 14},
+			Issues:        Axis{Count: 0, Percent: 0},
+			CodeReview:    Axis{Count: 1, Percent: 14},
+		},
+	}
 	if decoded != want {
 		t.Errorf("decoded = %+v, want %+v", decoded, want)
 	}

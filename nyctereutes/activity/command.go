@@ -81,7 +81,15 @@ func (c *Command) Execute(_ []string) error {
 	if err != nil {
 		return fmt.Errorf("fetch events: %w", err)
 	}
-	return c.write(core.NewSummary(user, since, until, core.Count(events)))
+	counts := core.Count(events)
+	if c.JSON {
+		return c.write(func(out io.Writer) error {
+			return core.WriteJSON(out, core.NewSummary(user, since, until, counts))
+		})
+	}
+	return c.write(func(out io.Writer) error {
+		return core.WriteSVG(out, counts.Percent())
+	})
 }
 
 // Resolves the period flags into inclusive date-only bounds. Today is taken
@@ -104,13 +112,13 @@ func (c *Command) window() (since, until time.Time, err error) {
 	return since, until, nil
 }
 
-// Delivers the rendered summary to stdout or to the --output file. The
+// Delivers the rendered document to stdout or to the --output file. The
 // document is rendered in memory first so a rendering failure never leaves a
 // truncated file behind.
-func (c *Command) write(summary core.Summary) error {
+func (c *Command) write(render func(io.Writer) error) error {
 	var document bytes.Buffer
-	if err := c.render(&document, summary); err != nil {
-		return err
+	if err := render(&document); err != nil {
+		return fmt.Errorf("render output: %w", err)
 	}
 	if c.Output == "" {
 		if _, err := c.inout.Stdout.Write(document.Bytes()); err != nil {
@@ -120,20 +128,6 @@ func (c *Command) write(summary core.Summary) error {
 	}
 	if err := os.WriteFile(c.Output, document.Bytes(), outputMode); err != nil {
 		return fmt.Errorf("write output: %w", err)
-	}
-	return nil
-}
-
-// Writes the summary in the form the flags selected.
-func (c *Command) render(out io.Writer, summary core.Summary) error {
-	if c.JSON {
-		if err := core.WriteJSON(out, summary); err != nil {
-			return fmt.Errorf("write summary: %w", err)
-		}
-		return nil
-	}
-	if err := core.WriteSVG(out, summary.Percents()); err != nil {
-		return fmt.Errorf("write chart: %w", err)
 	}
 	return nil
 }
