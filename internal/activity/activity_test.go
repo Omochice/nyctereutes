@@ -27,3 +27,10 @@ func TestCountAddsPushCommitCountToCommits(t *testing.T) {
 
 	assertCounts(t, Count(events), Counts{Commits: 4})
 }
+
+func TestCountBulkPushCountsAsOneCommit(t *testing.T) {
+	refCount := 12
+	events := []Event{pushEvent("pushed", 0, &refCount)}
+
+	assertCounts(t, Count(events), Counts{Commits: 1})
+}
