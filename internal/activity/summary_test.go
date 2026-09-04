@@ -19,7 +19,8 @@ func TestWriteJSONCarriesUserPeriodTotalAndEveryAxis(t *testing.T) {
 	if !strings.HasSuffix(out.String(), "\n") {
 		t.Error("output does not end with a newline")
 	}
-	for _, key := range []string{`"user"`, `"since"`, `"until"`, `"total"`, `"axes"`,
+	for _, key := range []string{
+		`"user"`, `"since"`, `"until"`, `"total"`, `"axes"`,
 		`"commits"`, `"merge_requests"`, `"issues"`, `"code_review"`, `"count"`, `"percent"`,
 	} {
 		if !strings.Contains(out.String(), key) {

@@ -18,7 +18,8 @@ func renderSVG(t *testing.T, percents Percents) string {
 func TestWriteSVGLabelsEachAxisWithItsPercent(t *testing.T) {
 	svg := renderSVG(t, Percents{Commits: 50, MergeRequests: 10, Issues: 10, CodeReview: 30})
 
-	for _, want := range []string{"<svg", `xmlns="http://www.w3.org/2000/svg"`,
+	for _, want := range []string{
+		"<svg", `xmlns="http://www.w3.org/2000/svg"`,
 		"Commits 50%", "Merge requests 10%", "Issues 10%", "Code review 30%",
 	} {
 		if !strings.Contains(svg, want) {
