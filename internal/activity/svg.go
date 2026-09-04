@@ -6,8 +6,8 @@ import (
 	"text/template"
 )
 
-// The axis names as they appear in the chart. They are shared with the JSON
-// summary so both outputs describe the same axes in the same words.
+// The axis names as they appear in the chart. The JSON summary keys its axes
+// in snake_case instead, so a machine consumer never depends on this wording.
 const (
 	LabelCommits       = "Commits"
 	LabelMergeRequests = "Merge requests"
