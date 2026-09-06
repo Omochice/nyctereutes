@@ -13,9 +13,7 @@ import (
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
-// A GitLab account as the events API needs it addressed: some instances reject
-// a username in the events path, so the numeric id is carried alongside the
-// username the summary reports.
+// A GitLab account, addressed by id and reported by username.
 type User struct {
 	ID       int    `json:"id"`
 	Username string `json:"username"`
@@ -52,8 +50,7 @@ func CurrentUser(ctx context.Context, runner glab.Runner) (User, error) {
 	return user, nil
 }
 
-// Resolves a username to the account it names through the users lookup, since
-// the events API of some GitLab instances only accepts the numeric id.
+// Resolves a username to the account it names.
 func LookupUser(ctx context.Context, runner glab.Runner, username string) (User, error) {
 	out, err := runner.Run(ctx, "api", "users?username="+url.QueryEscape(username))
 	if err != nil {

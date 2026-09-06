@@ -21,6 +21,7 @@ nyctereutes activity --since 2025-01-01 --until 2025-12-31
 ```
 
 - Without a username, the command asks `glab` which account it is logged in as and reports on that account.
+- A username is resolved to the user's numeric id first, because a username containing a dot does not match the events route and answers 404.
 - `--since` and `--until` take a date as `YYYY-MM-DD` and are both inclusive, so `--until 2025-12-31` includes the last day of the year.
 - `--since` defaults to twelve months before today and `--until` defaults to today, where today is the current date in UTC.
 - `--json` writes the JSON summary in place of the chart.
