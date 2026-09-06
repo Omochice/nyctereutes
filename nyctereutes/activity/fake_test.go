@@ -10,10 +10,10 @@ import (
 	"github.com/Omochice/nyctereutes/nyctereutes"
 )
 
-// Scripts the two glab calls the command makes: "api user" answers with a
-// fixed username and the events request with the scripted events. The
-// requested paths are recorded so a test can inspect the query the command
-// built.
+// Scripts the glab calls the command makes: "api user" answers with a fixed
+// account, the username lookup knows only "alice", and the events request
+// answers with the scripted events. The requested paths are recorded so a
+// test can inspect the query the command built.
 type fakeGlab struct {
 	events string
 	err    error
@@ -26,8 +26,13 @@ func (fake *fakeGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	path := args[len(args)-1]
 	fake.paths = append(fake.paths, path)
-	if path == "user" {
+	switch {
+	case path == "user":
 		return []byte(`{"id":42,"username":"me"}`), nil
+	case path == "users?username=alice":
+		return []byte(`[{"id":7,"username":"alice"}]`), nil
+	case strings.HasPrefix(path, "users?username="):
+		return []byte(`[]`), nil
 	}
 	return []byte(fake.events), nil
 }
