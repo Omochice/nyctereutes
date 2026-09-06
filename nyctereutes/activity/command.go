@@ -67,26 +67,40 @@ func (c *Command) Execute(_ []string) error {
 		return err
 	}
 
-	user := c.Args.Username
-	if user == "" {
-		user, err = core.CurrentUser(ctx, c.runner)
-		if err != nil {
-			return fmt.Errorf("resolve current user: %w", err)
-		}
+	user, err := c.user(ctx)
+	if err != nil {
+		return err
 	}
-	events, err := core.Fetch(ctx, c.runner, user, since, until)
+	events, err := core.Fetch(ctx, c.runner, user.ID, since, until)
 	if err != nil {
 		return fmt.Errorf("fetch events: %w", err)
 	}
 	counts := core.Count(events)
 	if c.JSON {
 		return c.write(func(out io.Writer) error {
-			return core.WriteJSON(out, core.NewSummary(user, since, until, counts))
+			return core.WriteJSON(out, core.NewSummary(user.Username, since, until, counts))
 		})
 	}
 	return c.write(func(out io.Writer) error {
 		return core.WriteSVG(out, counts.Percent())
 	})
+}
+
+// Resolves the account to report on: the named user when a username was
+// given, otherwise the account glab is logged in as.
+func (c *Command) user(ctx context.Context) (core.User, error) {
+	if c.Args.Username == "" {
+		user, err := core.CurrentUser(ctx, c.runner)
+		if err != nil {
+			return core.User{}, fmt.Errorf("resolve current user: %w", err)
+		}
+		return user, nil
+	}
+	user, err := core.LookupUser(ctx, c.runner, c.Args.Username)
+	if err != nil {
+		return core.User{}, fmt.Errorf("resolve user: %w", err)
+	}
+	return user, nil
 }
 
 // Resolves the period flags into inclusive date-only bounds. Today is taken
