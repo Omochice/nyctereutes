@@ -1,0 +1,121 @@
+// Package activity condenses a GitLab user's event stream into the four
+// contribution axes (commits, merge requests, issues, code review) that the
+// activity command visualizes. It only reads events through the glab CLI.
+package activity
+
+// A push whose action is "removed" deletes a ref; GitLab still emits it as a
+// push event.
+const pushActionRemoved = "removed"
+
+// The event action names and target types the counting rules match on, as
+// GitLab spells them in the events API.
+const (
+	actionOpened       = "opened"
+	actionApproved     = "approved"
+	actionCommented    = "commented on"
+	targetMergeRequest = "MergeRequest"
+	targetIssue        = "Issue"
+)
+
+// The subset of a GitLab push_data payload the counting rules look at.
+type PushData struct {
+	CommitCount int    `json:"commit_count"`
+	Action      string `json:"action"`
+	// Null for an ordinary push and set for a bulk push, so a pointer keeps
+	// the two cases apart.
+	RefCount *int `json:"ref_count"`
+}
+
+// The subset of a GitLab note payload the counting rules look at. A comment
+// event's target_type names the note kind, so the commented-on object is only
+// known through the note itself.
+type Note struct {
+	NoteableType string `json:"noteable_type"`
+	NoteableID   int    `json:"noteable_id"`
+}
+
+// The subset of a GitLab user event the counting rules look at. Payload
+// objects that only some event kinds carry are pointers so their absence is
+// distinguishable from zero values.
+type Event struct {
+	ActionName string    `json:"action_name"`
+	TargetType string    `json:"target_type"`
+	TargetID   int       `json:"target_id"`
+	PushData   *PushData `json:"push_data"`
+	Note       *Note     `json:"note"`
+}
+
+// The four contribution axes of one user over one period.
+type Counts struct {
+	Commits       int
+	MergeRequests int
+	Issues        int
+	CodeReview    int
+}
+
+// Each axis as a whole-number share of the total, for labeling the chart.
+type Percents Counts
+
+const percentBase = 100
+
+// Sums the four axes.
+func (c Counts) Total() int {
+	return c.Commits + c.MergeRequests + c.Issues + c.CodeReview
+}
+
+// Converts the axes into integer percentages of the total. An empty period
+// yields all zeros instead of a division by zero.
+func (c Counts) Percent() Percents {
+	total := c.Total()
+	if total == 0 {
+		return Percents{}
+	}
+	share := func(count int) int { return count * percentBase / total }
+	return Percents{
+		Commits:       share(c.Commits),
+		MergeRequests: share(c.MergeRequests),
+		Issues:        share(c.Issues),
+		CodeReview:    share(c.CodeReview),
+	}
+}
+
+// Folds events into the four axes.
+func Count(events []Event) Counts {
+	var counts Counts
+	reviewed := make(map[int]struct{})
+	for _, event := range events {
+		if event.PushData != nil {
+			counts.Commits += commitsOf(event.PushData)
+		}
+		switch event.ActionName {
+		case actionOpened:
+			switch event.TargetType {
+			case targetMergeRequest:
+				counts.MergeRequests++
+			case targetIssue:
+				counts.Issues++
+			}
+		case actionApproved:
+			reviewed[event.TargetID] = struct{}{}
+		case actionCommented:
+			if event.Note != nil && event.Note.NoteableType == targetMergeRequest {
+				reviewed[event.Note.NoteableID] = struct{}{}
+			}
+		}
+	}
+	counts.CodeReview = len(reviewed)
+	return counts
+}
+
+// A bulk push carries no commit total, only the number of refs, so it is
+// counted as a single contribution rather than as zero commits. Removal is
+// checked first because a bulk deletion also carries a ref count.
+func commitsOf(push *PushData) int {
+	if push.Action == pushActionRemoved {
+		return 0
+	}
+	if push.RefCount != nil {
+		return 1
+	}
+	return push.CommitCount
+}

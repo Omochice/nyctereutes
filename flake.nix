@@ -81,6 +81,12 @@
                   # keep-sorted end
                 ];
               }
+              {
+                # GitLab's wire format spells the commented-on object "noteable".
+                path = "internal/activity/";
+                linters = [ "misspell" ];
+                text = "noteable";
+              }
             ];
           };
         };
