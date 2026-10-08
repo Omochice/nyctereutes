@@ -142,7 +142,7 @@
             pname = "nyctereutes";
             inherit version;
             src = self;
-            vendorHash = "sha256-0AeMPASGAPWkkEO4EqL3dhBOSNWMXnko8KMmngZhS+A=";
+            vendorHash = "sha256-lewVcFgFKOZsEBa7TB4ggIq+c88Teegx7Ke+uwxuJzE=";
             ldflags = [
               "-X github.com/Omochice/nyctereutes/nyctereutes.version=${version}"
               # The version names the last release, not this tree, so where
