@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/Omochice/nyctereutes/compare/v0.5.0...v0.5.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** update module charm.land/bubbletea/v2 to v2.0.10 ([#97](https://github.com/Omochice/nyctereutes/issues/97)) ([2dab27b](https://github.com/Omochice/nyctereutes/commit/2dab27b358b369aba0450a7e8a182dc8a54fa7d1))
+* **deps:** update module charm.land/bubbletea/v2 to v2.1.0 ([#102](https://github.com/Omochice/nyctereutes/issues/102)) ([cf1533d](https://github.com/Omochice/nyctereutes/commit/cf1533d45ef24142283e340d807523f6566faded))
+* **deps:** update module charm.land/bubbletea/v2 to v2.1.1 ([#107](https://github.com/Omochice/nyctereutes/issues/107)) ([5d05fa8](https://github.com/Omochice/nyctereutes/commit/5d05fa83c723279a9ac6ee2fde663cf3efe5705f))
+
 ## [0.5.0](https://github.com/Omochice/nyctereutes/compare/v0.4.0...v0.5.0) (2026-09-01)
 
 
