@@ -24,6 +24,7 @@ go install github.com/Omochice/nyctereutes@latest
 
 The main commands are documented in their own pages.
 
+- [activity](doc/cmd/activity.md) charts a user's contributions as an SVG radar or a JSON summary.
 - [dep](doc/cmd/dep.md) manages dependency-update merge requests.
 - [infra](doc/cmd/infra.md) manages project settings through YAML manifests.
 - [doc](doc/cmd/doc.md) reads these pages back out of the installed binary.

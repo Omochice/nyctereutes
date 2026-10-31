@@ -46,7 +46,7 @@ func TestDocShowReportsAnUnknownNameWithTheAvailableOnes(t *testing.T) {
 	if stdout != "" {
 		t.Errorf("stdout = %q, want nothing written for a failed lookup", stdout)
 	}
-	for _, want := range []string{"nope", "dep", "infra"} {
+	for _, want := range []string{"nope", "activity", "dep", "infra"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr missing %q\n%s", want, stderr)
 		}

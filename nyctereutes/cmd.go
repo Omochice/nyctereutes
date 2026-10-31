@@ -10,6 +10,7 @@ import (
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/nyctereutes/activity"
 	"github.com/Omochice/nyctereutes/nyctereutes/dep"
 	"github.com/Omochice/nyctereutes/nyctereutes/doc"
 	"github.com/Omochice/nyctereutes/nyctereutes/infra"
@@ -84,12 +85,13 @@ func (c *helpCommand) Execute(args []string) error {
 }
 
 type options struct {
-	Version    bool            `short:"v" long:"version" description:"show version"`
-	Dep        *dep.Command    `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
-	Infra      *infra.Command  `command:"infra" description:"manage infrastructure"`
-	Doc        *doc.Command    `command:"doc" description:"read the embedded documentation"`
-	Help       *helpCommand    `command:"help" description:"show help"`
-	VersionCmd *versionCommand `command:"version" description:"show version"`
+	Version    bool              `short:"v" long:"version" description:"show version"`
+	Activity   *activity.Command `command:"activity" description:"summarize a user's contributions"`
+	Dep        *dep.Command      `command:"dep" description:"manage dependencies" subcommands-optional:"true"`
+	Infra      *infra.Command    `command:"infra" description:"manage infrastructure"`
+	Doc        *doc.Command      `command:"doc" description:"read the embedded documentation"`
+	Help       *helpCommand      `command:"help" description:"show help"`
+	VersionCmd *versionCommand   `command:"version" description:"show version"`
 }
 
 // Carries the documentation pointer into every command's usage text. go-flags
@@ -113,6 +115,7 @@ func MainCommand(args []string, inout *cli.ProcInout) int {
 // package's tests pass a fake to drive the tree from the outside.
 func Dispatch(args []string, inout *cli.ProcInout, runner glab.Runner) int {
 	opts := &options{
+		Activity:   activity.New(inout, runner),
 		Dep:        dep.New(inout, runner),
 		Infra:      infra.New(inout, runner, schemaRef()),
 		Doc:        doc.New(inout),
