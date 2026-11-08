@@ -178,11 +178,24 @@ func TestParseRejectsAutomaticRebaseUnderMergeCommits(t *testing.T) {
 	}
 }
 
+func TestParseRequiresMergeMethodForAutomaticRebase(t *testing.T) {
+	doc := validDoc + "  automatic_rebase_enabled: true\n"
+	_, errs := Parse([]byte(doc))
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want exactly one error", errs)
+	}
+	if !errors.Is(errs[0], errRequiredField) {
+		t.Errorf("error %q is not a required-field error", errs[0])
+	}
+	if !strings.Contains(errs[0].Error(), "spec.merge_method") {
+		t.Errorf("error %q does not name the missing field", errs[0])
+	}
+}
+
 func TestParseAllowsAutomaticRebaseWhereItTakesEffect(t *testing.T) {
 	cases := []struct{ name, method string }{
 		{"fast_forward", "  merge_method: ff\n"},
 		{"semi_linear", "  merge_method: rebase_merge\n"},
-		{"method_undeclared", ""},
 	}
 	for _, attr := range cases {
 		t.Run(attr.name, func(t *testing.T) {

@@ -249,7 +249,7 @@ func (*MergeMethod) allowedValues() []string {
 
 // Reports whether automatic rebase before merge can take effect under the method.
 func SupportsAutomaticRebase(method MergeMethod) bool {
-	return method != valueMerge
+	return method == valueRebaseMerge || method == valueFastForward
 }
 
 // Builds the schema of a manifest enum from its allowed values, so each enum

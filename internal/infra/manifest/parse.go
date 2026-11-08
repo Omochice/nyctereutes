@@ -192,12 +192,24 @@ func (repo *Repository) validate() error {
 			return fmt.Errorf("%w: spec.description is required when spec.ci_catalog is true", errRequiredField)
 		}
 	}
-	if repo.Spec.AutomaticRebaseEnabled != nil &&
-		repo.Spec.MergeMethod != nil && !SupportsAutomaticRebase(*repo.Spec.MergeMethod) {
-		return fmt.Errorf("%w: spec.automatic_rebase_enabled when spec.merge_method is %s",
-			errIneffectiveField, *repo.Spec.MergeMethod)
+	if err := validateAutomaticRebase(&repo.Spec); err != nil {
+		return err
 	}
 	return validateSchedules(repo.Spec.PipelineSchedules)
+}
+
+func validateAutomaticRebase(spec *RepositorySpec) error {
+	if spec.AutomaticRebaseEnabled == nil {
+		return nil
+	}
+	if spec.MergeMethod == nil {
+		return fmt.Errorf("%w: spec.merge_method is required when spec.automatic_rebase_enabled is set", errRequiredField)
+	}
+	if !SupportsAutomaticRebase(*spec.MergeMethod) {
+		return fmt.Errorf("%w: spec.automatic_rebase_enabled when spec.merge_method is %s",
+			errIneffectiveField, *spec.MergeMethod)
+	}
+	return nil
 }
 
 // Pins the document header in the generated schema to the single version and
@@ -213,6 +225,7 @@ func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
 // reaches GitLab. It sits on the spec rather than on the document because the
 // rule only refers to sibling fields of the spec.
 func (RepositorySpec) JSONSchemaExtend(schema *jsonschema.Schema) {
+	schema.DependentRequired = map[string][]string{fieldAutomaticRebaseEnabled: {fieldMergeMethod}}
 	schema.AllOf = []*jsonschema.Schema{
 		whenFieldIs(fieldCICatalog, true, &jsonschema.Schema{Required: []string{fieldDescription}}),
 		whenFieldIs(fieldMergeMethod, valueMerge, &jsonschema.Schema{

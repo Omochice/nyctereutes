@@ -262,7 +262,12 @@
         }
       },
       "additionalProperties": false,
-      "type": "object"
+      "type": "object",
+      "dependentRequired": {
+        "automatic_rebase_enabled": [
+          "merge_method"
+        ]
+      }
     },
     "Visibility": {
       "type": "string",

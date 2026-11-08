@@ -234,6 +234,7 @@ func TestToManifestExportsAutomaticRebaseOnlyWhereItTakesEffect(t *testing.T) {
 		{"merge", false},
 		{"rebase_merge", true},
 		{"ff", true},
+		{"", false},
 	}
 	for _, testCase := range cases {
 		t.Run(string(testCase.method), func(t *testing.T) {
@@ -391,12 +392,12 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 		},
 		{
 			name:        "automatic_rebase_enabled_true",
-			projectJSON: `{"visibility":"private","automatic_rebase_enabled":true}`,
+			projectJSON: `{"visibility":"private","merge_method":"ff","automatic_rebase_enabled":true}`,
 			want:        []string{"automatic_rebase_enabled: true"},
 		},
 		{
 			name:        "automatic_rebase_enabled_false",
-			projectJSON: `{"visibility":"private","automatic_rebase_enabled":false}`,
+			projectJSON: `{"visibility":"private","merge_method":"ff","automatic_rebase_enabled":false}`,
 			want:        []string{"automatic_rebase_enabled: false"},
 		},
 		{
