@@ -238,6 +238,7 @@
               enable = true;
               name = "gitleaks";
               entry = "${pkgs.lib.getExe pkgs.gitleaks} git --pre-commit --redact --staged --verbose --no-banner";
+              args = pkgs.lib.mkForce [ ];
               pass_filenames = false;
             };
             renovate-config-validator = {
