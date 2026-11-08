@@ -161,21 +161,25 @@
       ]
     },
     "RepositorySpec": {
-      "if": {
-        "properties": {
-          "ci_catalog": {
-            "const": true
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ci_catalog": {
+                "const": true
+              }
+            },
+            "required": [
+              "ci_catalog"
+            ]
+          },
+          "then": {
+            "required": [
+              "description"
+            ]
           }
-        },
-        "required": [
-          "ci_catalog"
-        ]
-      },
-      "then": {
-        "required": [
-          "description"
-        ]
-      },
+        }
+      ],
       "properties": {
         "description": {
           "type": "string"

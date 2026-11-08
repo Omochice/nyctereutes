@@ -205,13 +205,18 @@ func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
 // reaches GitLab. It sits on the spec rather than on the document because the
 // rule only refers to sibling fields of the spec.
 func (RepositorySpec) JSONSchemaExtend(schema *jsonschema.Schema) {
-	catalogRequested := &jsonschema.Schema{
-		Properties: jsonschema.NewProperties(),
-		Required:   []string{fieldCICatalog},
+	schema.AllOf = []*jsonschema.Schema{
+		whenFieldIs(fieldCICatalog, true, &jsonschema.Schema{Required: []string{fieldDescription}}),
 	}
-	catalogRequested.Properties.Set(fieldCICatalog, &jsonschema.Schema{Const: true})
-	schema.If = catalogRequested
-	schema.Then = &jsonschema.Schema{Required: []string{fieldDescription}}
+}
+
+func whenFieldIs(field string, value any, then *jsonschema.Schema) *jsonschema.Schema {
+	condition := &jsonschema.Schema{
+		Properties: jsonschema.NewProperties(),
+		Required:   []string{field},
+	}
+	condition.Properties.Set(field, &jsonschema.Schema{Const: value})
+	return &jsonschema.Schema{If: condition, Then: then}
 }
 
 // Signals two schedules in one document sharing a description.
