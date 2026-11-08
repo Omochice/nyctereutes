@@ -296,6 +296,9 @@ type RepositorySpec struct {
 	// whether an accepted MR lands as a merge commit, a semi-linear merge or a
 	// fast-forward.
 	MergeMethod *MergeMethod `yaml:"merge_method,omitempty"`
+	// Takes effect only under the ff and rebase_merge methods.
+	// True under merge is not rejected: GitLab stores it and export must round-trip it.
+	AutomaticRebaseEnabled *bool `yaml:"automatic_rebase_enabled,omitempty"`
 	// Merge checks from Settings > Merge requests: an accepted MR is gated on a
 	// green pipeline and on resolved threads. allow_merge_on_skipped_pipeline
 	// relaxes the pipeline gate, treating a skipped pipeline as a success.

@@ -207,6 +207,9 @@
         "merge_method": {
           "$ref": "#/$defs/MergeMethod"
         },
+        "automatic_rebase_enabled": {
+          "type": "boolean"
+        },
         "only_allow_merge_if_pipeline_succeeds": {
           "type": "boolean"
         },
