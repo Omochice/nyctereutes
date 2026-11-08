@@ -148,7 +148,7 @@
               (pkgs.lib.getAttr ".")
             ];
           in
-          pkgs.buildGoModule {
+          pkgs.buildGoLatestModule {
             pname = "nyctereutes";
             inherit version;
             src = self;
@@ -161,7 +161,7 @@
               "-X github.com/Omochice/nyctereutes/nyctereutes.sourceRef=${self.rev or "refs/heads/main"}"
             ];
           };
-        # Run golangci-lint by reusing buildGoModule's module fetching so the
+        # Run golangci-lint by reusing buildGoLatestModule's module fetching so the
         # dependency type information is available inside the sealed
         # `nix flake check` sandbox, where the git-hooks runner cannot reach
         # the network.
@@ -188,13 +188,13 @@
           name = "gopls-check";
           runtimeInputs = [
             pkgs.git
-            pkgs.go
+            pkgs.go_latest
             pkgs.gopls
           ];
           text = ''
             # A GOROOT inherited from another Go installation makes gopls load a
             # compiler that disagrees with the `go` on PATH.
-            export GOROOT="${pkgs.go}/share/go"
+            export GOROOT="${pkgs.go_latest}/share/go"
             # gopls takes file names rather than package patterns; listing them
             # through git keeps ignored trees such as scratch worktrees out.
             mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.go')
@@ -260,7 +260,7 @@
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
-            pkgs.go
+            pkgs.go_latest
             pkgs.golangci-lint
             pkgs.nix-update
             pkgs.octocov
