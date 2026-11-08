@@ -178,6 +178,25 @@
               "description"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "merge_method": {
+                "const": "merge"
+              }
+            },
+            "required": [
+              "merge_method"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "automatic_rebase_enabled"
+              ]
+            }
+          }
         }
       ],
       "properties": {

@@ -225,6 +225,28 @@ func TestToManifest(t *testing.T) {
 	}
 }
 
+func TestToManifestExportsAutomaticRebaseOnlyWhereItTakesEffect(t *testing.T) {
+	enabled := true
+	cases := []struct {
+		method   reported
+		exported bool
+	}{
+		{"merge", false},
+		{"rebase_merge", true},
+		{"ff", true},
+	}
+	for _, testCase := range cases {
+		t.Run(string(testCase.method), func(t *testing.T) {
+			doc := ToManifest(&CurrentState{
+				rawProject: rawProject{MergeMethod: testCase.method, AutomaticRebaseEnabled: &enabled},
+			})
+			if got := doc.Spec.AutomaticRebaseEnabled != nil; got != testCase.exported {
+				t.Errorf("exported = %v, want %v", got, testCase.exported)
+			}
+		})
+	}
+}
+
 // isCatalogResource is always reported over GraphQL, so import emits ci_catalog
 // for both states rather than omitting it the way an absent REST boolean is.
 func TestToManifestEmitsCatalogResource(t *testing.T) {

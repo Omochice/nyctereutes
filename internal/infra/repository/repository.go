@@ -222,7 +222,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Topics:                           state.Topics,
 			DefaultBranch:                    optional[string](state.DefaultBranch),
 			MergeMethod:                      optional[manifest.MergeMethod](state.MergeMethod),
-			AutomaticRebaseEnabled:           state.AutomaticRebaseEnabled,
+			AutomaticRebaseEnabled:           exportedAutomaticRebase(state),
 			OnlyAllowMergeIfPipelineSucceeds: state.OnlyAllowMergeIfPipelineSucceeds,
 			AllowMergeOnSkippedPipeline:      state.AllowMergeOnSkippedPipeline,
 			OnlyAllowMergeIfAllDiscussionsAreResolved: state.OnlyAllowMergeIfAllDiscussionsAreResolved,
@@ -264,6 +264,13 @@ func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 		return nil
 	}
 	return &features
+}
+
+func exportedAutomaticRebase(state *CurrentState) *bool {
+	if !manifest.SupportsAutomaticRebase(manifest.MergeMethod(state.MergeMethod)) {
+		return nil
+	}
+	return state.AutomaticRebaseEnabled
 }
 
 // nil for a value GitLab did not report, so omitempty drops the field. The

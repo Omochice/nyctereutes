@@ -108,12 +108,14 @@ const (
 // them, and a struct tag cannot name a constant. A key spelled alike on two
 // types is one entry, because these name the key rather than the field.
 const (
-	fieldAPIVersion  = "apiVersion"
-	fieldCICatalog   = "ci_catalog"
-	fieldCron        = "cron"
-	fieldDescription = "description"
-	fieldKind        = "kind"
-	fieldRef         = "ref"
+	fieldAPIVersion             = "apiVersion"
+	fieldAutomaticRebaseEnabled = "automatic_rebase_enabled"
+	fieldCICatalog              = "ci_catalog"
+	fieldCron                   = "cron"
+	fieldDescription            = "description"
+	fieldKind                   = "kind"
+	fieldMergeMethod            = "merge_method"
+	fieldRef                    = "ref"
 )
 
 // A single GitLab project's desired state as a manifest document. Only the
@@ -245,6 +247,11 @@ func (*MergeMethod) allowedValues() []string {
 	return []string{valueMerge, valueRebaseMerge, valueFastForward}
 }
 
+// Reports whether automatic rebase before merge can take effect under the method.
+func SupportsAutomaticRebase(method MergeMethod) bool {
+	return method != valueMerge
+}
+
 // Builds the schema of a manifest enum from its allowed values, so each enum
 // type states its values once, in the method decoding already consults.
 func enumSchema(allowed []string) *jsonschema.Schema {
@@ -295,10 +302,8 @@ type RepositorySpec struct {
 	// GitLab's merge_method, from Settings > Merge requests > Merge method:
 	// whether an accepted MR lands as a merge commit, a semi-linear merge or a
 	// fast-forward.
-	MergeMethod *MergeMethod `yaml:"merge_method,omitempty"`
-	// Takes effect only under the ff and rebase_merge methods.
-	// True under merge is not rejected: GitLab stores it and export must round-trip it.
-	AutomaticRebaseEnabled *bool `yaml:"automatic_rebase_enabled,omitempty"`
+	MergeMethod            *MergeMethod `yaml:"merge_method,omitempty"`
+	AutomaticRebaseEnabled *bool        `yaml:"automatic_rebase_enabled,omitempty"`
 	// Merge checks from Settings > Merge requests: an accepted MR is gated on a
 	// green pipeline and on resolved threads. allow_merge_on_skipped_pipeline
 	// relaxes the pipeline gate, treating a skipped pipeline as a success.

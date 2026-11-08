@@ -160,6 +160,40 @@ func TestParseAllowsCICatalogWithDescription(t *testing.T) {
 	}
 }
 
+func TestParseRejectsAutomaticRebaseUnderMergeCommits(t *testing.T) {
+	for _, value := range []string{"true", "false"} {
+		t.Run(value, func(t *testing.T) {
+			doc := validDoc + "  merge_method: merge\n  automatic_rebase_enabled: " + value + "\n"
+			_, errs := Parse([]byte(doc))
+			if len(errs) != 1 {
+				t.Fatalf("errs = %v, want exactly one error", errs)
+			}
+			if !errors.Is(errs[0], errIneffectiveField) {
+				t.Errorf("error %q is not an ineffective-field error", errs[0])
+			}
+			if !strings.Contains(errs[0].Error(), "spec.automatic_rebase_enabled") {
+				t.Errorf("error %q does not name the field", errs[0])
+			}
+		})
+	}
+}
+
+func TestParseAllowsAutomaticRebaseWhereItTakesEffect(t *testing.T) {
+	cases := []struct{ name, method string }{
+		{"fast_forward", "  merge_method: ff\n"},
+		{"semi_linear", "  merge_method: rebase_merge\n"},
+		{"method_undeclared", ""},
+	}
+	for _, attr := range cases {
+		t.Run(attr.name, func(t *testing.T) {
+			doc := validDoc + attr.method + "  automatic_rebase_enabled: true\n"
+			if _, errs := Parse([]byte(doc)); len(errs) > 0 {
+				t.Fatalf("errs = %v, want the manifest to validate", errs)
+			}
+		})
+	}
+}
+
 // A hand-written manifest may omit spec fields entirely; only metadata is
 // required.
 func TestParseAllowsMinimalSpec(t *testing.T) {

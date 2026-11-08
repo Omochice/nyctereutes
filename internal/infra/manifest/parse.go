@@ -17,6 +17,8 @@ var (
 	errUnsupportedAPIVersion = errors.New("unsupported apiVersion")
 	// Signals a field the schema requires but the document leaves empty.
 	errRequiredField = errors.New("required field is missing")
+	// Signals a declared field that another declared field leaves without effect.
+	errIneffectiveField = errors.New("field has no effect")
 	// Signals an in-line "--- content" marker, which this parser does not accept.
 	errInlineDocument = errors.New("unsupported inline document after ---")
 	// Reports a document holding nothing but comments or whitespace; the
@@ -171,8 +173,9 @@ func parseDocument(frag documentFragment) (*Repository, error) {
 }
 
 // The checks the schema types cannot express themselves: metadata must address
-// a GitLab project, the catalog needs a description, and the schedules must be
-// individually valid and distinctly described.
+// a GitLab project, the catalog needs a description, automatic rebase needs a
+// merge method it applies to, and the schedules must be individually valid and
+// distinctly described.
 func (repo *Repository) validate() error {
 	if repo.Metadata.Name == "" {
 		return fmt.Errorf("%w: metadata.name", errRequiredField)
@@ -189,6 +192,11 @@ func (repo *Repository) validate() error {
 			return fmt.Errorf("%w: spec.description is required when spec.ci_catalog is true", errRequiredField)
 		}
 	}
+	if repo.Spec.AutomaticRebaseEnabled != nil &&
+		repo.Spec.MergeMethod != nil && !SupportsAutomaticRebase(*repo.Spec.MergeMethod) {
+		return fmt.Errorf("%w: spec.automatic_rebase_enabled when spec.merge_method is %s",
+			errIneffectiveField, *repo.Spec.MergeMethod)
+	}
 	return validateSchedules(repo.Spec.PipelineSchedules)
 }
 
@@ -200,13 +208,16 @@ func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
 	schema.Properties.Value(fieldKind).Const = KindRepository
 }
 
-// Restates the catalog prerequisite above as the conditional the generated
+// Restates the cross-field rules above as the conditionals the generated
 // schema can express, so an editor flags the combination before an apply
 // reaches GitLab. It sits on the spec rather than on the document because the
 // rule only refers to sibling fields of the spec.
 func (RepositorySpec) JSONSchemaExtend(schema *jsonschema.Schema) {
 	schema.AllOf = []*jsonschema.Schema{
 		whenFieldIs(fieldCICatalog, true, &jsonschema.Schema{Required: []string{fieldDescription}}),
+		whenFieldIs(fieldMergeMethod, valueMerge, &jsonschema.Schema{
+			Not: &jsonschema.Schema{Required: []string{fieldAutomaticRebaseEnabled}},
+		}),
 	}
 }
 
