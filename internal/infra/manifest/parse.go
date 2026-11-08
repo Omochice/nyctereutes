@@ -17,6 +17,8 @@ var (
 	errUnsupportedAPIVersion = errors.New("unsupported apiVersion")
 	// Signals a field the schema requires but the document leaves empty.
 	errRequiredField = errors.New("required field is missing")
+	// Signals a declared field that another declared field leaves without effect.
+	errIneffectiveField = errors.New("field has no effect")
 	// Signals an in-line "--- content" marker, which this parser does not accept.
 	errInlineDocument = errors.New("unsupported inline document after ---")
 	// Reports a document holding nothing but comments or whitespace; the
@@ -171,8 +173,9 @@ func parseDocument(frag documentFragment) (*Repository, error) {
 }
 
 // The checks the schema types cannot express themselves: metadata must address
-// a GitLab project, the catalog needs a description, and the schedules must be
-// individually valid and distinctly described.
+// a GitLab project, the catalog needs a description, automatic rebase needs a
+// merge method it applies to, and the schedules must be individually valid and
+// distinctly described.
 func (repo *Repository) validate() error {
 	if repo.Metadata.Name == "" {
 		return fmt.Errorf("%w: metadata.name", errRequiredField)
@@ -189,7 +192,24 @@ func (repo *Repository) validate() error {
 			return fmt.Errorf("%w: spec.description is required when spec.ci_catalog is true", errRequiredField)
 		}
 	}
+	if err := validateAutomaticRebase(&repo.Spec); err != nil {
+		return err
+	}
 	return validateSchedules(repo.Spec.PipelineSchedules)
+}
+
+func validateAutomaticRebase(spec *RepositorySpec) error {
+	if spec.AutomaticRebaseEnabled == nil {
+		return nil
+	}
+	if spec.MergeMethod == nil {
+		return fmt.Errorf("%w: spec.merge_method is required when spec.automatic_rebase_enabled is set", errRequiredField)
+	}
+	if !SupportsAutomaticRebase(*spec.MergeMethod) {
+		return fmt.Errorf("%w: spec.automatic_rebase_enabled when spec.merge_method is %s",
+			errIneffectiveField, *spec.MergeMethod)
+	}
+	return nil
 }
 
 // Pins the document header in the generated schema to the single version and
@@ -200,18 +220,27 @@ func (Repository) JSONSchemaExtend(schema *jsonschema.Schema) {
 	schema.Properties.Value(fieldKind).Const = KindRepository
 }
 
-// Restates the catalog prerequisite above as the conditional the generated
+// Restates the cross-field rules above as the conditionals the generated
 // schema can express, so an editor flags the combination before an apply
 // reaches GitLab. It sits on the spec rather than on the document because the
 // rule only refers to sibling fields of the spec.
 func (RepositorySpec) JSONSchemaExtend(schema *jsonschema.Schema) {
-	catalogRequested := &jsonschema.Schema{
-		Properties: jsonschema.NewProperties(),
-		Required:   []string{fieldCICatalog},
+	schema.DependentRequired = map[string][]string{fieldAutomaticRebaseEnabled: {fieldMergeMethod}}
+	schema.AllOf = []*jsonschema.Schema{
+		whenFieldIs(fieldCICatalog, true, &jsonschema.Schema{Required: []string{fieldDescription}}),
+		whenFieldIs(fieldMergeMethod, valueMerge, &jsonschema.Schema{
+			Not: &jsonschema.Schema{Required: []string{fieldAutomaticRebaseEnabled}},
+		}),
 	}
-	catalogRequested.Properties.Set(fieldCICatalog, &jsonschema.Schema{Const: true})
-	schema.If = catalogRequested
-	schema.Then = &jsonschema.Schema{Required: []string{fieldDescription}}
+}
+
+func whenFieldIs(field string, value any, then *jsonschema.Schema) *jsonschema.Schema {
+	condition := &jsonschema.Schema{
+		Properties: jsonschema.NewProperties(),
+		Required:   []string{field},
+	}
+	condition.Properties.Set(field, &jsonschema.Schema{Const: value})
+	return &jsonschema.Schema{If: condition, Then: then}
 }
 
 // Signals two schedules in one document sharing a description.

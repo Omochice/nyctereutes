@@ -223,6 +223,11 @@ func TestDiffReportsBooleanChanges(t *testing.T) {
 			state: rawProject{EnforceAuthChecksOnUploads: &disabled},
 		},
 		{
+			name:  "automatic_rebase_enabled",
+			spec:  manifest.RepositorySpec{AutomaticRebaseEnabled: &enabled},
+			state: rawProject{AutomaticRebaseEnabled: &disabled},
+		},
+		{
 			name:  "only_allow_merge_if_pipeline_succeeds",
 			spec:  manifest.RepositorySpec{OnlyAllowMergeIfPipelineSucceeds: &enabled},
 			state: rawProject{OnlyAllowMergeIfPipelineSucceeds: &disabled},
@@ -250,6 +255,30 @@ func TestDiffReportsBooleanChanges(t *testing.T) {
 			}
 			if changes[0].OldValue != false || changes[0].NewValue != true {
 				t.Errorf("values = %v → %v, want false → true", changes[0].OldValue, changes[0].NewValue)
+			}
+		})
+	}
+}
+
+func TestDiffReadsUnreportedAutomaticRebaseAsDisabled(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		declared bool
+		want     int
+	}{
+		{"declared_false_is_no_drift", false, 0},
+		{"declared_true_is_drift", true, 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			desired := &manifest.Repository{
+				Metadata: manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+				Spec:     manifest.RepositorySpec{AutomaticRebaseEnabled: &testCase.declared},
+			}
+
+			changes := Diff(desired, &CurrentState{})
+
+			if len(changes) != testCase.want {
+				t.Fatalf("changes = %+v, want %d", changes, testCase.want)
 			}
 		})
 	}

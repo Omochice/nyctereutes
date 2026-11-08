@@ -156,6 +156,7 @@ type rawProject struct {
 	Archived                   *bool `json:"archived"`
 	RequestAccessEnabled       *bool `json:"request_access_enabled"`
 	EnforceAuthChecksOnUploads *bool `json:"enforce_auth_checks_on_uploads"`
+	AutomaticRebaseEnabled     *bool `json:"automatic_rebase_enabled"`
 	// Merge checks; the gates on a green pipeline and on resolved threads.
 	OnlyAllowMergeIfPipelineSucceeds          *bool     `json:"only_allow_merge_if_pipeline_succeeds"`
 	AllowMergeOnSkippedPipeline               *bool     `json:"allow_merge_on_skipped_pipeline"`
@@ -221,6 +222,7 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			Topics:                           state.Topics,
 			DefaultBranch:                    optional[string](state.DefaultBranch),
 			MergeMethod:                      optional[manifest.MergeMethod](state.MergeMethod),
+			AutomaticRebaseEnabled:           exportedAutomaticRebase(state),
 			OnlyAllowMergeIfPipelineSucceeds: state.OnlyAllowMergeIfPipelineSucceeds,
 			AllowMergeOnSkippedPipeline:      state.AllowMergeOnSkippedPipeline,
 			OnlyAllowMergeIfAllDiscussionsAreResolved: state.OnlyAllowMergeIfAllDiscussionsAreResolved,
@@ -262,6 +264,13 @@ func toFeatures(state *CurrentState) *manifest.RepositoryFeatures {
 		return nil
 	}
 	return &features
+}
+
+func exportedAutomaticRebase(state *CurrentState) *bool {
+	if !manifest.SupportsAutomaticRebase(manifest.MergeMethod(state.MergeMethod)) {
+		return nil
+	}
+	return state.AutomaticRebaseEnabled
 }
 
 // nil for a value GitLab did not report, so omitempty drops the field. The

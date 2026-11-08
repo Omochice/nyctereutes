@@ -225,6 +225,29 @@ func TestToManifest(t *testing.T) {
 	}
 }
 
+func TestToManifestExportsAutomaticRebaseOnlyWhereItTakesEffect(t *testing.T) {
+	enabled := true
+	cases := []struct {
+		method   reported
+		exported bool
+	}{
+		{"merge", false},
+		{"rebase_merge", true},
+		{"ff", true},
+		{"", false},
+	}
+	for _, testCase := range cases {
+		t.Run(string(testCase.method), func(t *testing.T) {
+			doc := ToManifest(&CurrentState{
+				rawProject: rawProject{MergeMethod: testCase.method, AutomaticRebaseEnabled: &enabled},
+			})
+			if got := doc.Spec.AutomaticRebaseEnabled != nil; got != testCase.exported {
+				t.Errorf("exported = %v, want %v", got, testCase.exported)
+			}
+		})
+	}
+}
+
 // isCatalogResource is always reported over GraphQL, so import emits ci_catalog
 // for both states rather than omitting it the way an absent REST boolean is.
 func TestToManifestEmitsCatalogResource(t *testing.T) {
@@ -366,6 +389,16 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 			name:        "enforce_auth_checks_on_uploads_true",
 			projectJSON: `{"visibility":"private","request_access_enabled":false,"enforce_auth_checks_on_uploads":true}`,
 			want:        []string{"request_access_enabled: false", "enforce_auth_checks_on_uploads: true"},
+		},
+		{
+			name:        "automatic_rebase_enabled_true",
+			projectJSON: `{"visibility":"private","merge_method":"ff","automatic_rebase_enabled":true}`,
+			want:        []string{"automatic_rebase_enabled: true"},
+		},
+		{
+			name:        "automatic_rebase_enabled_false",
+			projectJSON: `{"visibility":"private","merge_method":"ff","automatic_rebase_enabled":false}`,
+			want:        []string{"automatic_rebase_enabled: false"},
 		},
 		{
 			name: "merge_checks_pipeline_and_discussions_on",
@@ -534,6 +567,7 @@ func TestFetchRepositoryOmitsBooleansWhenAbsent(t *testing.T) {
 	out := exportYAML(t, `{"visibility":"private"}`)
 	for _, key := range []string{
 		"request_access_enabled", "enforce_auth_checks_on_uploads", "archived",
+		"automatic_rebase_enabled",
 		"only_allow_merge_if_pipeline_succeeds", "allow_merge_on_skipped_pipeline",
 		"only_allow_merge_if_all_discussions_are_resolved",
 	} {

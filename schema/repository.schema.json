@@ -161,21 +161,44 @@
       ]
     },
     "RepositorySpec": {
-      "if": {
-        "properties": {
-          "ci_catalog": {
-            "const": true
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ci_catalog": {
+                "const": true
+              }
+            },
+            "required": [
+              "ci_catalog"
+            ]
+          },
+          "then": {
+            "required": [
+              "description"
+            ]
           }
         },
-        "required": [
-          "ci_catalog"
-        ]
-      },
-      "then": {
-        "required": [
-          "description"
-        ]
-      },
+        {
+          "if": {
+            "properties": {
+              "merge_method": {
+                "const": "merge"
+              }
+            },
+            "required": [
+              "merge_method"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "automatic_rebase_enabled"
+              ]
+            }
+          }
+        }
+      ],
       "properties": {
         "description": {
           "type": "string"
@@ -207,6 +230,9 @@
         "merge_method": {
           "$ref": "#/$defs/MergeMethod"
         },
+        "automatic_rebase_enabled": {
+          "type": "boolean"
+        },
         "only_allow_merge_if_pipeline_succeeds": {
           "type": "boolean"
         },
@@ -236,7 +262,12 @@
         }
       },
       "additionalProperties": false,
-      "type": "object"
+      "type": "object",
+      "dependentRequired": {
+        "automatic_rebase_enabled": [
+          "merge_method"
+        ]
+      }
     },
     "Visibility": {
       "type": "string",
