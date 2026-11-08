@@ -33,6 +33,7 @@ const (
 	fieldEnforceAuthChecksOnUploads = "enforce_auth_checks_on_uploads"
 	fieldDefaultBranch              = "default_branch"
 	fieldMergeMethod                = "merge_method"
+	fieldAutomaticRebaseEnabled     = "automatic_rebase_enabled"
 
 	fieldOnlyAllowMergeIfPipelineSucceeds          = "only_allow_merge_if_pipeline_succeeds"
 	fieldAllowMergeOnSkippedPipeline               = "allow_merge_on_skipped_pipeline"
@@ -123,6 +124,8 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 		spec.EnforceAuthChecksOnUploads, boolValue(current.EnforceAuthChecksOnUploads))
 	appendChanged(&changes, name, fieldDefaultBranch, spec.DefaultBranch, string(current.DefaultBranch))
 	appendChanged(&changes, name, fieldMergeMethod, spec.MergeMethod, manifest.MergeMethod(current.MergeMethod))
+	appendChanged(&changes, name, fieldAutomaticRebaseEnabled,
+		spec.AutomaticRebaseEnabled, boolValue(current.AutomaticRebaseEnabled))
 	appendChanged(&changes, name, fieldOnlyAllowMergeIfPipelineSucceeds,
 		spec.OnlyAllowMergeIfPipelineSucceeds, boolValue(current.OnlyAllowMergeIfPipelineSucceeds))
 	appendChanged(&changes, name, fieldAllowMergeOnSkippedPipeline,

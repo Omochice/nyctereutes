@@ -335,6 +335,7 @@ func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
 		{"merge_commit_template", fieldMergeCommitTemplate, "%{title}", "-f merge_commit_template=%{title}"},
 		{"request_access_enabled", fieldRequestAccessEnabled, true, "-f request_access_enabled=true"},
 		{"enforce_auth_checks", fieldEnforceAuthChecksOnUploads, false, "-f enforce_auth_checks_on_uploads=false"},
+		{"automatic_rebase_enabled", fieldAutomaticRebaseEnabled, true, "-f automatic_rebase_enabled=true"},
 		{"pipeline_succeeds", fieldOnlyAllowMergeIfPipelineSucceeds, true, "-f only_allow_merge_if_pipeline_succeeds=true"},
 		{"skipped_pipeline", fieldAllowMergeOnSkippedPipeline, false, "-f allow_merge_on_skipped_pipeline=false"},
 		{
