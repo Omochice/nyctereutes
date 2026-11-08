@@ -45,7 +45,6 @@
               "depguard" # requires an explicit import policy to be useful
               "exhaustruct" # test fixtures and go-flags structs init only some fields
               "exhaustruct_v5" # successor of exhaustruct, flags the same partial inits
-              "godoclint" # forces godoc comments to restate the symbol name
               "gomodguard" # deprecated in v2.12, superseded by gomodguard_v2
               "nlreturn" # blank-line-before-return style, overlaps wsl
               "noinlineerr" # forbids the idiomatic inline error check
@@ -59,6 +58,16 @@
               "wsl_v5" # successor of wsl, same opinionated whitespace rules
               # keep-sorted end
             ];
+            settings.godoclint = {
+              default = "all";
+              disable = [
+                # keep-sorted start
+                "max-len" # enforces a wrap width the reader's editor should own
+                "pkg-doc" # forces restating the package name
+                "start-with-name" # forces restating the symbol name
+                # keep-sorted end
+              ];
+            };
             # Found only on the value type, while the decoding methods on the
             # same types need pointers.
             settings.recvcheck.exclusions = [
@@ -77,6 +86,7 @@
                   # keep-sorted start
                   "err113"
                   "goconst"
+                  "godoclint"
                   "wrapcheck"
                   # keep-sorted end
                 ];
@@ -138,7 +148,7 @@
               (pkgs.lib.getAttr ".")
             ];
           in
-          pkgs.buildGoModule {
+          pkgs.buildGoLatestModule {
             pname = "nyctereutes";
             inherit version;
             src = self;
@@ -151,7 +161,7 @@
               "-X github.com/Omochice/nyctereutes/nyctereutes.sourceRef=${self.rev or "refs/heads/main"}"
             ];
           };
-        # Run golangci-lint by reusing buildGoModule's module fetching so the
+        # Run golangci-lint by reusing buildGoLatestModule's module fetching so the
         # dependency type information is available inside the sealed
         # `nix flake check` sandbox, where the git-hooks runner cannot reach
         # the network.
@@ -174,39 +184,17 @@
             runHook postInstall
           '';
         });
-        # godoclint needs the same dependency type information as golangci-lint,
-        # so reuse buildGoModule's module fetching for the sealed sandbox.
-        # start-with-name and pkg-doc force restating the symbol/package name,
-        # and max-len enforces a wrap width the reader's editor should own.
-        godoclint-check = nyctereutes.overrideAttrs (previousAttrs: {
-          pname = "${previousAttrs.pname}-godoclint";
-          nativeBuildInputs = (previousAttrs.nativeBuildInputs or [ ]) ++ [
-            pkgs.godoclint
-          ];
-          doCheck = false;
-          buildPhase = ''
-            runHook preBuild
-            export HOME="$TMPDIR"
-            godoclint -default=all -disable=start-with-name,pkg-doc,max-len ./...
-            runHook postBuild
-          '';
-          installPhase = ''
-            runHook preInstall
-            touch "$out"
-            runHook postInstall
-          '';
-        });
         gopls-check = pkgs.writeShellApplication {
           name = "gopls-check";
           runtimeInputs = [
             pkgs.git
-            pkgs.go
+            pkgs.go_latest
             pkgs.gopls
           ];
           text = ''
             # A GOROOT inherited from another Go installation makes gopls load a
             # compiler that disagrees with the `go` on PATH.
-            export GOROOT="${pkgs.go}/share/go"
+            export GOROOT="${pkgs.go_latest}/share/go"
             # gopls takes file names rather than package patterns; listing them
             # through git keeps ignored trees such as scratch worktrees out.
             mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.go')
@@ -267,14 +255,12 @@
         apps.gopls-check = flake-utils.lib.mkApp { drv = gopls-check; };
         checks = {
           git-hooks = gitHooks;
-          godoclint = godoclint-check;
           golangci-lint = golangci-lint-check;
           inherit nyctereutes;
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
-            pkgs.go
-            pkgs.godoclint
+            pkgs.go_latest
             pkgs.golangci-lint
             pkgs.nix-update
             pkgs.octocov
