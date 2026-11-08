@@ -368,6 +368,16 @@ func TestFetchRepositoryMapsVisibilityBooleans(t *testing.T) {
 			want:        []string{"request_access_enabled: false", "enforce_auth_checks_on_uploads: true"},
 		},
 		{
+			name:        "automatic_rebase_enabled_true",
+			projectJSON: `{"visibility":"private","automatic_rebase_enabled":true}`,
+			want:        []string{"automatic_rebase_enabled: true"},
+		},
+		{
+			name:        "automatic_rebase_enabled_false",
+			projectJSON: `{"visibility":"private","automatic_rebase_enabled":false}`,
+			want:        []string{"automatic_rebase_enabled: false"},
+		},
+		{
 			name: "merge_checks_pipeline_and_discussions_on",
 			projectJSON: `{"visibility":"private","only_allow_merge_if_pipeline_succeeds":true,` +
 				`"allow_merge_on_skipped_pipeline":false,"only_allow_merge_if_all_discussions_are_resolved":true}`,
@@ -534,6 +544,7 @@ func TestFetchRepositoryOmitsBooleansWhenAbsent(t *testing.T) {
 	out := exportYAML(t, `{"visibility":"private"}`)
 	for _, key := range []string{
 		"request_access_enabled", "enforce_auth_checks_on_uploads", "archived",
+		"automatic_rebase_enabled",
 		"only_allow_merge_if_pipeline_succeeds", "allow_merge_on_skipped_pipeline",
 		"only_allow_merge_if_all_discussions_are_resolved",
 	} {
