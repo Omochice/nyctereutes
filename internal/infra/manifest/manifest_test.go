@@ -92,9 +92,8 @@ func settingsUIKeyOrder() []string {
 	}
 }
 
-// A protected branch's own attributes in declaration order. Pinned separately
-// from the spec keys for the reason [scheduleKeyOrder] gives: "name" also names
-// a key on the metadata, so a single flat list would scan for it twice.
+// A protected branch's own attributes in declaration order.
+// Pinned apart from the spec keys for the reason [scheduleKeyOrder] gives: "name" is also a metadata key.
 func protectedBranchKeyOrder() []string {
 	return []string{"name", "push_access_level", "merge_access_level", "allow_force_push"}
 }

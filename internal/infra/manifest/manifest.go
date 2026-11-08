@@ -325,10 +325,7 @@ type RepositorySpec struct {
 	// two states into one and leaving a deletion as the only thing silence could
 	// mean.
 	PipelineSchedules []PipelineSchedule `yaml:"pipeline_schedules,omitzero"`
-	// The second child resource, carrying the same three states as the schedules
-	// above and for the same reason. Placed after them because the settings a
-	// branch protection guards are declared higher up.
-	ProtectedBranches []ProtectedBranch `yaml:"protected_branches,omitzero"`
+	ProtectedBranches []ProtectedBranch  `yaml:"protected_branches,omitzero"`
 }
 
 // The per-feature access levels of a GitLab project; an unset feature is

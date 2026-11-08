@@ -269,9 +269,7 @@ func validateSchedules(schedules []PipelineSchedule) error {
 // Signals two protected branches in one document sharing a name.
 var errDuplicateProtectedBranch = errors.New("duplicate protected branch name")
 
-// Checks each protected branch and rejects a repeated name. GitLab answers a
-// second protection of the same name with 409, so a document declaring one
-// twice could never apply; catching it here turns that into a local error.
+// GitLab answers a second protection of the same name with 409, so a repeated name is refused before an apply meets it.
 func validateProtectedBranches(branches []ProtectedBranch) error {
 	seen := make(map[string]struct{}, len(branches))
 	for index, branch := range branches {

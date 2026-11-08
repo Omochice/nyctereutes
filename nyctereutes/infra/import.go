@@ -74,10 +74,9 @@ func (c *importCommand) Execute(args []string) error {
 	return errors.Join(failed, partial)
 }
 
-// The child resources a target was exported without, because reading them
-// failed. The document is still written, so this describes a partial export
-// rather than a failed one. A child resource added later takes a field here
-// instead of another result threaded back through [importCommand.document].
+// The child resources a target was exported without.
+// The document is still written, so the export is partial rather than failed.
+// A struct, not a bool, so the next resource adds a field here rather than another result of [importCommand.document].
 type unreadResources struct {
 	schedules bool
 }
