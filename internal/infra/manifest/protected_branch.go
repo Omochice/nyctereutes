@@ -66,8 +66,7 @@ func (level *BranchAccessLevel) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-// Reports the branch access levels to the schema generator, which cannot see
-// through UnmarshalYAML.
+// Reports the branch access levels to the schema generator, which cannot see through UnmarshalYAML.
 func (level BranchAccessLevel) JSONSchema() *jsonschema.Schema {
 	return enumSchema(level.allowedValues())
 }

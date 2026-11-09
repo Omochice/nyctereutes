@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// One fully spelled-out protected branch, so a decode test can assert every
-// attribute without a default standing in for a declared one.
+// One fully spelled-out protected branch.
+// A decode test can assert every attribute of it without a default standing in for a declared one.
 const protectedBranchDoc = `apiVersion: nyctereutes/v1
 kind: Repository
 metadata:
@@ -22,8 +22,8 @@ spec:
       allow_force_push: true
 `
 
-// Every attribute a document spells out survives decoding, so a declared
-// protection is read as written rather than as the defaults below.
+// Every attribute a document spells out survives decoding.
+// A declared protection is read as written rather than as the defaults below.
 func TestParseReadsProtectedBranches(t *testing.T) {
 	repos, errs := Parse([]byte(protectedBranchDoc))
 	if len(errs) > 0 {
@@ -40,8 +40,8 @@ func TestParseReadsProtectedBranches(t *testing.T) {
 	}
 }
 
-// A branch declaring only its name takes what GitLab would grant on create, so
-// the manifest and the live state agree about a protection nobody spelled out.
+// A branch declaring only its name takes what GitLab would grant on create.
+// The manifest and the live state then agree about a protection nobody spelled out.
 func TestParseFillsOmittedProtectedBranchAttributesWithGitLabDefaults(t *testing.T) {
 	doc := validDoc + `  protected_branches:
     - name: main
@@ -62,8 +62,8 @@ func TestParseFillsOmittedProtectedBranchAttributesWithGitLabDefaults(t *testing
 	}
 }
 
-// The wildcard patterns GitLab accepts are branch names as far as the manifest
-// is concerned, so nothing rewrites them the way a bare ref is expanded.
+// The wildcard patterns GitLab accepts are branch names as far as the manifest is concerned.
+// Nothing rewrites them the way a bare ref is expanded.
 func TestParseKeepsAProtectedBranchWildcardVerbatim(t *testing.T) {
 	doc := validDoc + `  protected_branches:
     - name: release/*
@@ -77,9 +77,8 @@ func TestParseKeepsAProtectedBranchWildcardVerbatim(t *testing.T) {
 	}
 }
 
-// The two ways of writing "no protected branches" mean different things, so
-// decoding must keep them apart: an omitted block leaves the live protections
-// alone, while an empty list declares that none should exist.
+// The two ways of writing "no protected branches" mean different things, so decoding must keep them apart.
+// An omitted block leaves the live protections alone, while an empty list declares that none should exist.
 func TestParseDistinguishesOmittedProtectedBranchesFromAnEmptyList(t *testing.T) {
 	omitted, errs := Parse([]byte(validDoc))
 	if len(errs) > 0 {
@@ -102,10 +101,10 @@ func TestParseDistinguishesOmittedProtectedBranchesFromAnEmptyList(t *testing.T)
 	}
 }
 
-// A branch decodes itself, so the strict decoding the surrounding document gets
-// does not reach inside it unless the nested decode asks for it too. The two
-// Premium keys GitLab CE never reports are the mistypes most likely to be
-// tried, so they must be refused rather than dropped in silence.
+// A branch decodes itself.
+// The strict decoding the surrounding document gets does not reach inside it unless the nested decode asks for it too.
+// The two Premium keys GitLab CE never reports are the mistypes most likely to be tried.
+// They must be refused rather than dropped in silence.
 func TestParseRejectsUnknownKeyInsideAProtectedBranch(t *testing.T) {
 	for _, key := range []string{"unprotect_access_level: maintainer", "code_owner_approval_required: true"} {
 		t.Run(key, func(t *testing.T) {
@@ -120,9 +119,9 @@ func TestParseRejectsUnknownKeyInsideAProtectedBranch(t *testing.T) {
 	}
 }
 
-// The name is what GitLab addresses a protection by, so one left empty could
-// neither be created nor paired with a live branch. The error locates it by
-// position, because nothing else identifies it.
+// The name is what GitLab addresses a protection by.
+// One left empty could neither be created nor paired with a live branch.
+// The error locates it by position, because nothing else identifies it.
 func TestParseRequiresAProtectedBranchName(t *testing.T) {
 	doc := validDoc + `  protected_branches:
     - name: main
@@ -137,9 +136,8 @@ func TestParseRequiresAProtectedBranchName(t *testing.T) {
 	}
 }
 
-// GitLab answers a second protection of the same name with 409, so a document
-// declaring one twice could never apply. The error names the branch because
-// that is what the reader has to go and change.
+// GitLab answers a second protection of the same name with 409, so a document declaring one twice could never apply.
+// The error names the branch because that is what the reader has to go and change.
 func TestParseRejectsDuplicateProtectedBranchNames(t *testing.T) {
 	doc := validDoc + `  protected_branches:
     - name: main
@@ -155,9 +153,8 @@ func TestParseRejectsDuplicateProtectedBranchNames(t *testing.T) {
 	}
 }
 
-// An empty protected-branch list survives Marshal as "protected_branches: []"
-// rather than being dropped the way an unset value is, so an export of a
-// project holding none says so.
+// An empty protected-branch list survives Marshal as "protected_branches: []".
+// It is not dropped the way an unset value is, so an export of a project holding none says so.
 func TestMarshalKeepsAnEmptyProtectedBranchList(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.ProtectedBranches = []ProtectedBranch{}
@@ -171,8 +168,7 @@ func TestMarshalKeepsAnEmptyProtectedBranchList(t *testing.T) {
 	}
 }
 
-// A document that says nothing about the protections emits no key, and parsing
-// that output says nothing again.
+// A document that says nothing about the protections emits no key, and parsing that output says nothing again.
 func TestMarshalOmitsUndeclaredProtectedBranches(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.ProtectedBranches = nil
@@ -186,9 +182,9 @@ func TestMarshalOmitsUndeclaredProtectedBranches(t *testing.T) {
 	}
 }
 
-// A branch whose push is denied to everyone is the reason "no_one" exists, and
-// it is also the value a boolean-shaped default would quietly turn into
-// something else, so it has to survive the whole round trip.
+// A branch whose push is denied to everyone is the reason "no_one" exists.
+// It is also the value a boolean-shaped default would quietly turn into something else.
+// It therefore has to survive the whole round trip.
 func TestMarshalKeepsABranchNobodyMayPushTo(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.ProtectedBranches = []ProtectedBranch{{

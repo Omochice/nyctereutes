@@ -82,9 +82,9 @@ type unreadResources struct {
 }
 
 // Builds one target's manifest document, or nil when it cannot be described.
-// Each way of failing is reported here and answered with no document, which is
-// what keeps one target's failure from ending the run. The second result names
-// the child resources the document was built without.
+// Each way of failing is reported here and answered with no document.
+// That is what keeps one target's failure from ending the run.
+// The second result names the child resources the document was built without.
 func (c *importCommand) document(
 	ctx context.Context, client *repository.Client, target string,
 ) (data []byte, unread unreadResources) {

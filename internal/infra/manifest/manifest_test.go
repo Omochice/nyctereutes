@@ -184,8 +184,8 @@ func TestRepositoryMarshalsKeysInSettingsUIOrder(t *testing.T) {
 		section = section[idx+len(key):]
 	}
 
-	// The branches follow the schedules, so their scan continues from where the
-	// schedule attributes left off rather than restarting at the document.
+	// The branches follow the schedules.
+	// Their scan continues from where the schedule attributes left off rather than restarting at the document.
 	if len(fullRepository().Spec.ProtectedBranches) == 0 {
 		t.Fatal("the fixture must declare a protected branch to pin a branch's key order")
 	}

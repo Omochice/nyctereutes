@@ -172,10 +172,10 @@ func parseDocument(frag documentFragment) (*Repository, error) {
 	return &repo, nil
 }
 
-// The checks the schema types cannot express themselves: metadata must address
-// a GitLab project, the catalog needs a description, automatic rebase needs a
-// merge method it applies to, and the child resources must be individually
-// valid and distinctly identified.
+// The checks the schema types cannot express themselves.
+// Metadata must address a GitLab project and the catalog needs a description.
+// Automatic rebase needs a merge method it applies to.
+// The child resources must be individually valid and distinctly identified.
 func (repo *Repository) validate() error {
 	if repo.Metadata.Name == "" {
 		return fmt.Errorf("%w: metadata.name", errRequiredField)
