@@ -16,9 +16,9 @@ func declaringBranches(branches []manifest.ProtectedBranch) *manifest.Repository
 	}
 }
 
-// Live state holding the given protections, read from an instance that reports
-// no unprotect access level, which is what a Community Edition build answers. A
-// nil slice is a project whose protections were not read at all.
+// Live state holding the given protections, read from an instance that reports no unprotect access level.
+// That is what a Community Edition build answers.
+// A nil slice is a project whose protections were not read at all.
 func holdingBranches(branches []manifest.ProtectedBranch) *CurrentState {
 	if branches == nil {
 		return &CurrentState{Owner: ownerGroup, Name: nameProj}
@@ -171,10 +171,9 @@ func TestDiffPairsAWildcardBranchByItsName(t *testing.T) {
 	}
 }
 
-// A declaration silent about the unprotect level is not a demand that it be
-// cleared, so a live one is left alone rather than planned as drift. Without
-// this a document exported from a CE build would report perpetual drift the
-// moment it was pointed at an Enterprise one.
+// A declaration silent about the unprotect level is not a demand that it be cleared.
+// A live one is left alone rather than planned as drift.
+// Without this a document exported from a CE build would report perpetual drift once pointed at an Enterprise one.
 func TestDiffLeavesALiveUnprotectLevelAloneWhenTheDocumentIsSilent(t *testing.T) {
 	live := branch("main", roleMaintainer)
 	live.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
@@ -189,8 +188,7 @@ func TestDiffLeavesALiveUnprotectLevelAloneWhenTheDocumentIsSilent(t *testing.T)
 	}
 }
 
-// A declared unprotect level that differs is drift like any other attribute,
-// and the plan names it.
+// A declared unprotect level that differs is drift like any other attribute, and the plan names it.
 func TestDiffUpdatesADeclaredUnprotectLevel(t *testing.T) {
 	want := branch("main", roleMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
@@ -208,9 +206,9 @@ func TestDiffUpdatesADeclaredUnprotectLevel(t *testing.T) {
 	}
 }
 
-// A creation lists only what the declaration states. An unprotect level nobody
-// wrote takes whatever GitLab grants, which the plan cannot name, so showing it
-// empty would claim knowledge the tool does not have.
+// A creation lists only what the declaration states.
+// An unprotect level nobody wrote takes whatever GitLab grants, which the plan cannot name.
+// Showing it empty would claim knowledge the tool does not have.
 func TestDiffOmitsAnUnstatedUnprotectLevelFromACreation(t *testing.T) {
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
@@ -223,10 +221,10 @@ func TestDiffOmitsAnUnstatedUnprotectLevelFromACreation(t *testing.T) {
 	}
 }
 
-// A CE build never reports an unprotect level, so a manifest declaring one
-// against such an instance must not be planned as drift: the apply would
-// recreate the branch, the next read would report nothing again, and the plan
-// would say the same thing forever while reopening the branch each time.
+// A CE build never reports an unprotect level.
+// A manifest declaring one against such an instance must not be planned as drift.
+// The apply would recreate the branch and the next read would report nothing again.
+// The plan would say the same thing forever while reopening the branch each time.
 func TestDiffPlansNothingForAnUnprotectLevelTheInstanceCannotReport(t *testing.T) {
 	want := branch("main", roleMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))
@@ -241,9 +239,8 @@ func TestDiffPlansNothingForAnUnprotectLevelTheInstanceCannotReport(t *testing.T
 	}
 }
 
-// An Enterprise build reports an empty unprotect list for a protection created
-// with its project, so a declared level there is drift the apply can settle: the
-// recreate sends it and the next read reports it back.
+// An Enterprise build reports an empty unprotect list for a protection created with its project.
+// A declared level there is drift the apply can settle: the recreate sends it and the next read reports it back.
 func TestDiffUpdatesAnUnprotectLevelTheInstanceReportsAsUnset(t *testing.T) {
 	want := branch("main", roleMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
@@ -259,8 +256,8 @@ func TestDiffUpdatesAnUnprotectLevelTheInstanceReportsAsUnset(t *testing.T) {
 	}
 }
 
-// A declaration the instance cannot confirm is named, so a plan can say the key
-// is being left alone rather than show nothing for a key the operator wrote.
+// A declaration the instance cannot confirm is named.
+// A plan can then say the key is being left alone rather than show nothing for a key the operator wrote.
 func TestUnconfirmableUnprotectLevelsNamesTheBranchesItIgnores(t *testing.T) {
 	want := branch("main", roleMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))

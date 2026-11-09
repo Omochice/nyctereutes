@@ -43,12 +43,11 @@ func diffProtectedBranches(name string, desired []manifest.ProtectedBranch, live
 	}
 
 	for _, want := range desired {
-		// A level the instance cannot report is dropped from the declaration
-		// rather than compared, shown or sent. Against such a build it could never
-		// be confirmed: the apply would recreate the branch, the next read would
-		// report nothing again, and the plan would report the same drift forever
-		// while reopening the branch each time. [UnconfirmableUnprotectLevels] is
-		// what names the dropped declaration to the operator instead.
+		// A level the instance cannot report is dropped from the declaration rather than compared, shown or sent.
+		// Against such a build it could never be confirmed.
+		// The apply would recreate the branch and the next read would report nothing again.
+		// The plan would report the same drift forever while reopening the branch each time.
+		// [UnconfirmableUnprotectLevels] is what names the dropped declaration to the operator instead.
 		if !live.ReportsUnprotectLevels {
 			want.UnprotectAccessLevel = nil
 		}
@@ -71,9 +70,9 @@ func diffProtectedBranches(name string, desired []manifest.ProtectedBranch, live
 }
 
 // Reports whether the live protection already is what the declaration asks for.
-// Not a struct comparison, because the unprotect level is a pointer whose nil
-// says nothing about the live value rather than demanding it be absent, and
-// because comparing pointers would compare addresses.
+// Not a struct comparison, for two reasons.
+// The unprotect level is a pointer whose nil says nothing about the live value rather than demanding it be absent.
+// Comparing pointers would also compare addresses.
 func describesTheSame(have, want manifest.ProtectedBranch) bool {
 	if have.PushAccessLevel != want.PushAccessLevel ||
 		have.MergeAccessLevel != want.MergeAccessLevel ||
@@ -86,10 +85,9 @@ func describesTheSame(have, want manifest.ProtectedBranch) bool {
 	return have.UnprotectAccessLevel != nil && *have.UnprotectAccessLevel == *want.UnprotectAccessLevel
 }
 
-// Names the branches whose declared unprotect level this instance could never
-// confirm, so a plan can say that the key is being ignored rather than leave the
-// operator believing it was applied. Empty for a build that reports the field,
-// and for a document that declares no level.
+// Names the branches whose declared unprotect level this instance could never confirm.
+// A plan can then say that the key is being ignored rather than leave the operator believing it was applied.
+// Empty for a build that reports the field, and for a document that declares no level.
 func UnconfirmableUnprotectLevels(desired *manifest.Repository, current *CurrentState) []string {
 	if current.ProtectedBranches == nil || current.ProtectedBranches.ReportsUnprotectLevels {
 		return nil
@@ -131,9 +129,9 @@ func protectedBranchAttributes(branch manifest.ProtectedBranch) []protectedBranc
 	}
 }
 
-// What a plan line shows for an unprotect level nobody stated. The empty string
-// is what keeps such a line out of an update, because the comparison against the
-// live side is by rendered value and an unstated level renders alike on both.
+// What a plan line shows for an unprotect level nobody stated.
+// The empty string is what keeps such a line out of an update.
+// The comparison against the live side is by rendered value, and an unstated level renders alike on both.
 func unprotectAttribute(branch manifest.ProtectedBranch) string {
 	if branch.UnprotectAccessLevel == nil {
 		return ""
@@ -141,8 +139,8 @@ func unprotectAttribute(branch manifest.ProtectedBranch) string {
 	return string(*branch.UnprotectAccessLevel)
 }
 
-// What a plan shows for a live attribute the instance reports no value for, so
-// the line reads as a change from nothing rather than from a blank.
+// What a plan shows for a live attribute the instance reports no value for.
+// The line then reads as a change from nothing rather than from a blank.
 func stated(value string) string {
 	if value == "" {
 		return "(none)"
@@ -158,8 +156,8 @@ func (b *ProtectedBranchChange) line(kind ChangeType) string {
 		lines := make([]string, 0, len(declared)+1)
 		lines = append(lines, "+ "+header)
 		for _, want := range declared {
-			// An attribute nobody stated is left off rather than shown empty: the
-			// create takes whatever GitLab grants, which the plan cannot name.
+			// An attribute nobody stated is left off rather than shown empty.
+			// The create takes whatever GitLab grants, which the plan cannot name.
 			if want.value == "" {
 				continue
 			}

@@ -41,11 +41,10 @@ func (a *Applier) applyProtectedBranch(ctx context.Context, change Change) error
 	}
 }
 
-// Puts the live unprotect level onto a declaration that is silent about it, so
-// recreating the protection does not quietly change a setting the manifest
-// never spoke for. Without this an update would send no unprotect level and
-// GitLab would grant its own default, which on an Enterprise build demotes a
-// branch only instance admins could unprotect down to maintainers.
+// Puts the live unprotect level onto a declaration that is silent about it.
+// Recreating the protection then does not quietly change a setting the manifest never spoke for.
+// Without this an update would send no unprotect level and GitLab would grant its own default.
+// On an Enterprise build that demotes a branch only instance admins could unprotect down to maintainers.
 func carryUnstatedUnprotect(desired, live manifest.ProtectedBranch) manifest.ProtectedBranch {
 	if desired.UnprotectAccessLevel == nil {
 		desired.UnprotectAccessLevel = live.UnprotectAccessLevel
@@ -53,11 +52,11 @@ func carryUnstatedUnprotect(desired, live manifest.ProtectedBranch) manifest.Pro
 	return desired
 }
 
-// Protects a branch as the manifest declares it. Every stated attribute goes on
-// the request: this is always a create, so an omitted one would take GitLab's
-// default rather than the declared value. An unprotect level nobody stated is
-// left off, because a CE build refuses to report it and would have nothing to
-// compare a sent value against.
+// Protects a branch as the manifest declares it.
+// Every stated attribute goes on the request.
+// This is always a create, so an omitted one would take GitLab's default rather than the declared value.
+// An unprotect level nobody stated is left off.
+// A CE build refuses to report it and would have nothing to compare a sent value against.
 func (a *Applier) protect(
 	ctx context.Context, project, field string, branch manifest.ProtectedBranch,
 ) error {
@@ -85,8 +84,7 @@ func protectedBranchField(name string) string {
 	return fmt.Sprintf("%s %q", protectedBranchPrefix, name)
 }
 
-// The widest a protect's form gets: four attributes and the optional unprotect
-// level, each as a flag and a value.
+// The widest a protect's form gets: four attributes and the optional unprotect level, each as a flag and a value.
 const protectedBranchFormSize = 10
 
 func protectedBranchForm(branch manifest.ProtectedBranch) ([]string, error) {

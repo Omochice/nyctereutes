@@ -522,10 +522,10 @@ func TestInfraPlanReportsAnUnreadableBranchListAndPlansTheRest(t *testing.T) {
 	}
 }
 
-// Whether an instance answers with an unprotect access level is not knowable
-// from the document, so validate cannot catch a declaration it will ignore.
-// The plan says so, because it would otherwise show nothing at all for a key
-// the operator wrote and the branch would never converge.
+// Whether an instance answers with an unprotect access level is not knowable from the document.
+// validate therefore cannot catch a declaration the instance will ignore.
+// The plan says so.
+// It would otherwise show nothing for a key the operator wrote, and the branch would never converge.
 func TestInfraPlanSaysADeclaredUnprotectLevelIsBeingIgnored(t *testing.T) {
 	const manifestWithUnprotect = planBranchManifest + "    unprotect_access_level: admin\n"
 	path := writeManifest(t, t.TempDir(), "a.yaml", manifestWithUnprotect)

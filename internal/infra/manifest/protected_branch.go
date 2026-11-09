@@ -90,8 +90,7 @@ func (level *BranchUnprotectAccessLevel) UnmarshalYAML(data []byte) error {
 	return nil
 }
 
-// Reports the unprotect access levels to the schema generator, which cannot see
-// through UnmarshalYAML.
+// Reports the unprotect access levels to the schema generator, which cannot see through UnmarshalYAML.
 func (level BranchUnprotectAccessLevel) JSONSchema() *jsonschema.Schema {
 	return enumSchema(level.allowedValues())
 }

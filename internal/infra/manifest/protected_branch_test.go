@@ -117,8 +117,8 @@ func TestParseRejectsUnknownKeyInsideAProtectedBranch(t *testing.T) {
 }
 
 // An unprotect level is optional, because only an Enterprise build reports one.
-// An omitted key is nil rather than a default, so a document exported from CE
-// says nothing about it instead of demanding a value GitLab would never confirm.
+// An omitted key is nil rather than a default.
+// A document exported from CE then says nothing about it instead of demanding a value GitLab would never confirm.
 func TestParseDistinguishesAnOmittedUnprotectLevelFromADeclaredOne(t *testing.T) {
 	omitted, errs := Parse([]byte(validDoc + "  protected_branches:\n    - name: main\n"))
 	if len(errs) > 0 {
@@ -139,8 +139,8 @@ func TestParseDistinguishesAnOmittedUnprotectLevelFromADeclaredOne(t *testing.T)
 	}
 }
 
-// GitLab answers an unprotect access level of 0 with 400, so "no_one" is not
-// among the values, and a protection nobody could lift would be permanent.
+// GitLab answers an unprotect access level of 0 with 400, so "no_one" is not among the values.
+// A protection nobody could lift would be permanent.
 func TestParseRejectsAnUnprotectLevelOfNoOne(t *testing.T) {
 	doc := validDoc + `  protected_branches:
     - name: main

@@ -28,9 +28,8 @@ type CurrentState struct {
 	// The schedules the project owns, read from their own endpoint because the
 	// projects response does not carry them.
 	PipelineSchedules []LiveSchedule
-	// The branch protections the project owns, read from their own endpoint for
-	// the same reason. Nil when they were not read, which is what keeps a project
-	// nobody asked about apart from one holding none.
+	// The branch protections the project owns, read from their own endpoint for the same reason.
+	// Nil when they were not read, which is what keeps a project nobody asked about apart from one holding none.
 	ProtectedBranches *ProtectedBranches
 }
 
