@@ -12,11 +12,8 @@ import (
 )
 
 // One protected branch as GitLab reports it.
-// Unlike [LiveSchedule], no id is kept.
-// GitLab addresses a protection by the name the manifest already holds, so a write has no use for the id.
-//
-// GitLab CE reports no unprotect_access_levels and no code_owner_approval_required, both being Premium features.
-// Neither is read.
+// Unlike [LiveSchedule], no id is kept, because GitLab addresses a protection by its name.
+// The Premium fields unprotect_access_levels and code_owner_approval_required are not read, since CE omits them.
 type LiveProtectedBranch struct {
 	Name              string             `json:"name"`
 	PushAccessLevels  []LiveBranchAccess `json:"push_access_levels"`
@@ -25,13 +22,10 @@ type LiveProtectedBranch struct {
 }
 
 // One grant inside a protected branch's access-level list.
-// Only AccessLevel is describable by a manifest.
-// The rest are read solely so a grant the manifest cannot express is refused.
-// Flattening it to the role beside it would drop the grant.
+// Only AccessLevel reaches the manifest; the other fields are read so a grant it cannot express is refused.
 type LiveBranchAccess struct {
 	AccessLevel int `json:"access_level"`
 	// GitLab reports these as null when the grant is a plain role, so they are pointers.
-	// A zero id and an absent one are not the same answer.
 	UserID       *int  `json:"user_id"`
 	GroupID      *int  `json:"group_id"`
 	DeployKeyID  *int  `json:"deploy_key_id"`
@@ -40,8 +34,7 @@ type LiveBranchAccess struct {
 }
 
 // Reads every protected branch a project owns.
-// The endpoint pages the way the schedules one does, confirmed against GitLab CE 19.2.1.
-// glab is asked to follow the pages, so the project is not described by its first page alone.
+// The endpoint pages, confirmed against GitLab CE 19.2.1.
 func (c *Client) FetchProtectedBranches(ctx context.Context, owner, name string) ([]LiveProtectedBranch, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
 		"projects/"+glab.EncodePath(owner+"/"+name)+"/protected_branches")
@@ -58,25 +51,18 @@ func (c *Client) FetchProtectedBranches(ctx context.Context, owner, name string)
 	return branches, nil
 }
 
-// Signals output that carries no page of protected branches to read.
 var errNoProtectedBranchPage = errors.New("response carries no protected branch list")
 
-// Signals a protection whose grants a manifest cannot express.
 var errIndescribableBranch = errors.New("indescribable protected branch")
 
-// The two access-level lists, named so a refusal says which one it read.
 const (
 	fieldPushAccessLevels  = "push_access_levels"
 	fieldMergeAccessLevels = "merge_access_levels"
 )
 
-// Rejects a protection the manifest could not describe, rather than reading it as the role it happens to list first.
-// A branch granted to a user, a group, a deploy key or a custom role holds more than one grant.
-// Or it holds one grant naming something no manifest carries.
-// Applying a document written from a flattened read would revoke the grant that was dropped.
-//
-// Deploy keys work in the free tier, so this is a shape a CE project really reaches; the others need Premium.
-// An inherited protection comes from a group and is not the project's to change.
+// Refused rather than flattened to the first role.
+// A document written from a flattened read would revoke the dropped grant once applied.
+// An inherited protection is the group's to change, not the project's.
 func rejectIndescribableBranches(branches []LiveProtectedBranch) error {
 	for _, branch := range branches {
 		for _, list := range []struct {
@@ -94,7 +80,6 @@ func rejectIndescribableBranches(branches []LiveProtectedBranch) error {
 	return nil
 }
 
-// Reports why one access-level list cannot be described, or nil when it holds exactly one plain role.
 func rejectIndescribableGrants(branch, field string, grants []LiveBranchAccess) error {
 	if len(grants) != 1 {
 		return fmt.Errorf("%w: branch %q reports %d %s, want exactly one",
@@ -122,11 +107,8 @@ func rejectIndescribableGrants(branch, field string, grants []LiveBranchAccess) 
 	return nil
 }
 
-// Signals an access level GitLab reports that no manifest role names.
 var errUnknownBranchAccessLevel = errors.New("unknown branch access level")
 
-// The roles a manifest names.
-// Spelled here so the table below and any write can refer to one rather than repeat the string.
 const (
 	roleNoOne      manifest.BranchAccessLevel = "no_one"
 	roleDeveloper  manifest.BranchAccessLevel = "developer"
@@ -134,7 +116,7 @@ const (
 	roleAdmin      manifest.BranchAccessLevel = "admin"
 )
 
-// The numbers GitLab uses for those roles, confirmed against CE 19.2.1.
+// The numbers GitLab uses for the roles, confirmed against CE 19.2.1.
 // It describes them as "No one", "Developers + Maintainers", "Maintainers" and "Instance admins".
 const (
 	accessNoOne      = 0
@@ -143,13 +125,12 @@ const (
 	accessAdmin      = 60
 )
 
-// One role a manifest names, paired with the number GitLab uses for it.
 type branchRole struct {
 	name   manifest.BranchAccessLevel
 	number int
 }
 
-// The whole table, read by both directions so the export and the write cannot disagree about what a role means.
+// One table for both directions, so the export and the write cannot disagree about what a role means.
 func branchRoles() []branchRole {
 	return []branchRole{
 		{name: roleNoOne, number: accessNoOne},
@@ -159,9 +140,6 @@ func branchRoles() []branchRole {
 	}
 }
 
-// Names the role GitLab's number stands for.
-// An unrecognized number is refused rather than defaulted.
-// A role a later GitLab adds is then reported instead of silently read as one of these.
 func branchAccessLevelName(level int) (manifest.BranchAccessLevel, error) {
 	for _, role := range branchRoles() {
 		if role.number == level {
@@ -171,13 +149,7 @@ func branchAccessLevelName(level int) (manifest.BranchAccessLevel, error) {
 	return "", fmt.Errorf("%w: %d", errUnknownBranchAccessLevel, level)
 }
 
-// Converts the live protections into manifest documents, ordered by name.
-// GitLab lists them in creation order, so a protection removed and recreated would move.
-// A manifest is a file under version control, so the same live state has to produce the same bytes.
-// The name is unique, which makes the order total.
-//
-// Protections that were never read pass through as nil.
-// The field on [manifest.RepositorySpec] keeps nil distinct from the empty list.
+// Sorted by name rather than left in GitLab's creation order, so the same live state produces the same file.
 func toManifestProtectedBranches(live []LiveProtectedBranch) ([]manifest.ProtectedBranch, error) {
 	if live == nil {
 		return nil, nil
@@ -196,8 +168,7 @@ func toManifestProtectedBranches(live []LiveProtectedBranch) ([]manifest.Protect
 	return branches, nil
 }
 
-// Describes one live protection the way a manifest would, which is what makes it comparable with a declared one.
-// The grants are known to hold exactly one entry each, because [rejectIndescribableBranches] ran first.
+// Each grant list holds exactly one entry, because [rejectIndescribableBranches] ran first.
 func toManifestProtectedBranch(live LiveProtectedBranch) (manifest.ProtectedBranch, error) {
 	push, err := branchAccessLevelName(live.PushAccessLevels[0].AccessLevel)
 	if err != nil {

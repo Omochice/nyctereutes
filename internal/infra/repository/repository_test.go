@@ -185,8 +185,6 @@ func TestFetchRepositoryUnclassifiedErrorSurfaces(t *testing.T) {
 	}
 }
 
-// Describes state, failing the test rather than the assertion when the conversion refuses.
-// Only a role no manifest names can make it fail, and a test that did not set one up has nothing to say about that.
 func mustManifest(t *testing.T, state *CurrentState) *manifest.Repository {
 	t.Helper()
 	doc, err := ToManifest(state)

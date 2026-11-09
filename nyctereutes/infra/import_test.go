@@ -312,7 +312,6 @@ func TestInfraImportPointsAtTheSchemaOfTheGivenRef(t *testing.T) {
 	}
 }
 
-// An export describes the protections a project holds, sorted by name so the same live state produces the same file.
 func TestInfraImportEmitsProtectedBranches(t *testing.T) {
 	runner := &fakeInfraGlab{
 		projects:  map[string]string{targetGroupProj: projJSON},
@@ -347,9 +346,7 @@ func TestInfraImportEmitsProtectedBranches(t *testing.T) {
 	}
 }
 
-// A failed branch read still exports the project's settings, the way an unread schedule list is handled.
-// The branches key is left out and the cause is reported on stderr.
-// The two shortfalls are counted apart, so a run that hits only this one still names it.
+// The branch shortfall is counted apart from the schedule one, so a run that hits only this one still names it.
 func TestInfraImportExportsAProjectWhoseProtectedBranchesCannotBeRead(t *testing.T) {
 	runner := &fakeInfraGlab{
 		projects:  map[string]string{targetGroupProj: projJSON},
@@ -373,9 +370,7 @@ func TestInfraImportExportsAProjectWhoseProtectedBranchesCannotBeRead(t *testing
 	}
 }
 
-// A project holding a protection the manifest cannot describe is not exported at all.
 // A document written from a flattened read would revoke the grant it dropped as soon as it was applied.
-// The refusal names the branch, and the other project in the run is still emitted.
 func TestInfraImportRefusesToDescribeAProtectionGrantedToADeployKey(t *testing.T) {
 	const otherProject = "group/other"
 	runner := &fakeInfraGlab{

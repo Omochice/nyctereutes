@@ -201,14 +201,8 @@ func parseProject(out []byte) (*CurrentState, error) {
 }
 
 // Converts current state into a Repository manifest document.
-// The document carries the GitLab basic settings and the child resources the state holds.
-//
 // A child resource that was never read leaves its key out of the document.
-// The field on [manifest.RepositorySpec] defines an absent key as saying nothing about the resource.
-//
-// Only the branches can fail the conversion.
-// A role GitLab reports that no manifest names has to be reported.
-// Writing it into a document as one of the roles it is not would misdescribe the project.
+// A role GitLab reports that no manifest names is an error rather than written as a role it is not.
 func ToManifest(state *CurrentState) (*manifest.Repository, error) {
 	branches, err := toManifestProtectedBranches(state.ProtectedBranches)
 	if err != nil {

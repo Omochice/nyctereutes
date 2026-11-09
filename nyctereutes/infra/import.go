@@ -122,7 +122,6 @@ func (c *importCommand) document(
 	} else {
 		state.PipelineSchedules = schedules
 	}
-	// Read on the same terms as the schedules, and lost on the same terms too.
 	branches, err := client.FetchProtectedBranches(ctx, owner, name)
 	if err != nil {
 		c.reportf("%v\n", err)

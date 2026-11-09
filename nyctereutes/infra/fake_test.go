@@ -45,9 +45,7 @@ func catalogBody(isResource bool) []byte {
 	return fmt.Appendf(nil, `{"data":{"project":{"isCatalogResource":%t}}}`, isResource)
 }
 
-// Reports whether args is the paginated read of one of a project's child collections, returning the project it targets.
-// Both child-resource reads have this shape and differ only in the endpoint they end at.
-// The fake tells them apart by the suffix, and tells both from the project fetch it must still guard.
+// Both child-collection reads differ only in the endpoint suffix, so one matcher serves them.
 func collectionRead(args []string, suffix string) (project string, ok bool) {
 	if len(args) != 3 || args[0] != "api" || args[1] != "--paginate" {
 		return "", false
@@ -67,7 +65,6 @@ func collectionRead(args []string, suffix string) (project string, ok bool) {
 	return path, true
 }
 
-// The list response for a project.
 // A project absent from the map owns none of the resource, which is the answer GitLab gives for most of them.
 func collectionBody(bodies map[string]string, project string) []byte {
 	if body, ok := bodies[project]; ok {
@@ -112,8 +109,7 @@ func scheduleDetailBody(variables map[string]string, id string) []byte {
 // An absent project yields a 404 error so the importer treats it as missing.
 // Any other glab invocation is an error so unexpected calls fail the test loudly.
 //
-// A nil child-collection map turns that read into an unexpected call.
-// A test asserting that none is made therefore needs only to leave the map out.
+// A nil child-collection map turns that read into an unexpected call, which is how a test asserts none is made.
 type fakeInfraGlab struct {
 	projects  map[string]string // "owner/name" -> project JSON
 	catalog   map[string]bool   // "owner/name" -> catalog status, default false
@@ -135,9 +131,6 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	return f.project(args)
 }
 
-// Answers whichever child-collection read args address, or reports that they address none.
-// A nil map leaves its read unanswered, so [fakeInfraGlab.project] reports it as an unexpected call.
-// That is how a test asserts that a read is never made.
 func (f *fakeInfraGlab) collection(args []string) ([]byte, bool) {
 	for _, collection := range []struct {
 		suffix string
@@ -156,9 +149,6 @@ func (f *fakeInfraGlab) collection(args []string) ([]byte, bool) {
 	return nil, false
 }
 
-// Answers the project fetch itself, which is what a call matching none of the reads above has to be.
-// An absent project yields a 404 error so the importer treats it as missing.
-// A call of any other shape is unexpected.
 func (f *fakeInfraGlab) project(args []string) ([]byte, error) {
 	if len(args) != 2 || args[0] != "api" || !strings.HasPrefix(args[1], "projects/") {
 		return nil, fmt.Errorf("%w: %v", errUnexpectedGlab, args)
@@ -173,9 +163,7 @@ func (f *fakeInfraGlab) project(args []string) ([]byte, error) {
 	return nil, errInfra404
 }
 
-// A fake for the import command, whose export reads both child resources.
-// The empty maps declare those reads expected while leaving every project owning none.
-// That is what the tests about neither resource want.
+// The empty maps declare both child reads expected while leaving every project owning none.
 func importFake(projects map[string]string) *fakeInfraGlab {
 	return &fakeInfraGlab{
 		projects:  projects,
