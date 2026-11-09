@@ -62,6 +62,11 @@ func fullRepository() *Repository {
 				CronTimezone: "UTC",
 				Active:       true,
 			}},
+			ProtectedBranches: []ProtectedBranch{{
+				Name:             "main",
+				PushAccessLevel:  "maintainer",
+				MergeAccessLevel: "maintainer",
+			}},
 		},
 	}
 }
@@ -85,6 +90,12 @@ func settingsUIKeyOrder() []string {
 		"releases",
 		"pipeline_schedules",
 	}
+}
+
+// A protected branch's own attributes in declaration order.
+// Pinned apart from the spec keys for the reason [scheduleKeyOrder] gives: "name" is also a metadata key.
+func protectedBranchKeyOrder() []string {
+	return []string{"name", "push_access_level", "merge_access_level", "allow_force_push"}
 }
 
 // A schedule's own attributes in declaration order. They are pinned separately
@@ -169,6 +180,19 @@ func TestRepositoryMarshalsKeysInSettingsUIOrder(t *testing.T) {
 		idx := strings.Index(section, key+":")
 		if idx < 0 {
 			t.Fatalf("schedule attribute %s missing or out of declaration order\n%s", key, out)
+		}
+		section = section[idx+len(key):]
+	}
+
+	// The branches follow the schedules.
+	// Their scan continues from where the schedule attributes left off rather than restarting at the document.
+	if len(fullRepository().Spec.ProtectedBranches) == 0 {
+		t.Fatal("the fixture must declare a protected branch to pin a branch's key order")
+	}
+	for _, key := range append([]string{"protected_branches"}, protectedBranchKeyOrder()...) {
+		idx := strings.Index(section, key+":")
+		if idx < 0 {
+			t.Fatalf("protected branch attribute %s missing or out of declaration order\n%s", key, out)
 		}
 		section = section[idx+len(key):]
 	}

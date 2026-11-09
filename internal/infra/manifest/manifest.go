@@ -115,6 +115,7 @@ const (
 	fieldDescription            = "description"
 	fieldKind                   = "kind"
 	fieldMergeMethod            = "merge_method"
+	fieldName                   = "name"
 	fieldRef                    = "ref"
 )
 
@@ -324,6 +325,7 @@ type RepositorySpec struct {
 	// two states into one and leaving a deletion as the only thing silence could
 	// mean.
 	PipelineSchedules []PipelineSchedule `yaml:"pipeline_schedules,omitzero"`
+	ProtectedBranches []ProtectedBranch  `yaml:"protected_branches,omitzero"`
 }
 
 // The per-feature access levels of a GitLab project; an unset feature is

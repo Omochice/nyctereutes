@@ -172,10 +172,10 @@ func parseDocument(frag documentFragment) (*Repository, error) {
 	return &repo, nil
 }
 
-// The checks the schema types cannot express themselves: metadata must address
-// a GitLab project, the catalog needs a description, automatic rebase needs a
-// merge method it applies to, and the schedules must be individually valid and
-// distinctly described.
+// The checks the schema types cannot express themselves.
+// Metadata must address a GitLab project and the catalog needs a description.
+// Automatic rebase needs a merge method it applies to.
+// The child resources must be individually valid and distinctly identified.
 func (repo *Repository) validate() error {
 	if repo.Metadata.Name == "" {
 		return fmt.Errorf("%w: metadata.name", errRequiredField)
@@ -195,7 +195,10 @@ func (repo *Repository) validate() error {
 	if err := validateAutomaticRebase(&repo.Spec); err != nil {
 		return err
 	}
-	return validateSchedules(repo.Spec.PipelineSchedules)
+	if err := validateSchedules(repo.Spec.PipelineSchedules); err != nil {
+		return err
+	}
+	return validateProtectedBranches(repo.Spec.ProtectedBranches)
 }
 
 func validateAutomaticRebase(spec *RepositorySpec) error {
@@ -259,6 +262,24 @@ func validateSchedules(schedules []PipelineSchedule) error {
 			return fmt.Errorf("%w: %q", errDuplicateSchedule, schedule.Description)
 		}
 		seen[schedule.Description] = struct{}{}
+	}
+	return nil
+}
+
+// Signals two protected branches in one document sharing a name.
+var errDuplicateProtectedBranch = errors.New("duplicate protected branch name")
+
+// GitLab answers a second protection of the same name with 409, so a repeated name is refused before an apply meets it.
+func validateProtectedBranches(branches []ProtectedBranch) error {
+	seen := make(map[string]struct{}, len(branches))
+	for index, branch := range branches {
+		if err := branch.validate(index); err != nil {
+			return err
+		}
+		if _, repeated := seen[branch.Name]; repeated {
+			return fmt.Errorf("%w: %q", errDuplicateProtectedBranch, branch.Name)
+		}
+		seen[branch.Name] = struct{}{}
 	}
 	return nil
 }
