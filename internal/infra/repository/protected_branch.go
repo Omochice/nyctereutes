@@ -33,16 +33,14 @@ type LiveBranchAccess struct {
 	Inherited    *bool `json:"inherited"`
 }
 
-// Reads every protected branch a project owns, already described the way a
-// manifest would. The endpoint pages the way the schedules one does, confirmed
-// against GitLab CE 19.2.1, so glab is asked to follow the pages rather than the
-// project being described by its first page.
+// Reads every protected branch a project owns, already described the way a manifest would.
+// The endpoint pages the way the schedules one does, confirmed against GitLab CE 19.2.1.
+// glab is asked to follow the pages, so the project is not described by its first page alone.
 //
-// Unlike [Client.FetchSchedules], which answers with the reported form because a
-// write needs the id GitLab assigns, nothing downstream has any use for the
-// reported form: a protection is addressed by its name, which the manifest holds
-// already. Describing here rather than at each caller is what keeps the failure
-// modes of a read in the one place a read is made.
+// [Client.FetchSchedules] answers with the reported form because a write needs the id GitLab assigns.
+// Nothing downstream has any use for the reported form here.
+// A protection is addressed by its name, which the manifest holds.
+// Describing here rather than at each caller is what keeps the failure modes of a read in the one place a read is made.
 func (c *Client) FetchProtectedBranches(
 	ctx context.Context, owner, name string,
 ) ([]manifest.ProtectedBranch, error) {

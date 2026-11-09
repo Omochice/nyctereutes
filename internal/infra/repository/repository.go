@@ -28,9 +28,8 @@ type CurrentState struct {
 	// The schedules the project owns, read from their own endpoint because the
 	// projects response does not carry them.
 	PipelineSchedules []LiveSchedule
-	// The branch protections the project owns, read from their own endpoint for
-	// the same reason. Held already described, because [Client.FetchProtectedBranches]
-	// answers in that form.
+	// The branch protections the project owns, read from their own endpoint for the same reason.
+	// Held already described, because [Client.FetchProtectedBranches] answers in that form.
 	ProtectedBranches []manifest.ProtectedBranch
 }
 
@@ -205,9 +204,8 @@ func parseProject(out []byte) (*CurrentState, error) {
 // Converts current state into a Repository manifest document.
 // The document carries the GitLab basic settings and the child resources the state holds.
 //
-// A child resource that was never read leaves its key out of the document,
-// which the field on [manifest.RepositorySpec] defines as saying nothing about
-// it.
+// A child resource that was never read leaves its key out of the document.
+// The field on [manifest.RepositorySpec] defines an absent key as saying nothing about the resource.
 func ToManifest(state *CurrentState) *manifest.Repository {
 	return &manifest.Repository{
 		APIVersion: manifest.APIVersion,

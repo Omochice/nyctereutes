@@ -451,8 +451,8 @@ func TestInfraPlanRefusesDuplicateScheduleDescriptionsAndPlansTheRest(t *testing
 	}
 }
 
-// planBranchManifest declares one protection and nothing else, so a plan
-// against a live state reports the branches alone.
+// planBranchManifest declares one protection and nothing else.
+// A plan against a live state therefore reports the branches alone.
 const planBranchManifest = `apiVersion: nyctereutes/v1
 kind: Repository
 metadata:
@@ -464,15 +464,15 @@ spec:
     push_access_level: no_one
 `
 
-// The branch list of a project whose default branch carries the protection
-// GitLab creates with it, which is what a plan is usually compared against.
+// The branch list of a project whose default branch carries the protection GitLab creates with it.
+// That is what a plan is usually compared against.
 const defaultBranchProtectionJSON = `[{"id":1,"name":"main",
   "push_access_levels":[{"id":1,"access_level":40,"deploy_key_id":null}],
   "merge_access_levels":[{"id":1,"access_level":40}],"allow_force_push":false}]`
 
-// A declared protection whose role differs from the live one is reported as an
-// update naming the attribute that changed, so the operator sees what applying
-// would do before it is done.
+// A declared protection whose role differs from the live one is reported as an update.
+// The update names the attribute that changed.
+// The operator sees what applying would do before it is done.
 func TestInfraPlanShowsAProtectedBranchRoleChange(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planBranchManifest)
 	runner := &fakeInfraGlab{
@@ -492,9 +492,9 @@ func TestInfraPlanShowsAProtectedBranchRoleChange(t *testing.T) {
 	}
 }
 
-// A manifest saying nothing about the protections costs no request, so a
-// project whose branches nobody declared is still planned at one call. The nil
-// map is what makes an unwanted read an unexpected call.
+// A manifest saying nothing about the protections costs no request.
+// A project whose branches nobody declared is still planned at one call.
+// The nil map is what makes an unwanted read an unexpected call.
 func TestInfraPlanReadsNoBranchesForAManifestThatDeclaresNone(t *testing.T) {
 	path := writeManifest(t, t.TempDir(), "a.yaml", planManifest)
 	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
@@ -509,9 +509,8 @@ func TestInfraPlanReadsNoBranchesForAManifestThatDeclaresNone(t *testing.T) {
 	}
 }
 
-// A branch read that fails costs the branches alone: the project's other
-// settings are still planned, and the cause is reported so the reader knows
-// what the plan could not speak for.
+// A branch read that fails costs the branches alone, and the project's other settings are still planned.
+// The cause is reported so the reader knows what the plan could not speak for.
 func TestInfraPlanReportsAnUnreadableBranchListAndPlansTheRest(t *testing.T) {
 	const bothManifest = planBranchManifest + "  visibility: internal\n"
 	path := writeManifest(t, t.TempDir(), "a.yaml", bothManifest)

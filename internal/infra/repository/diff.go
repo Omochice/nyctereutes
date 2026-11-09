@@ -57,8 +57,8 @@ type Change struct {
 	// every other field. Typed rather than held in OldValue and NewValue, which
 	// would make both the plan line and the write assert for it.
 	Schedule *ScheduleChange
-	// The protected branch a [fieldProtectedBranches] change acts on, nil for
-	// every other field, and typed for the same reason.
+	// The protected branch a [fieldProtectedBranches] change acts on, nil for every other field.
+	// Typed for the same reason.
 	ProtectedBranch *ProtectedBranchChange
 }
 

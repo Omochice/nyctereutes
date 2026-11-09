@@ -7,8 +7,8 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// A document declaring the given protections. A nil slice is one carrying no
-// protected_branches key at all.
+// A document declaring the given protections.
+// A nil slice is one carrying no protected_branches key at all.
 func declaringBranches(branches []manifest.ProtectedBranch) *manifest.Repository {
 	return &manifest.Repository{
 		Metadata: manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj},
@@ -16,15 +16,14 @@ func declaringBranches(branches []manifest.ProtectedBranch) *manifest.Repository
 	}
 }
 
-// Live state holding the given protections. A nil slice is a project whose
-// protections were not read.
+// Live state holding the given protections.
+// A nil slice is a project whose protections were not read.
 func holdingBranches(branches []manifest.ProtectedBranch) *CurrentState {
 	return &CurrentState{Owner: ownerGroup, Name: nameProj, ProtectedBranches: branches}
 }
 
-// One protection as both a decoded document and a described read hold it, which
-// is the same shape: the read describes what it finds the way the manifest
-// would.
+// One protection as both a decoded document and a described read hold it.
+// The shape is the same because the read describes what it finds the way the manifest would.
 func branch(name string, push manifest.BranchAccessLevel) manifest.ProtectedBranch {
 	return manifest.ProtectedBranch{
 		Name:             name,
@@ -33,8 +32,7 @@ func branch(name string, push manifest.BranchAccessLevel) manifest.ProtectedBran
 	}
 }
 
-// The single protected-branch change in changes, failing the test when there is
-// not exactly one to read.
+// The single protected-branch change in changes, failing the test when there is not exactly one to read.
 func onlyBranchChange(t *testing.T, changes []Change) Change {
 	t.Helper()
 	if len(changes) != 1 {
@@ -46,9 +44,9 @@ func onlyBranchChange(t *testing.T, changes []Change) Change {
 	return changes[0]
 }
 
-// A manifest carrying no protected_branches key says nothing about the live
-// protections, so nothing is planned for them. Without this a project would be
-// stripped of its protections by any document that simply does not mention them.
+// A manifest carrying no protected_branches key says nothing about the live protections.
+// Nothing is planned for them.
+// Without this a project would be stripped of its protections by any document that simply does not mention them.
 func TestDiffLeavesLiveBranchesAloneWhenTheDocumentDeclaresNoKey(t *testing.T) {
 	changes := Diff(declaringBranches(nil), holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}))
 
@@ -57,9 +55,8 @@ func TestDiffLeavesLiveBranchesAloneWhenTheDocumentDeclaresNoKey(t *testing.T) {
 	}
 }
 
-// A project whose protections were not read is one a plan can say nothing
-// about, so a declared list plans nothing rather than proposing to create every
-// branch it names.
+// A project whose protections were not read is one a plan can say nothing about.
+// A declared list plans nothing there rather than proposing to create every branch it names.
 func TestDiffPlansNothingWhenTheLiveBranchesWereNotRead(t *testing.T) {
 	changes := Diff(declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}), holdingBranches(nil))
 
@@ -68,8 +65,8 @@ func TestDiffPlansNothingWhenTheLiveBranchesWereNotRead(t *testing.T) {
 	}
 }
 
-// A declared protection GitLab does not hold is created, and the plan lists
-// every attribute because none of them exists yet.
+// A declared protection GitLab does not hold is created.
+// The plan lists every attribute because none of them exists yet.
 func TestDiffCreatesADeclaredBranchTheProjectDoesNotProtect(t *testing.T) {
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{branch("main", roleNoOne)}),
@@ -90,8 +87,8 @@ func TestDiffCreatesADeclaredBranchTheProjectDoesNotProtect(t *testing.T) {
 	}
 }
 
-// A live protection no declaration names is removed, and the line carries only
-// the header: what a removal costs is the protection, which the header names.
+// A live protection no declaration names is removed, and the line carries only the header.
+// What a removal costs is the protection, which the header names.
 func TestDiffRemovesALiveBranchNoDeclarationNames(t *testing.T) {
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{}),
@@ -107,8 +104,8 @@ func TestDiffRemovesALiveBranchNoDeclarationNames(t *testing.T) {
 	}
 }
 
-// A protection that differs is updated, and the plan names only the attributes
-// that changed so the reader is not made to diff two full listings themselves.
+// A protection that differs is updated, and the plan names only the attributes that changed.
+// The reader is not made to diff two full listings themselves.
 func TestDiffUpdatesABranchWhoseRoleChanged(t *testing.T) {
 	want := branch("main", roleNoOne)
 	want.AllowForcePush = true
@@ -133,8 +130,8 @@ func TestDiffUpdatesABranchWhoseRoleChanged(t *testing.T) {
 	}
 }
 
-// A protection matching its declaration is not planned, so a run against a
-// project already in the declared state reports nothing.
+// A protection matching its declaration is not planned.
+// A run against a project already in the declared state reports nothing.
 func TestDiffPlansNothingForAMatchingBranch(t *testing.T) {
 	declared := []manifest.ProtectedBranch{branch("main", roleMaintainer)}
 
@@ -145,9 +142,9 @@ func TestDiffPlansNothingForAMatchingBranch(t *testing.T) {
 	}
 }
 
-// Removals are planned before creations. An update is applied by unprotecting
-// and protecting again, so a run that created first would meet a name GitLab
-// still holds and be refused with 409.
+// Removals are planned before creations.
+// An update is applied by unprotecting and protecting again.
+// A run that created first would meet a name GitLab still holds and be refused with 409.
 func TestDiffPlansBranchRemovalsBeforeCreations(t *testing.T) {
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{branch("develop", roleMaintainer)}),
@@ -162,8 +159,8 @@ func TestDiffPlansBranchRemovalsBeforeCreations(t *testing.T) {
 	}
 }
 
-// A wildcard is a name like any other, so it is paired and left alone rather
-// than being read as a pattern to expand against the live branches.
+// A wildcard is a name like any other, so it is paired and left alone.
+// It is not read as a pattern to expand against the live branches.
 func TestDiffPairsAWildcardBranchByItsName(t *testing.T) {
 	declared := []manifest.ProtectedBranch{branch("release/*", roleMaintainer)}
 
