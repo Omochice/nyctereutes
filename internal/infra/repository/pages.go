@@ -8,14 +8,12 @@ import (
 	"io"
 )
 
-// Joins the pages glab wrote. In --paginate mode it emits one JSON array per
-// page back to back rather than a single merged array, so the whole output is
-// not one JSON value and has to be decoded in sequence.
+// Joins the pages glab wrote.
+// In --paginate mode it emits one JSON array per page back to back rather than a single merged array.
+// The whole output is therefore not one JSON value and has to be decoded in sequence.
 //
-// Output holding no page, or a page written as null, is refused with empty
-// rather than read as a project owning none of the resource: the child-resource
-// fields on [manifest.RepositorySpec] would carry that into a document as a
-// declaration that none may exist.
+// Output holding no page, or a page written as null, is refused with empty rather than read as a project owning none.
+// The child-resource fields on [manifest.RepositorySpec] would otherwise read it as a declaration that none may exist.
 func decodePages[Item any](out []byte, empty error) ([]Item, error) {
 	decoder := json.NewDecoder(bytes.NewReader(out))
 	items := []Item{}
