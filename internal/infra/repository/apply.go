@@ -56,9 +56,8 @@ var errCreateUnsupported = errors.New("creating a project is not supported yet")
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
-	// Taken first: a child resource is created through its own endpoint while a
-	// project cannot be created at all, and the scalar PUT below would send a
-	// child resource's attributes to the project.
+	// Taken first: a child resource is created through its own endpoint while a project cannot be created at all.
+	// The scalar PUT below would send a child resource's attributes to the project.
 	if write := a.childResourceWriter(change.Field); write != nil {
 		return write(ctx, change)
 	}
@@ -89,8 +88,7 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 	}
 }
 
-// Names the write a child-resource field goes through, or nil when the field is
-// a setting of the project itself.
+// Names the write a child-resource field goes through, or nil when the field is a setting of the project itself.
 func (a *Applier) childResourceWriter(field string) func(context.Context, Change) error {
 	switch field {
 	case fieldPipelineSchedules:
@@ -102,8 +100,7 @@ func (a *Applier) childResourceWriter(field string) func(context.Context, Change
 	}
 }
 
-// The glab subcommand and the flag naming an HTTP method, spelled once because
-// every write below repeats them.
+// The glab subcommand and the flag naming an HTTP method, spelled once because every write below repeats them.
 const (
 	glabAPI    = "api"
 	glabMethod = "--method"

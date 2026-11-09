@@ -9,14 +9,12 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// The change one protected-branch write acts on, in the form the diff hands to
-// the applier.
+// The change one protected-branch write acts on, in the form the diff hands to the applier.
 func branchChange(kind ChangeType, change ProtectedBranchChange) Change {
 	return protectedBranchChange(kind, "group/proj", change)
 }
 
-// Applies one change and reports the calls it made, failing the test when the
-// write itself failed.
+// Applies one change and reports the calls it made, failing the test when the write itself failed.
 func applyBranch(t *testing.T, writer *recordingWriter, change Change) []writerCall {
 	t.Helper()
 	results := NewApplier(writer).Apply(context.Background(), []Change{change})
@@ -29,8 +27,8 @@ func applyBranch(t *testing.T, writer *recordingWriter, change Change) []writerC
 	return writer.calls
 }
 
-// A creation posts to the collection with every attribute, the roles carried as
-// the numbers GitLab wants rather than the names the manifest holds.
+// A creation posts to the collection with every attribute.
+// The roles are carried as the numbers GitLab wants rather than the names the manifest holds.
 func TestApplyProtectsADeclaredBranch(t *testing.T) {
 	writer := &recordingWriter{}
 	change := branchChange(ChangeCreate, ProtectedBranchChange{
@@ -55,9 +53,9 @@ func TestApplyProtectsADeclaredBranch(t *testing.T) {
 	}
 }
 
-// An update unprotects and protects again. GitLab's PATCH answers 200 to a
-// changed push_access_level and changes nothing, so a write built on it would
-// report a change it did not make.
+// An update unprotects and protects again.
+// GitLab's PATCH answers 200 to a changed push_access_level and changes nothing.
+// A write built on it would report a change it did not make.
 func TestApplyReprotectsABranchWhoseRoleChanged(t *testing.T) {
 	writer := &recordingWriter{}
 	change := branchChange(ChangeUpdate, ProtectedBranchChange{
@@ -99,9 +97,8 @@ func TestApplyUnprotectsABranchNoDeclarationNames(t *testing.T) {
 	}
 }
 
-// A protected branch is routinely named with a slash, and GitLab answers an
-// unencoded path 404. Without the encoding an update would delete nothing and
-// then be refused for a name GitLab still holds.
+// A protected branch is routinely named with a slash, and GitLab answers an unencoded path 404.
+// Without the encoding an update would delete nothing and then be refused for a name GitLab still holds.
 func TestApplyEncodesASlashInABranchName(t *testing.T) {
 	writer := &recordingWriter{}
 
@@ -113,9 +110,9 @@ func TestApplyEncodesASlashInABranchName(t *testing.T) {
 	}
 }
 
-// A re-protect that fails after its unprotect succeeded leaves the branch open,
-// which nothing else in the report would say. The error names that outcome so
-// the operator knows to go and look rather than only that a write failed.
+// A re-protect that fails after its unprotect succeeded leaves the branch open.
+// Nothing else in the report would say so.
+// The error names that outcome so the operator knows to go and look rather than only that a write failed.
 func TestApplyReportsABranchLeftUnprotectedByAFailedReprotect(t *testing.T) {
 	writer := &recordingWriter{errAt: map[int]error{1: errBoom}}
 	change := branchChange(ChangeUpdate, ProtectedBranchChange{
@@ -135,8 +132,8 @@ func TestApplyReportsABranchLeftUnprotectedByAFailedReprotect(t *testing.T) {
 	}
 }
 
-// An unprotect that fails is reported as an ordinary failed write: the branch
-// still holds the protection it had, so nothing was lost.
+// An unprotect that fails is reported as an ordinary failed write.
+// The branch still holds the protection it had, so nothing was lost.
 func TestApplyReportsAFailedUnprotectWithoutClaimingTheBranchIsOpen(t *testing.T) {
 	writer := &recordingWriter{errAt: map[int]error{0: errBoom}}
 
