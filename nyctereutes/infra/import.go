@@ -17,6 +17,7 @@ var (
 	errImportNeedsTarget   = errors.New("import requires at least one <owner/project>")
 	errSomeImportsFailed   = errors.New("some projects could not be imported")
 	errSomeSchedulesUnread = errors.New("some projects were exported without their pipeline schedules")
+	errSomeBranchesUnread  = errors.New("some projects were exported without their protected branches")
 )
 
 type importCommand struct {
@@ -39,11 +40,14 @@ func (c *importCommand) Execute(args []string) error {
 	ctx := context.Background()
 	client := repository.NewClient(c.runner)
 
-	emitted, undescribedSchedules := 0, 0
+	emitted, undescribedSchedules, undescribedBranches := 0, 0, 0
 	for _, target := range args {
 		data, unread := c.document(ctx, client, target)
 		if unread.schedules {
 			undescribedSchedules++
+		}
+		if unread.protectedBranches {
+			undescribedBranches++
 		}
 		if data == nil {
 			continue
@@ -60,7 +64,7 @@ func (c *importCommand) Execute(args []string) error {
 	// A run can fall short both ways at once, and each names a different thing
 	// for the reader to go and look at, so neither may mask the other. Joining
 	// also keeps both answerable through errors.Is.
-	var failed, partial error
+	var failed, partial, partialBranches error
 	// Every target that did not emit a document failed one of the checks above.
 	if emitted < len(args) {
 		failed = fmt.Errorf("%w: %d of %d", errSomeImportsFailed, len(args)-emitted, len(args))
@@ -71,14 +75,18 @@ func (c *importCommand) Execute(args []string) error {
 	if undescribedSchedules > 0 {
 		partial = fmt.Errorf("%w: %d of %d", errSomeSchedulesUnread, undescribedSchedules, len(args))
 	}
-	return errors.Join(failed, partial)
+	if undescribedBranches > 0 {
+		partialBranches = fmt.Errorf("%w: %d of %d", errSomeBranchesUnread, undescribedBranches, len(args))
+	}
+	return errors.Join(failed, partial, partialBranches)
 }
 
 // The child resources a target was exported without.
 // The document is still written, so the export is partial rather than failed.
 // A struct, not a bool, so the next resource adds a field here rather than another result of [importCommand.document].
 type unreadResources struct {
-	schedules bool
+	schedules         bool
+	protectedBranches bool
 }
 
 // Builds one target's manifest document, or nil when it cannot be described.
@@ -114,7 +122,19 @@ func (c *importCommand) document(
 	} else {
 		state.PipelineSchedules = schedules
 	}
-	data, err = manifest.Marshal(repository.ToManifest(state))
+	branches, err := client.FetchProtectedBranches(ctx, owner, name)
+	if err != nil {
+		c.reportf("%v\n", err)
+		unread.protectedBranches = true
+	} else {
+		state.ProtectedBranches = branches
+	}
+	doc, err := repository.ToManifest(state)
+	if err != nil {
+		c.reportf("%v\n", err)
+		return nil, unread
+	}
+	data, err = manifest.Marshal(doc)
 	if err != nil {
 		c.reportf("marshal %s: %v\n", target, err)
 		return nil, unread

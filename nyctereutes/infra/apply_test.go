@@ -46,8 +46,8 @@ func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	// Nor is the schedule list. A nil map leaves it unanswered so a test
 	// asserting that no such read is made sees the call recorded as a write it
 	// did not expect, rather than absorbed.
-	if path, ok := scheduleRead(args); ok && f.schedules != nil {
-		return scheduleBody(f.schedules, path), nil
+	if path, ok := collectionRead(args, "/pipeline_schedules"); ok && f.schedules != nil {
+		return collectionBody(f.schedules, path), nil
 	}
 	return f.recordWrite(nil, args)
 }

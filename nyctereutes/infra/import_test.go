@@ -139,6 +139,7 @@ func TestInfraImportEmitsPipelineSchedules(t *testing.T) {
 		   "cron_timezone":"UTC","active":true},
 		  {"id":2,"description":"full ref","ref":"refs/tags/v1.0.0","cron":"0 5 * * *",
 		   "cron_timezone":"Asia/Tokyo","active":false}]`},
+		branches: map[string]string{},
 	}
 
 	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj)
@@ -170,6 +171,7 @@ func TestInfraImportExportsAProjectWhoseSchedulesCannotBeRead(t *testing.T) {
 	runner := &fakeInfraGlab{
 		projects:  map[string]string{targetGroupProj: projJSON},
 		schedules: map[string]string{targetGroupProj: "not json"},
+		branches:  map[string]string{},
 	}
 
 	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj)
@@ -195,6 +197,7 @@ func TestInfraImportReportsBothAMissingProjectAndAnUnreadScheduleList(t *testing
 	runner := &fakeInfraGlab{
 		projects:  map[string]string{targetGroupProj: projJSON},
 		schedules: map[string]string{targetGroupProj: "not json"},
+		branches:  map[string]string{},
 	}
 
 	exit, _, stderr := runWithRunner(runner, "infra", "import", "group/missing", targetGroupProj)
@@ -219,6 +222,7 @@ func TestInfraImportReportsDuplicateSchedulesAndContinues(t *testing.T) {
 		schedules: map[string]string{targetGroupProj: `[
 		  {"id":1,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"},
 		  {"id":5,"description":"nightly","ref":"refs/heads/main","cron":"0 8 * * *"}]`},
+		branches: map[string]string{},
 	}
 
 	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj, otherProject)
@@ -305,5 +309,90 @@ func TestInfraImportPointsAtTheSchemaOfTheGivenRef(t *testing.T) {
 	want := manifest.SchemaModeline(ref)
 	if !strings.HasPrefix(stdout.String(), want) {
 		t.Errorf("stdout does not open with %q\n%s", want, stdout.String())
+	}
+}
+
+func TestInfraImportEmitsProtectedBranches(t *testing.T) {
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{},
+		branches: map[string]string{targetGroupProj: `[
+		  {"id":1,"name":"main",
+		   "push_access_levels":[{"id":1,"access_level":40,"deploy_key_id":null}],
+		   "merge_access_levels":[{"id":1,"access_level":40}],"allow_force_push":false},
+		  {"id":2,"name":"develop",
+		   "push_access_levels":[{"id":2,"access_level":0,"deploy_key_id":null}],
+		   "merge_access_levels":[{"id":2,"access_level":30}],"allow_force_push":true}]`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0\n%s", exit, stderr)
+	}
+	for _, want := range []string{
+		"protected_branches:",
+		"name: develop",
+		"push_access_level: no_one",
+		"merge_access_level: developer",
+		"allow_force_push: true",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+	if strings.Index(stdout, "name: develop") > strings.Index(stdout, "name: main") {
+		t.Errorf("branches are not sorted by name\n%s", stdout)
+	}
+}
+
+// The branch shortfall is counted apart from the schedule one, so a run that hits only this one still names it.
+func TestInfraImportExportsAProjectWhoseProtectedBranchesCannotBeRead(t *testing.T) {
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON},
+		schedules: map[string]string{},
+		branches:  map[string]string{targetGroupProj: "not json"},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a project is exported without its branches", exit)
+	}
+	if !strings.Contains(stdout, "name: proj") {
+		t.Errorf("the project's settings should still be exported\n%s", stdout)
+	}
+	if strings.Contains(stdout, "protected_branches") {
+		t.Errorf("an unread branch list must not be declared in the document\n%s", stdout)
+	}
+	if !strings.Contains(stderr, "protected branches") {
+		t.Errorf("the failed branch read should be reported on stderr\n%s", stderr)
+	}
+}
+
+// A document written from a flattened read would revoke the grant it dropped as soon as it was applied.
+func TestInfraImportRefusesToDescribeAProtectionGrantedToADeployKey(t *testing.T) {
+	const otherProject = "group/other"
+	runner := &fakeInfraGlab{
+		projects:  map[string]string{targetGroupProj: projJSON, otherProject: projJSON},
+		schedules: map[string]string{},
+		branches: map[string]string{targetGroupProj: `[
+		  {"id":1,"name":"main",
+		   "push_access_levels":[
+		     {"id":1,"access_level":40,"deploy_key_id":null},
+		     {"id":2,"access_level":40,"deploy_key_id":7}],
+		   "merge_access_levels":[{"id":1,"access_level":40}]}]`},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "import", targetGroupProj, otherProject)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when a project cannot be described", exit)
+	}
+	if !strings.Contains(stderr, "main") {
+		t.Errorf("stderr missing the branch that cannot be described\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "name: other") {
+		t.Errorf("stdout missing the healthy project, later projects must still be emitted\n%s", stdout)
 	}
 }

@@ -1,13 +1,10 @@
 package repository
 
 import (
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"slices"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
@@ -38,7 +35,7 @@ func (c *Client) FetchSchedules(ctx context.Context, owner, name string) ([]Live
 	if err != nil {
 		return nil, fmt.Errorf("fetch pipeline schedules %s/%s: %w", owner, name, err)
 	}
-	schedules, err := decodeSchedulePages(out)
+	schedules, err := decodePages[LiveSchedule](out, errNoSchedulePage)
 	if err != nil {
 		return nil, fmt.Errorf("parse pipeline schedules %s/%s: %w", owner, name, err)
 	}
@@ -146,34 +143,3 @@ func toManifestSchedule(live LiveSchedule) manifest.PipelineSchedule {
 
 // Signals output that carries no page of schedules to read.
 var errNoSchedulePage = errors.New("response carries no pipeline schedule list")
-
-// Joins the pages glab wrote. In --paginate mode it emits one JSON array per
-// page back to back rather than a single merged array, so the whole output is
-// not one JSON value and has to be decoded in sequence.
-//
-// Output holding no page, or a page written as null, is refused rather than
-// read as a project owning no schedule, which the field on
-// [manifest.RepositorySpec] would carry into a document as a declaration.
-func decodeSchedulePages(out []byte) ([]LiveSchedule, error) {
-	decoder := json.NewDecoder(bytes.NewReader(out))
-	schedules := []LiveSchedule{}
-	pages := 0
-	for {
-		var page []LiveSchedule
-		if err := decoder.Decode(&page); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, fmt.Errorf("decode page: %w", err)
-		}
-		if page == nil {
-			return nil, errNoSchedulePage
-		}
-		schedules = append(schedules, page...)
-		pages++
-	}
-	if pages == 0 {
-		return nil, errNoSchedulePage
-	}
-	return schedules, nil
-}

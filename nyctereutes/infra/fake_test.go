@@ -45,11 +45,8 @@ func catalogBody(isResource bool) []byte {
 	return fmt.Appendf(nil, `{"data":{"project":{"isCatalogResource":%t}}}`, isResource)
 }
 
-// Reports whether args is the paginated pipeline schedule list FetchSchedules
-// issues, returning the project it targets. Only import calls it, and it is the
-// only schedule request any command makes; the fake uses this to tell that read
-// apart from the project fetch it must still guard.
-func scheduleRead(args []string) (project string, ok bool) {
+// Both child-collection reads differ only in the endpoint suffix, so one matcher serves them.
+func collectionRead(args []string, suffix string) (project string, ok bool) {
 	if len(args) != 3 || args[0] != "api" || args[1] != "--paginate" {
 		return "", false
 	}
@@ -57,7 +54,7 @@ func scheduleRead(args []string) (project string, ok bool) {
 	if !found {
 		return "", false
 	}
-	encoded, found := strings.CutSuffix(endpoint, "/pipeline_schedules")
+	encoded, found := strings.CutSuffix(endpoint, suffix)
 	if !found {
 		return "", false
 	}
@@ -68,10 +65,9 @@ func scheduleRead(args []string) (project string, ok bool) {
 	return path, true
 }
 
-// The list response for a project. A project absent from the map owns no
-// schedule, which is the answer GitLab gives for most of them.
-func scheduleBody(schedules map[string]string, project string) []byte {
-	if body, ok := schedules[project]; ok {
+// A project absent from the map owns none of the resource, which is the answer GitLab gives for most of them.
+func collectionBody(bodies map[string]string, project string) []byte {
+	if body, ok := bodies[project]; ok {
 		return []byte(body)
 	}
 	return []byte("[]")
@@ -109,17 +105,16 @@ func scheduleDetailBody(variables map[string]string, id string) []byte {
 	return fmt.Appendf(nil, `{"variables":%s}`, field)
 }
 
-// fakeInfraGlab answers `glab api projects/<enc>` from a project map and the
-// catalog GraphQL query from a catalog map; an absent project yields a 404
-// error so the importer treats it as missing. Any other glab invocation is an
-// error so unexpected calls fail the test loudly.
+// fakeInfraGlab answers `glab api projects/<enc>` from a project map and the catalog GraphQL query from a catalog map.
+// An absent project yields a 404 error so the importer treats it as missing.
+// Any other glab invocation is an error so unexpected calls fail the test loudly.
 //
-// A nil schedules map turns a schedule read into an unexpected call, so a test
-// asserting that none is made needs only to leave the map out.
+// A nil child-collection map turns that read into an unexpected call, which is how a test asserts none is made.
 type fakeInfraGlab struct {
 	projects  map[string]string // "owner/name" -> project JSON
 	catalog   map[string]bool   // "owner/name" -> catalog status, default false
 	schedules map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
+	branches  map[string]string // "owner/name" -> protected branch list JSON; nil forbids the read
 	variables map[string]string // schedule id -> the variables field; absent holds none
 }
 
@@ -127,12 +122,34 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if path, ok := catalogRead(args); ok {
 		return catalogBody(f.catalog[path]), nil
 	}
-	if path, ok := scheduleRead(args); ok && f.schedules != nil {
-		return scheduleBody(f.schedules, path), nil
+	if body, ok := f.collection(args); ok {
+		return body, nil
 	}
 	if id, ok := scheduleDetailRead(args); ok {
 		return scheduleDetailBody(f.variables, id), nil
 	}
+	return f.project(args)
+}
+
+func (f *fakeInfraGlab) collection(args []string) ([]byte, bool) {
+	for _, collection := range []struct {
+		suffix string
+		bodies map[string]string
+	}{
+		{suffix: "/pipeline_schedules", bodies: f.schedules},
+		{suffix: "/protected_branches", bodies: f.branches},
+	} {
+		if collection.bodies == nil {
+			continue
+		}
+		if path, ok := collectionRead(args, collection.suffix); ok {
+			return collectionBody(collection.bodies, path), true
+		}
+	}
+	return nil, false
+}
+
+func (f *fakeInfraGlab) project(args []string) ([]byte, error) {
 	if len(args) != 2 || args[0] != "api" || !strings.HasPrefix(args[1], "projects/") {
 		return nil, fmt.Errorf("%w: %v", errUnexpectedGlab, args)
 	}
@@ -146,11 +163,13 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	return nil, errInfra404
 }
 
-// A fake for the import command, whose export reads schedules. The empty map
-// declares that read expected while leaving every project owning none, which is
-// what the tests that are not about schedules want.
+// The empty maps declare both child reads expected while leaving every project owning none.
 func importFake(projects map[string]string) *fakeInfraGlab {
-	return &fakeInfraGlab{projects: projects, schedules: map[string]string{}}
+	return &fakeInfraGlab{
+		projects:  projects,
+		schedules: map[string]string{},
+		branches:  map[string]string{},
+	}
 }
 
 // Drives the whole command tree with an injected glab runner, which is how the

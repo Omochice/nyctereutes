@@ -66,7 +66,7 @@ func (f *planScheduleErrGlab) Run(_ context.Context, args ...string) ([]byte, er
 	if _, ok := catalogRead(args); ok {
 		return catalogBody(false), nil
 	}
-	if _, ok := scheduleRead(args); ok {
+	if _, ok := collectionRead(args, "/pipeline_schedules"); ok {
 		return nil, errors.New("403 Forbidden")
 	}
 	return []byte(projJSON), nil
