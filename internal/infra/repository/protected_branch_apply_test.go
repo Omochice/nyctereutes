@@ -102,6 +102,36 @@ func TestApplyEncodesASlashInABranchName(t *testing.T) {
 	}
 }
 
+// GitLab CE 19.5.3 unprotects a wildcard addressed with its asterisk percent-encoded, and protects one sent verbatim.
+func TestApplyReprotectsAWildcardByItsName(t *testing.T) {
+	writer := &recordingWriter{}
+	change := branchChange(ChangeUpdate, ProtectedBranchChange{
+		Name: "release/*",
+		Desired: manifest.ProtectedBranch{
+			Name: "release/*", PushAccessLevel: roleDeveloper, MergeAccessLevel: roleMaintainer,
+		},
+		Live: manifest.ProtectedBranch{
+			Name: "release/*", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+		},
+	})
+
+	calls := applyBranch(t, writer, change)
+
+	want := []string{
+		"api projects/group%2Fproj/protected_branches/release%2F%2A --method DELETE",
+		"api projects/group%2Fproj/protected_branches --method POST " +
+			"-f name=release/* -f push_access_level=30 -f merge_access_level=40 -f allow_force_push=false",
+	}
+	if len(calls) != len(want) {
+		t.Fatalf("calls = %+v, want %d", calls, len(want))
+	}
+	for i, call := range calls {
+		if got := strings.Join(call.args, " "); got != want[i] {
+			t.Errorf("call %d = %q, want %q", i, got, want[i])
+		}
+	}
+}
+
 // Nothing else in the report would say that the branch is open.
 func TestApplyReportsABranchLeftUnprotectedByAFailedReprotect(t *testing.T) {
 	writer := &recordingWriter{errAt: map[int]error{1: errBoom}}
