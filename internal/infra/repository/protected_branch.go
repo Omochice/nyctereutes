@@ -33,20 +33,27 @@ type LiveBranchAccess struct {
 	Inherited    *bool `json:"inherited"`
 }
 
-// Reads every protected branch a project owns.
+// Reads every protected branch a project owns, already described the way a manifest would.
 // The endpoint pages, confirmed against GitLab CE 19.2.1.
-func (c *Client) FetchProtectedBranches(ctx context.Context, owner, name string) ([]LiveProtectedBranch, error) {
+// Described here rather than at each caller, so a read fails in the one place a read is made.
+func (c *Client) FetchProtectedBranches(
+	ctx context.Context, owner, name string,
+) ([]manifest.ProtectedBranch, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
 		"projects/"+glab.EncodePath(owner+"/"+name)+"/protected_branches")
 	if err != nil {
 		return nil, fmt.Errorf("fetch protected branches %s/%s: %w", owner, name, err)
 	}
-	branches, err := decodePages[LiveProtectedBranch](out, errNoProtectedBranchPage)
+	live, err := decodePages[LiveProtectedBranch](out, errNoProtectedBranchPage)
 	if err != nil {
 		return nil, fmt.Errorf("parse protected branches %s/%s: %w", owner, name, err)
 	}
-	if err := rejectIndescribableBranches(branches); err != nil {
+	if err := rejectIndescribableBranches(live); err != nil {
 		return nil, fmt.Errorf("read protected branches %s/%s: %w", owner, name, err)
+	}
+	branches, err := toManifestProtectedBranches(live)
+	if err != nil {
+		return nil, fmt.Errorf("describe protected branches %s/%s: %w", owner, name, err)
 	}
 	return branches, nil
 }

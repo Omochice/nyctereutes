@@ -118,20 +118,30 @@ func fetchState(
 		_, _ = fmt.Fprintf(stderr, "%v\n", err)
 		return nil, 1
 	}
-	// A manifest declaring no schedules says nothing about them, so the read is
-	// not made and such a project stays at one request.
-	if repo.Spec.PipelineSchedules == nil {
-		return state, 0
+	// A manifest declaring neither child resource says nothing about them.
+	// Neither read is made, so such a project stays at one request.
+	failures := 0
+	if repo.Spec.PipelineSchedules != nil {
+		schedules, err := client.FetchSchedules(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+		if err != nil {
+			// The state still goes back.
+			// A project whose schedules cannot be described keeps the settings that can be.
+			_, _ = fmt.Fprintf(stderr, "%v\n", err)
+			failures++
+		} else {
+			state.PipelineSchedules = schedules
+		}
 	}
-	schedules, err := client.FetchSchedules(ctx, repo.Metadata.Owner, repo.Metadata.Name)
-	if err != nil {
-		// The state still goes back, so a project whose schedules cannot be
-		// described keeps the settings that can be.
-		_, _ = fmt.Fprintf(stderr, "%v\n", err)
-		return state, 1
+	if repo.Spec.ProtectedBranches != nil {
+		branches, err := client.FetchProtectedBranches(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "%v\n", err)
+			failures++
+		} else {
+			state.ProtectedBranches = branches
+		}
 	}
-	state.PipelineSchedules = schedules
-	return state, 0
+	return state, failures
 }
 
 // Expands one path argument into the manifest files it names: a file is

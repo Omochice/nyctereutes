@@ -1,0 +1,155 @@
+package repository
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
+)
+
+// A nil slice is a document carrying no protected_branches key at all.
+func declaringBranches(branches []manifest.ProtectedBranch) *manifest.Repository {
+	return &manifest.Repository{
+		Metadata: manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj},
+		Spec:     manifest.RepositorySpec{ProtectedBranches: branches},
+	}
+}
+
+// A nil slice is a project whose protections were not read.
+func holdingBranches(branches []manifest.ProtectedBranch) *CurrentState {
+	return &CurrentState{Owner: ownerGroup, Name: nameProj, ProtectedBranches: branches}
+}
+
+func branch(name string, push manifest.BranchAccessLevel) manifest.ProtectedBranch {
+	return manifest.ProtectedBranch{
+		Name:             name,
+		PushAccessLevel:  push,
+		MergeAccessLevel: roleMaintainer,
+	}
+}
+
+func onlyBranchChange(t *testing.T, changes []Change) Change {
+	t.Helper()
+	if len(changes) != 1 {
+		t.Fatalf("changes = %+v, want exactly 1", changes)
+	}
+	if changes[0].ProtectedBranch == nil {
+		t.Fatalf("change = %+v, want it to carry a protected branch", changes[0])
+	}
+	return changes[0]
+}
+
+// Without this a project would be stripped of its protections by any document that simply does not mention them.
+func TestDiffLeavesLiveBranchesAloneWhenTheDocumentDeclaresNoKey(t *testing.T) {
+	changes := Diff(declaringBranches(nil), holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}))
+
+	if len(changes) != 0 {
+		t.Errorf("changes = %+v, want none for an undeclared key", changes)
+	}
+}
+
+// Otherwise the plan would propose to create every branch the document names.
+func TestDiffPlansNothingWhenTheLiveBranchesWereNotRead(t *testing.T) {
+	changes := Diff(declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}), holdingBranches(nil))
+
+	if len(changes) != 0 {
+		t.Errorf("changes = %+v, want none when the live state is unknown", changes)
+	}
+}
+
+func TestDiffCreatesADeclaredBranchTheProjectDoesNotProtect(t *testing.T) {
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{branch("main", roleNoOne)}),
+		holdingBranches([]manifest.ProtectedBranch{}),
+	)
+
+	change := onlyBranchChange(t, changes)
+	if change.Type != ChangeCreate {
+		t.Errorf("type = %q, want a create", change.Type)
+	}
+	for _, want := range []string{
+		`+ protected_branch "main"`, "+ push_access_level: no_one",
+		"+ merge_access_level: maintainer", "+ allow_force_push: false",
+	} {
+		if !strings.Contains(change.String(), want) {
+			t.Errorf("line = %q, want it to carry %q", change.String(), want)
+		}
+	}
+}
+
+func TestDiffRemovesALiveBranchNoDeclarationNames(t *testing.T) {
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+	)
+
+	change := onlyBranchChange(t, changes)
+	if change.Type != ChangeDelete {
+		t.Errorf("type = %q, want a delete", change.Type)
+	}
+	if change.String() != `- protected_branch "main"` {
+		t.Errorf("line = %q, want the header alone", change.String())
+	}
+}
+
+// The plan names only the attributes that changed, so the reader is not made to diff two full listings.
+func TestDiffUpdatesABranchWhoseRoleChanged(t *testing.T) {
+	want := branch("main", roleNoOne)
+	want.AllowForcePush = true
+
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{want}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+	)
+
+	change := onlyBranchChange(t, changes)
+	if change.Type != ChangeUpdate {
+		t.Errorf("type = %q, want an update", change.Type)
+	}
+	line := change.String()
+	for _, named := range []string{"push_access_level", "allow_force_push"} {
+		if !strings.Contains(line, named) {
+			t.Errorf("line = %q, want it to name %q", line, named)
+		}
+	}
+	if strings.Contains(line, "merge_access_level") {
+		t.Errorf("line = %q, want it to leave the unchanged attribute out", line)
+	}
+}
+
+func TestDiffPlansNothingForAMatchingBranch(t *testing.T) {
+	declared := []manifest.ProtectedBranch{branch("main", roleMaintainer)}
+
+	changes := Diff(declaringBranches(declared), holdingBranches(declared))
+
+	if len(changes) != 0 {
+		t.Errorf("changes = %+v, want none", changes)
+	}
+}
+
+// An update is applied by unprotecting and protecting again.
+// A run that created first would meet a name GitLab still holds and be refused with 409.
+func TestDiffPlansBranchRemovalsBeforeCreations(t *testing.T) {
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{branch("develop", roleMaintainer)}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+	)
+
+	if len(changes) != 2 {
+		t.Fatalf("changes = %+v, want a removal and a creation", changes)
+	}
+	if changes[0].Type != ChangeDelete || changes[1].Type != ChangeCreate {
+		t.Errorf("order = %q then %q, want the removal first", changes[0].Type, changes[1].Type)
+	}
+}
+
+// A wildcard is a name like any other, not a pattern to expand against the live branches.
+func TestDiffPairsAWildcardBranchByItsName(t *testing.T) {
+	declared := []manifest.ProtectedBranch{branch("release/*", roleMaintainer)}
+
+	changes := Diff(declaringBranches(declared), holdingBranches(declared))
+
+	if len(changes) != 0 {
+		t.Errorf("changes = %+v, want none", changes)
+	}
+}

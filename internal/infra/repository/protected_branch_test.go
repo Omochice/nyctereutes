@@ -49,7 +49,7 @@ func protectedBranchRunner(listJSON string, record *[]string) glab.RunnerFunc {
 	}
 }
 
-func fetchBranches(t *testing.T, listJSON string) []LiveProtectedBranch {
+func fetchBranches(t *testing.T, listJSON string) []manifest.ProtectedBranch {
 	t.Helper()
 	branches, err := NewClient(protectedBranchRunner(listJSON, nil)).
 		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
@@ -73,10 +73,7 @@ func TestFetchProtectedBranchesFollowsThePages(t *testing.T) {
 }
 
 func TestProtectedBranchesAreDescribedByNameAndRole(t *testing.T) {
-	got, err := toManifestProtectedBranches(fetchBranches(t, protectedBranchListJSON))
-	if err != nil {
-		t.Fatalf("describe protected branches: %v", err)
-	}
+	got := fetchBranches(t, protectedBranchListJSON)
 	want := []manifest.ProtectedBranch{
 		{Name: "feature/*", PushAccessLevel: "admin", MergeAccessLevel: "maintainer"},
 		{Name: "main", PushAccessLevel: "maintainer", MergeAccessLevel: "maintainer"},
@@ -164,7 +161,8 @@ func TestDescribingAProtectedBranchRejectsAnUnknownRole(t *testing.T) {
 	  "push_access_levels":[{"id":1,"access_level":25}],
 	  "merge_access_levels":[{"id":1,"access_level":40}]}]`
 
-	_, err := toManifestProtectedBranches(fetchBranches(t, unknownRoleJSON))
+	_, err := NewClient(protectedBranchRunner(unknownRoleJSON, nil)).
+		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
 
 	if !errors.Is(err, errUnknownBranchAccessLevel) {
 		t.Fatalf("err = %v, want an unknown access level", err)
