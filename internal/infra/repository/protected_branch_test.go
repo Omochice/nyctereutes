@@ -34,9 +34,6 @@ func isProtectedBranchCall(args []string) bool {
 	})
 }
 
-// Answers the calls a fetch makes.
-// Those are the GraphQL catalog query, the instance version, the branch list from list, and the project itself.
-// The args of the branch call go to called when one is given, which is what the test about paging asserts on.
 type protectedBranchGlab struct {
 	list       string
 	enterprise bool
@@ -72,7 +69,6 @@ func fetchBranches(t *testing.T, listJSON string) []manifest.ProtectedBranch {
 	return fetchProtections(t, listJSON).Branches
 }
 
-// The whole read, for the assertions about what the instance could say rather than about the protections themselves.
 func fetchProtections(t *testing.T, listJSON string) *ProtectedBranches {
 	t.Helper()
 	read, err := NewClient(protectedBranchRunner(listJSON, nil)).
@@ -206,10 +202,7 @@ func TestFetchProtectedBranchesRejectsAResponseWithNoPage(t *testing.T) {
 	}
 }
 
-// A CE build leaves unprotect_access_levels out of the response.
-// There is nothing to describe, so the manifest key is omitted.
-// An Enterprise build reports an empty list for a protection created with the project.
-// That states no role either and describes the same way.
+// A CE build omits unprotect_access_levels and an Enterprise one reports it empty for a default protection.
 func TestAnUnreportedUnprotectLevelIsNotDescribed(t *testing.T) {
 	for _, testCase := range []struct{ name, listJSON string }{
 		{
@@ -235,8 +228,7 @@ func TestAnUnreportedUnprotectLevelIsNotDescribed(t *testing.T) {
 	}
 }
 
-// An Enterprise build reports the role that may lift the protection.
-// The manifest holds it so that reconciling the branch does not change it.
+// The manifest holds the role so that reconciling the branch does not change it.
 func TestAnEnterpriseUnprotectLevelIsDescribed(t *testing.T) {
 	const eeJSON = `[{"id":1,"name":"main",
 	  "push_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
@@ -252,8 +244,7 @@ func TestAnEnterpriseUnprotectLevelIsDescribed(t *testing.T) {
 	}
 }
 
-// An unprotect grant naming a user or a group is refused like a push one.
-// The manifest cannot hold it, and recreating the protection from a document that dropped it would revoke it.
+// Recreating the protection from a document that dropped the grant would revoke it.
 func TestFetchProtectedBranchesRejectsAnUnprotectGrantNoManifestCanHold(t *testing.T) {
 	const grantedJSON = `[{"id":1,"name":"main",
 	  "push_access_levels":[{"id":1,"access_level":40}],
@@ -271,10 +262,7 @@ func TestFetchProtectedBranchesRejectsAnUnprotectGrantNoManifestCanHold(t *testi
 	}
 }
 
-// Whether the instance answers with unprotect access levels is a property of the edition.
-// It is read from the instance rather than from the protections.
-// A project holding none yet says nothing about it.
-// An Enterprise build with such a project would otherwise be taken for a Community one, and its declared level dropped.
+// An Enterprise build whose project holds no protection yet would otherwise be taken for a Community one.
 func TestTheReadSaysWhetherTheInstanceReportsUnprotectLevels(t *testing.T) {
 	for _, testCase := range []struct {
 		name, listJSON string
@@ -306,8 +294,7 @@ func TestTheReadSaysWhetherTheInstanceReportsUnprotectLevels(t *testing.T) {
 	}
 }
 
-// The edition decides what a declared unprotect level means.
-// A read that cannot learn it fails rather than guessing Community.
+// The edition decides what a declared unprotect level means, so it is not guessed.
 func TestFetchProtectedBranchesFailsWhenTheVersionCannotBeRead(t *testing.T) {
 	versionErr := errors.New("version unavailable")
 	_, err := NewClient(protectedBranchGlab{list: protectedBranchListJSON, versionErr: versionErr}).

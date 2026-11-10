@@ -12,19 +12,13 @@ import (
 )
 
 // One protected branch as GitLab reports it.
-// Unlike [LiveSchedule], no id is kept.
-// GitLab addresses a protection by the name the manifest already holds, so a write has no use for the id.
-//
-// A CE build reports no unprotect_access_levels at all, and an Enterprise build always does.
-// The difference is what the pointer on [manifest.ProtectedBranch] carries.
+// Unlike [LiveSchedule], no id is kept, because GitLab addresses a protection by its name.
 type LiveProtectedBranch struct {
 	Name              string             `json:"name"`
 	PushAccessLevels  []LiveBranchAccess `json:"push_access_levels"`
 	MergeAccessLevels []LiveBranchAccess `json:"merge_access_levels"`
 	AllowForcePush    bool               `json:"allow_force_push"`
-	// Nil on a CE build, which leaves the field out of the response entirely.
-	// Non-nil on an Enterprise one even when it holds no grant.
-	// An empty list is what a project's automatic protection of its default branch reports.
+	// Nil on a CE build, which omits the field, and non-nil on an Enterprise one even when it holds no grant.
 	UnprotectAccessLevels []LiveBranchAccess `json:"unprotect_access_levels"`
 }
 
@@ -70,14 +64,9 @@ func (c *Client) FetchProtectedBranches(
 }
 
 // The protections a project holds, together with what the instance was able to say about them.
-// The capability below is a property of the build rather than of any one branch.
-// It is held once here instead of being repeated on every described protection.
 type ProtectedBranches struct {
 	Branches []manifest.ProtectedBranch
-	// Whether the instance reports unprotect access levels at all.
-	// A Community Edition build omits the field from every response.
-	// A declared level could never be confirmed against one.
-	// An Enterprise build reports it even for a protection that holds no such grant.
+	// False on a Community Edition build, against which a declared level could never be confirmed.
 	// Read from the edition rather than from the protections above, which a project may not hold yet.
 	ReportsUnprotectLevels bool
 }
@@ -108,10 +97,7 @@ func rejectIndescribableBranches(branches []LiveProtectedBranch) error {
 				return err
 			}
 		}
-		// The unprotect list is the one that may legitimately hold nothing.
-		// A CE build reports none.
-		// An Enterprise build reports an empty one for the protection a project creates with itself.
-		// More than one, or one naming something no manifest can hold, is refused like the others.
+		// Only this list may hold nothing: Enterprise reports it empty for a protection created with its project.
 		if len(branch.UnprotectAccessLevels) > 0 {
 			if err := rejectIndescribableGrants(
 				branch.Name, fieldUnprotectAccessLevels, branch.UnprotectAccessLevels,
@@ -227,9 +213,7 @@ func toManifestProtectedBranch(live LiveProtectedBranch) (manifest.ProtectedBran
 		MergeAccessLevel: merge,
 		AllowForcePush:   live.AllowForcePush,
 	}
-	// A CE build omits the field and an Enterprise one reports an empty list for a protection created with its project.
-	// Neither states a role, so both leave the key unset.
-	// A manifest naming one where GitLab states none would report drift no apply could settle.
+	// The key stays unset where GitLab states no role, because naming one would report drift no apply could settle.
 	if len(live.UnprotectAccessLevels) > 0 {
 		role, err := branchAccessLevelName(live.UnprotectAccessLevels[0].AccessLevel)
 		if err != nil {

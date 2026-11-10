@@ -104,7 +104,6 @@ func TestParseDistinguishesOmittedProtectedBranchesFromAnEmptyList(t *testing.T)
 // A branch decodes itself.
 // The strict decoding the surrounding document gets does not reach inside it unless the nested decode asks for it too.
 // The key most likely to be tried is the one GitLab reports and this schema does not.
-// It must be refused rather than dropped in silence.
 func TestParseRejectsUnknownKeyInsideAProtectedBranch(t *testing.T) {
 	doc := validDoc + `  protected_branches:
     - name: main
@@ -116,8 +115,6 @@ func TestParseRejectsUnknownKeyInsideAProtectedBranch(t *testing.T) {
 	}
 }
 
-// An unprotect level is optional, because only an Enterprise build reports one.
-// An omitted key is nil rather than a default.
 // A document exported from CE then says nothing about it instead of demanding a value GitLab would never confirm.
 func TestParseDistinguishesAnOmittedUnprotectLevelFromADeclaredOne(t *testing.T) {
 	omitted, errs := Parse([]byte(validDoc + "  protected_branches:\n    - name: main\n"))
@@ -139,8 +136,7 @@ func TestParseDistinguishesAnOmittedUnprotectLevelFromADeclaredOne(t *testing.T)
 	}
 }
 
-// GitLab answers an unprotect access level of 0 with 400, so "no_one" is not among the values.
-// A protection nobody could lift would be permanent.
+// GitLab answers an unprotect access level of 0 with 400.
 func TestParseRejectsAnUnprotectLevelOfNoOne(t *testing.T) {
 	doc := validDoc + `  protected_branches:
     - name: main

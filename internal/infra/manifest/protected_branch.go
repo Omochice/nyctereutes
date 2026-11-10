@@ -15,9 +15,7 @@ type ProtectedBranch struct {
 	MergeAccessLevel BranchAccessLevel `yaml:"merge_access_level"`
 	AllowForcePush   bool              `yaml:"allow_force_push"`
 	// Nil rather than a default, because only an Enterprise build reports it: nil leaves whatever the project holds alone.
-	//
-	// code_owner_approval_required is not a key.
-	// An Enterprise build reports it but refuses the value without a licence, so it cannot be reconciled.
+	// code_owner_approval_required is not a key, because an Enterprise build refuses the value without a licence.
 	UnprotectAccessLevel *BranchUnprotectAccessLevel `yaml:"unprotect_access_level,omitempty"`
 }
 

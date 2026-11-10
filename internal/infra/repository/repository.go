@@ -235,7 +235,6 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 	}
 }
 
-// The protections as a document holds them, or nil when they were not read.
 func (state *CurrentState) describedBranches() []manifest.ProtectedBranch {
 	if state.ProtectedBranches == nil {
 		return nil

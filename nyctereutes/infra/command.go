@@ -106,9 +106,7 @@ func discloseDestroyedVariables(
 	}
 }
 
-// Says that a declared unprotect level is being ignored, which only a plan can report.
-// Whether the instance answers with the field is not knowable from the document, so validate cannot catch it.
-// The plan would otherwise show nothing at all for a key the operator wrote.
+// Only a plan can say this, because whether the instance answers with the field is not knowable from the document.
 func discloseIgnoredUnprotectLevels(stderr io.Writer, repo *manifest.Repository, state *repository.CurrentState) {
 	ignored := repository.UnconfirmableUnprotectLevels(repo, state)
 	if len(ignored) == 0 {

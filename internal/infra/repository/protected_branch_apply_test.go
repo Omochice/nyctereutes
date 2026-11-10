@@ -187,9 +187,7 @@ func TestApplyReportsAFailedUnprotectWithoutClaimingTheBranchIsOpen(t *testing.T
 	}
 }
 
-// A recreate carries the live unprotect level onto a declaration that is silent about it.
-// Without this an update would send no unprotect level and GitLab would grant its own default.
-// A branch only instance admins could unprotect would quietly fall to maintainers with nothing in the plan to say so.
+// A branch only instance admins could unprotect would otherwise fall to maintainers with nothing in the plan to say so.
 func TestApplyCarriesAnUnstatedUnprotectLevelThroughARecreate(t *testing.T) {
 	writer := &recordingWriter{}
 	live := manifest.ProtectedBranch{
@@ -214,7 +212,6 @@ func TestApplyCarriesAnUnstatedUnprotectLevelThroughARecreate(t *testing.T) {
 	}
 }
 
-// A declared unprotect level goes on the request, overriding the live one.
 func TestApplySendsADeclaredUnprotectLevel(t *testing.T) {
 	writer := &recordingWriter{}
 	change := branchChange(ChangeCreate, ProtectedBranchChange{
@@ -232,7 +229,6 @@ func TestApplySendsADeclaredUnprotectLevel(t *testing.T) {
 	}
 }
 
-// A CE build reports no unprotect level, so nothing states one and nothing is sent.
 // A value GitLab would never report back could not be planned against.
 func TestApplySendsNoUnprotectLevelWhenNobodyStatesOne(t *testing.T) {
 	writer := &recordingWriter{}

@@ -41,8 +41,6 @@ func (a *Applier) applyProtectedBranch(ctx context.Context, change Change) error
 	}
 }
 
-// Puts the live unprotect level onto a declaration that is silent about it.
-// Recreating the protection then does not quietly change a setting the manifest never spoke for.
 // Without this an update would send no unprotect level and GitLab would grant its own default.
 // On an Enterprise build that demotes a branch only instance admins could unprotect down to maintainers.
 func carryUnstatedUnprotect(desired, live manifest.ProtectedBranch) manifest.ProtectedBranch {
@@ -52,11 +50,8 @@ func carryUnstatedUnprotect(desired, live manifest.ProtectedBranch) manifest.Pro
 	return desired
 }
 
-// Protects a branch as the manifest declares it.
-// Every stated attribute goes on the request.
-// This is always a create, so an omitted one would take GitLab's default rather than the declared value.
-// An unprotect level nobody stated is left off.
-// A CE build refuses to report it and would have nothing to compare a sent value against.
+// Every stated attribute goes on the request, because a create takes GitLab's default for an omitted one.
+// An unstated unprotect level is left off, because a CE build would report nothing to compare a sent value against.
 func (a *Applier) protect(
 	ctx context.Context, project, field string, branch manifest.ProtectedBranch,
 ) error {
@@ -84,7 +79,7 @@ func protectedBranchField(name string) string {
 	return fmt.Sprintf("%s %q", protectedBranchPrefix, name)
 }
 
-// The widest a protect's form gets: four attributes and the optional unprotect level, each as a flag and a value.
+// Four attributes and the optional unprotect level, each as a flag and a value.
 const protectedBranchFormSize = 10
 
 func protectedBranchForm(branch manifest.ProtectedBranch) ([]string, error) {
