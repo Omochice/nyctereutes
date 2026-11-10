@@ -57,8 +57,7 @@ type Change struct {
 	// every other field. Typed rather than held in OldValue and NewValue, which
 	// would make both the plan line and the write assert for it.
 	Schedule *ScheduleChange
-	// The protected branch a [fieldProtectedBranches] change acts on, nil for every other field.
-	// Typed for the same reason.
+	// The protected branch a [fieldProtectedBranches] change acts on, typed for the same reason.
 	ProtectedBranch *ProtectedBranchChange
 }
 
@@ -164,7 +163,6 @@ func Diff(desired *manifest.Repository, current *CurrentState) []Change {
 	if spec.PipelineSchedules != nil && current.PipelineSchedules != nil {
 		changes = append(changes, diffSchedules(name, spec.PipelineSchedules, current.PipelineSchedules)...)
 	}
-	// The branches follow the same rule, for the same reasons.
 	if spec.ProtectedBranches != nil && current.ProtectedBranches != nil {
 		changes = append(changes, diffProtectedBranches(name, spec.ProtectedBranches, current.ProtectedBranches)...)
 	}

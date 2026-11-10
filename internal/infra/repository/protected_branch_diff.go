@@ -8,26 +8,21 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// The field every protected-branch change is reported under, which is how [Applier] tells one from a project setting.
+// How [Applier] tells a protected-branch change from a project setting.
 const fieldProtectedBranches = "protected_branches"
 
-// How one protection is named on a plan line and in the error of a write that failed, shared so the two can be matched.
+// Shared by the plan line and the error of a failed write, so the two can be matched.
 const protectedBranchPrefix = "protected_branch"
 
 // The protected branch one [Change] acts on.
 // Only the side the change type implies is filled: a creation has no Live, a deletion no Desired.
-// Name is held separately because it is what every change carries.
-// It is also what pairs a declared protection with a live one.
 type ProtectedBranchChange struct {
 	Name    string
 	Desired manifest.ProtectedBranch
 	Live    manifest.ProtectedBranch
 }
 
-// Reports how a project's live protections differ from the declared ones, pairing them by name.
-//
-// Deletions come first for the reason [diffSchedules] gives, and for a second one here.
-// An update is applied by unprotecting and protecting again.
+// Deletions come first for the reason [diffSchedules] gives, and because an update recreates the branch.
 // A run that created before deleting would meet a name GitLab still holds.
 func diffProtectedBranches(name string, desired, live []manifest.ProtectedBranch) []Change {
 	declared := make(map[string]struct{}, len(desired))
@@ -66,12 +61,11 @@ func diffProtectedBranches(name string, desired, live []manifest.ProtectedBranch
 	return changes
 }
 
-// Wraps one protection as a [Change], so the three producers cannot disagree about the field it is reported under.
 func protectedBranchChange(kind ChangeType, name string, branch ProtectedBranchChange) Change {
 	return Change{Type: kind, Name: name, Field: fieldProtectedBranches, ProtectedBranch: &branch}
 }
 
-// The protected-branch attribute names, repeating the manifest keys because a struct tag cannot name a constant.
+// Repeats the manifest keys, because a struct tag cannot name a constant.
 const (
 	fieldPushAccessLevel  = "push_access_level"
 	fieldMergeAccessLevel = "merge_access_level"
@@ -83,8 +77,7 @@ type protectedBranchAttribute struct {
 	value string
 }
 
-// Renders a protection's attributes in a fixed order, so two of them line up position by position.
-// The name is absent because it is the identity: a protection of another branch is a different one, not a changed one.
+// The order is fixed, because an update compares two renderings position by position.
 func protectedBranchAttributes(branch manifest.ProtectedBranch) []protectedBranchAttribute {
 	return []protectedBranchAttribute{
 		{field: fieldPushAccessLevel, value: string(branch.PushAccessLevel)},
@@ -93,10 +86,6 @@ func protectedBranchAttributes(branch manifest.ProtectedBranch) []protectedBranc
 	}
 }
 
-// Renders the change as the lines a plan shows for it.
-// A creation lists every attribute because none of them exists yet.
-// An update lists only those that differ, and a deletion none.
-// What a removal costs is the protection itself, which the header already names.
 func (b *ProtectedBranchChange) line(kind ChangeType) string {
 	header := fmt.Sprintf("%s %q", protectedBranchPrefix, b.Name)
 	switch kind {
