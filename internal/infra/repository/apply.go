@@ -88,7 +88,6 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 	}
 }
 
-// Names the write a child-resource field goes through, or nil when the field is a setting of the project itself.
 func (a *Applier) childResourceWriter(field string) func(context.Context, Change) error {
 	switch field {
 	case fieldPipelineSchedules:
@@ -100,7 +99,6 @@ func (a *Applier) childResourceWriter(field string) func(context.Context, Change
 	}
 }
 
-// The glab subcommand and the flag naming an HTTP method, spelled once because every write below repeats them.
 const (
 	glabAPI    = "api"
 	glabMethod = "--method"

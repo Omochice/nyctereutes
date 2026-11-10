@@ -10,17 +10,12 @@ import (
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
-// Signals a re-protect that failed after its unprotect succeeded.
-// That is the one outcome of an update that leaves the branch worse off than it started.
+// The one outcome of an update that leaves the branch worse off than it started.
 var errBranchLeftUnprotected = errors.New("branch was left unprotected")
 
-// Creates, updates or removes one protected branch.
-//
 // An update unprotects and protects again rather than patching.
-// GitLab's PATCH accepts push_access_level and merge_access_level, answers 200, and changes neither.
-// That was confirmed against CE 19.2.1.
-// A write path built on it would report success for a change it did not make.
-// The cost is that the branch is unprotected between the two calls, which is why a failed re-protect says so.
+// GitLab's PATCH accepts both access levels, answers 200, and changes neither, confirmed against CE 19.2.1.
+// The branch is unprotected between the two calls, which is why a failed re-protect says so.
 func (a *Applier) applyProtectedBranch(ctx context.Context, change Change) error {
 	branch := change.ProtectedBranch
 	if branch == nil {
@@ -45,9 +40,7 @@ func (a *Applier) applyProtectedBranch(ctx context.Context, change Change) error
 	}
 }
 
-// Protects a branch as the manifest declares it.
-// Every attribute goes on the request.
-// This is always a create, so an omitted one would take GitLab's default rather than the declared value.
+// Every attribute goes on the request, because a create takes GitLab's default for an omitted one.
 func (a *Applier) protect(
 	ctx context.Context, project, field string, branch manifest.ProtectedBranch,
 ) error {
@@ -63,9 +56,7 @@ func (a *Applier) protect(
 	return wrapWrite(err, project, field)
 }
 
-// Removes a branch's protection.
-// The name is percent-encoded because a protected branch is routinely named with a slash ("release/1.x", "release/*").
-// An unencoded path splits it into further segments, and GitLab answers such a request 404 on CE 19.2.1.
+// The name is percent-encoded: a slash left in it splits the path, which GitLab CE 19.2.1 answers with 404.
 func (a *Applier) unprotect(ctx context.Context, project, field, branch string) error {
 	_, err := a.writer.Run(ctx, glabAPI,
 		"projects/"+glab.EncodePath(project)+"/protected_branches/"+glab.EncodePath(branch),
@@ -73,14 +64,10 @@ func (a *Applier) unprotect(ctx context.Context, project, field, branch string) 
 	return wrapWrite(err, project, field)
 }
 
-// Names the branch as the field a failure is reported under, in the form the plan line uses.
 func protectedBranchField(name string) string {
 	return fmt.Sprintf("%s %q", protectedBranchPrefix, name)
 }
 
-// The form fields a protect sends.
-// The roles go as the numbers GitLab wants, read from the one table the export reads.
-// A document and the write it produces therefore cannot disagree about what a role means.
 func protectedBranchForm(branch manifest.ProtectedBranch) ([]string, error) {
 	push, err := branchAccessLevelNumber(branch.PushAccessLevel)
 	if err != nil {
@@ -98,7 +85,6 @@ func protectedBranchForm(branch manifest.ProtectedBranch) ([]string, error) {
 	}, nil
 }
 
-// The number GitLab wants for a role a manifest names.
 func branchAccessLevelNumber(name manifest.BranchAccessLevel) (int, error) {
 	for _, role := range branchRoles() {
 		if role.name == name {
