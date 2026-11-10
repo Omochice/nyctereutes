@@ -132,6 +132,26 @@ func TestApplyReprotectsAWildcardByItsName(t *testing.T) {
 	}
 }
 
+// GitLab CE 19.5.3 accepts every one of these as a protection's name, a run of asterisks included.
+func TestApplyUnprotectsEveryWildcardShapeGitLabAccepts(t *testing.T) {
+	for name, encoded := range map[string]string{
+		"*":          "%2A",
+		"**":         "%2A%2A",
+		"***":        "%2A%2A%2A",
+		"*-stable":   "%2A-stable",
+		"release/**": "release%2F%2A%2A",
+	} {
+		writer := &recordingWriter{}
+
+		calls := applyBranch(t, writer, branchChange(ChangeDelete, ProtectedBranchChange{Name: name}))
+
+		want := "api projects/group%2Fproj/protected_branches/" + encoded + " --method DELETE"
+		if got := strings.Join(calls[0].args, " "); got != want {
+			t.Errorf("%s: glab args = %q, want %q", name, got, want)
+		}
+	}
+}
+
 // Nothing else in the report would say that the branch is open.
 func TestApplyReportsABranchLeftUnprotectedByAFailedReprotect(t *testing.T) {
 	writer := &recordingWriter{errAt: map[int]error{1: errBoom}}
