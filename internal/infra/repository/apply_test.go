@@ -359,3 +359,20 @@ func TestApplyPutsIdentityAndBoolFields(t *testing.T) {
 		})
 	}
 }
+
+// The scalar PUT would send the change to the project endpoint, where it protects nothing.
+func TestApplyRefusesAProtectedBranchChange(t *testing.T) {
+	for _, kind := range []ChangeType{ChangeCreate, ChangeUpdate, ChangeDelete} {
+		writer := &recordingWriter{}
+		change := protectedBranchChange(kind, "group/proj", ProtectedBranchChange{Name: "main"})
+
+		results := NewApplier(writer).Apply(context.Background(), []Change{change})
+
+		if len(results) != 1 || !errors.Is(results[0].Err, errProtectedBranchWriteUnsupported) {
+			t.Errorf("%s: results = %+v, want errProtectedBranchWriteUnsupported", kind, results)
+		}
+		if len(writer.calls) != 0 {
+			t.Errorf("%s: calls = %d, want 0", kind, len(writer.calls))
+		}
+	}
+}
