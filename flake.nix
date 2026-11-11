@@ -215,6 +215,13 @@
           hooks = {
             # keep-sorted start block=yes
             actionlint.enable = true;
+            adrs-doctor = {
+              enable = true;
+              name = "adrs-doctor";
+              entry = "${pkgs.lib.getExe pkgs.adrs} doctor --warnings-as-errors";
+              files = "^doc/adr/.*\\.md$";
+              pass_filenames = false;
+            };
             ghalint = {
               enable = true;
               name = "ghalint";
@@ -260,6 +267,7 @@
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
+            pkgs.adrs
             pkgs.go_latest
             pkgs.golangci-lint
             pkgs.nix-update
