@@ -148,6 +148,34 @@ spec:
 	}
 }
 
+// The fake leaves both child reads unanswered, so one made for a missing project would surface as an unexpected call.
+func TestInfraPlanReadsNoChildResourceOfAMissingProject(t *testing.T) {
+	create := `apiVersion: nyctereutes/v1
+kind: Repository
+metadata:
+  name: fresh
+  owner: group
+spec:
+  visibility: private
+  pipeline_schedules: []
+  protected_branches: []
+`
+	path := writeManifest(t, t.TempDir(), "a.yaml", create)
+	runner := &fakeInfraGlab{projects: map[string]string{}}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0 for a project that is only missing", exit)
+	}
+	if stderr != "" {
+		t.Errorf("stderr = %q, want no read reported as failed", stderr)
+	}
+	if !strings.Contains(stdout, "new repository") {
+		t.Errorf("stdout missing the creation\n%s", stdout)
+	}
+}
+
 // A fetch failure for one project is reported and skipped without hiding the
 // drift of the projects around it, and the run fails overall.
 func TestInfraPlanContinuesPastFetchError(t *testing.T) {
