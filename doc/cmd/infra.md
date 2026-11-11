@@ -53,6 +53,11 @@ A role names a floor rather than an exact role. `developer` is GitLab's access l
 
 Who may lift a protection is a key only where GitLab reports one. A Community Edition build accepts `unprotect_access_level` on create and then answers every read without it, so on such an instance there is nothing to declare and an export writes no key; an Enterprise build reports it whether or not it is licensed, so an export from one carries `unprotect_access_level` and a plan compares it. Its values are `developer`, `maintainer` and `admin`: GitLab refuses an unprotect level of "no one", and a protection nobody could lift would be permanent.
 
+Reporting the level is not the same as enforcing it.
+GitLab documents the restriction on who may unprotect a branch as a Premium feature, and an Enterprise build without a licence stores the level and reports it back while leaving the decision where a Community Edition build leaves it, with the Maintainer role.
+On GitLab EE 19.5.3 with no licence, a maintainer unprotected a branch whose level was `admin`, and a developer could not unprotect one whose level was `developer`.
+The key is reconciled on such an instance all the same, because the stored value is what a licensed one enforces and a recreate that dropped it would lose it.
+
 Because the key exists on one kind of instance and not the other, silence about it means "leave it as it is" rather than "clear it". A document exported from a Community Edition instance therefore plans no drift when it is pointed at an Enterprise one, and an update carries the live value through the recreate rather than letting GitLab's create default replace it.
 
 A declaration pointed the other way, at an instance that reports nothing, is left alone rather than applied. Such a value could never be confirmed: applying it would recreate the branch, the next read would report nothing again, and every run would repeat the same change while reopening the branch for the length of it. Whether an instance answers with the field is not knowable from the document, so `infra validate` cannot catch this; `infra plan` says on stderr which branches carry a level it is ignoring.
