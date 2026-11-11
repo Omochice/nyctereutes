@@ -14,11 +14,7 @@ Against GitLab CE 19.2.1 the answer is that nothing happens and nothing says so.
 
 The `allowed_to_*` arrays are the documented way to change an access level through PATCH. They address an existing grant by the record id GitLab assigned it, take `{"id": n, "_destroy": true}` to remove one, and take an object without an id to add one. A manifest holds no such id, so a write built on them would have to read the protection, pair each declared role with the grant record it corresponds to, and compose an array of edits and destructions.
 
-What a recreate costs depends on what the instance reports, and the two editions do not report the same thing. CE answers every read without `unprotect_access_levels`, accepting the value on create with a `201` and never echoing it: on CE it can be written and never read, so there is nothing to declare and nothing a recreate could lose.
-
-An Enterprise build reports it whether or not it is licensed. GitLab EE 19.3.1 with `license` null reports `unprotect_access_levels`, `code_owner_approval_required` and `inherited` on every protection, and honours `unprotect_access_level` on create. Recreating such a protection without sending the value replaces it with GitLab's create default: a branch set to 60 was observed becoming 40 after a `DELETE` and a `POST` that omitted it. That is the recreate silently changing a setting, which is the one thing this design may not do.
-
-`code_owner_approval_required` behaves differently again: EE reports the field and refuses the value, answering `false` to a create sending `true`. It can be neither declared nor preserved, so it stays out.
+One more thing was learned from the same instance. CE reports no `unprotect_access_levels` at all: it accepts `unprotect_access_level` on create with a `201` and answers every subsequent read without it, "Allowed to unprotect" being a Premium feature. That value can therefore be written and never read, so it is not in the manifest and is not something reconciliation has to preserve.
 
 ## Decision Drivers
 
@@ -26,7 +22,6 @@ An Enterprise build reports it whether or not it is licensed. GitLab EE 19.3.1 w
 - **One write path per change type**: a second path taken for some differences and not others is a second thing to be wrong, and the plan cannot show which one a change will take.
 - **The manifest holds no server-assigned value**: a write that needs one has to read it first, which makes the write depend on a read the plan already made and may no longer match.
 - **A branch left unprotected is visible**: whatever the design costs, the operator has to be able to see when it has been paid.
-- **A recreate restores what it removed**: a setting the manifest does not speak for must come back as it was, or the recreate becomes the silent change the first driver forbids.
 
 ## Considered Options
 
@@ -60,15 +55,7 @@ An update is one `ChangeUpdate` on the plan, naming the attributes that differ. 
 
 `errBranchLeftUnprotected` wraps the failure of the second call, so the report distinguishes "the change did not happen" from "the change did not happen and the branch is now unprotected". Nothing else in an apply report would mention it, and the two call for different urgency.
 
-### 4. A recreate carries the settings the manifest is silent about
-
-`unprotect_access_level` is a key only where GitLab reports one, so a document written against CE is silent about it. Silence means "leave it as it is", and `carryUnstatedUnprotect` puts the live value onto the `POST` so the recreate restores what it removed. Without that the recreate would be exactly the silent change this ADR set out to avoid, and the plan would show nothing.
-
-A declaration the instance cannot report is dropped from the comparison instead, and named on stderr by `UnconfirmableUnprotectLevels`. Keeping it would not preserve anything: the recreate would send a value the build never echoes, the next read would report nothing again, and the plan would repeat the change on every run while reopening the branch each time. A key that is silently ignored is bad; a key that reopens a protected branch forever is worse, and the plan says which it is doing.
-
-The one state that cannot survive is the empty list EE reports for a protection created with its project. Nothing distinguishes it from an unstated level, and the `POST` has no way to ask for no unprotect grant at all, so recreating such a protection gives it GitLab's default. Both grant maintainers the same thing, and the change is visible in a later export.
-
-### 5. Removals are planned before creations
+### 4. Removals are planned before creations
 
 `diffProtectedBranches` emits every removal ahead of every creation, matching the order the schedules set. Here it is load-bearing rather than conventional: a name GitLab still holds is answered `409`, so a run that created first could be refused for a protection it was about to remove.
 
@@ -83,7 +70,6 @@ The one state that cannot survive is the empty list EE reports for a protection 
 ### Negative
 
 - A branch is unprotected for the duration of one round trip on every access-level change, and stays unprotected if the re-protect fails.
-- An Enterprise protection whose unprotect list is empty gains GitLab's default when it is recreated, because the two states cannot be told apart.
 - The protection's server-assigned id changes on every update, along with anything GitLab keeps against it.
 - An update makes two calls where one would have done for `allow_force_push`.
 
@@ -100,5 +86,5 @@ The one state that cannot survive is the empty list EE reports for a protection 
 
 ## References
 
-- The captured responses and what they showed: `.momomo/ai/gitlab/capture/protected-branches/README.md` for CE 19.2.1 and `.momomo/ai/gitlab/capture/protected-branches-ee/` for the unlicensed EE 19.3.1.
+- The captured responses and what they showed: `.momomo/ai/gitlab/capture/protected-branches/README.md`.
 - [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md), which settled how a child resource is identified when the manifest holds no id.
