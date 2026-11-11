@@ -1,4 +1,4 @@
-# ADR-006: The Unprotect Access Level Is Reconciled Only Where GitLab Reports It
+# 6. The Unprotect Access Level Is Reconciled Only Where GitLab Reports It
 
 Date: 2026-11-12
 
@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-[ADR-005](./adr-005-a-protected-branch-is-reconciled-by-recreating-it.md) settled that a change to a protected branch is applied by unprotecting the branch and protecting it again.
+[ADR-005](./0005-a-protected-branch-is-reconciled-by-recreating-it.md) settled that a change to a protected branch is applied by unprotecting the branch and protecting it again.
 It also recorded, from a Community Edition instance alone, that the level controlling who may unprotect a branch can be written and never read, and concluded that the level is not something reconciliation has to preserve.
 That conclusion did not survive the first Enterprise instance.
 
@@ -170,6 +170,6 @@ An Enterprise build without a licence reports the field and refuses the value, s
 
 ## References
 
-- [ADR-005](./adr-005-a-protected-branch-is-reconciled-by-recreating-it.md), whose recreate this decision keeps from changing the level, and whose statement that the level need not be preserved this decision replaces.
+- [ADR-005](./0005-a-protected-branch-is-reconciled-by-recreating-it.md), whose recreate this decision keeps from changing the level, and whose statement that the level need not be preserved this decision replaces.
 - [Protected branches](https://docs.gitlab.com/user/project/repository/branches/protected/), "Control who can unprotect branches".
 - [Protected branches API](https://docs.gitlab.com/api/protected_branches/).

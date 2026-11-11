@@ -1,4 +1,6 @@
-# ADR-001: Pipeline Schedule Variables Stay Out of the Manifest
+# 1. Pipeline Schedule Variables Stay Out of the Manifest
+
+Date: 2026-08-07
 
 ## Status
 
@@ -166,7 +168,7 @@ func (c *Client) ScheduleVariableKeys(
 
 **Rationale**: The variables are destroyed with the schedule and nothing else in the plan mentions them, so this is the operator's only chance to see them. It is scoped to deletions because that is the only change that destroys a variable without naming it, which keeps a plan that deletes nothing at one request per project. Returning keys rather than variables is what keeps a value from reaching a caller that could render or write it, which is the property the removed path could not offer.
 
-**Carried out later than the other two**: [ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md) stopped `infra plan` reconciling schedules at all, so for a time no plan proposed a deletion and there was nothing to disclose. [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) restored deletions, and this decision landed with that work rather than before it, because `ScheduleVariableKeys` with no caller would have been a guess at what its caller wanted.
+**Carried out later than the other two**: [ADR-002](./0002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md) stopped `infra plan` reconciling schedules at all, so for a time no plan proposed a deletion and there was nothing to disclose. [ADR-003](./0003-a-schedule-is-identified-by-its-description.md) restored deletions, and this decision landed with that work rather than before it, because `ScheduleVariableKeys` with no caller would have been a guess at what its caller wanted.
 
 ## Consequences
 
@@ -186,7 +188,7 @@ func (c *Client) ScheduleVariableKeys(
 ### Mitigations
 
 - `doc/cmd/infra.md` says that schedule variables are outside the manifest, so an operator is not left inferring it from a field that has quietly stopped being accepted.
-- The destructive case is contained by decision 3, which landed with [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md), the record that restored removals. Had it not, that record would have reintroduced the silent destruction this one was written to prevent. The drift that stays invisible either way changes what a pipeline receives and destroys nothing.
+- The destructive case is contained by decision 3, which landed with [ADR-003](./0003-a-schedule-is-identified-by-its-description.md), the record that restored removals. Had it not, that record would have reintroduced the silent destruction this one was written to prevent. The drift that stays invisible either way changes what a pipeline receives and destroys nothing.
 - The conditional read is named for what it is and justified where it happens, so it reads as a disclosure step rather than as part of reconciliation.
 
 ## Implementation Notes
@@ -203,5 +205,5 @@ Verification for decision 3, carried out against GitLab 19.2.1 CE: a plan removi
 
 ## References
 
-- [ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md)
+- [ADR-002](./0002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md)
 - GitLab pipeline schedules API, which marks `value` required on both create and update of a schedule variable, and states that `variables` is included in a response only for Maintainer, Owner, or the schedule's owner.

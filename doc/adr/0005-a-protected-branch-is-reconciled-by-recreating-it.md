@@ -1,4 +1,6 @@
-# ADR-005: A Protected Branch Is Reconciled by Recreating It
+# 5. A Protected Branch Is Reconciled by Recreating It
+
+Date: 2026-11-11
 
 ## Status
 
@@ -31,7 +33,7 @@ The smallest change to write, and the one the shape of the API suggests. It is r
 
 ### Option 2: PATCH the `allowed_to_*` arrays
 
-This works, and it never leaves the branch unprotected. The cost is that a write acquires state: the applier has to read the protection to learn its grant record ids, pair each with the role the manifest declares, and send a mixture of edits and `_destroy` entries. That read is a second read of something the plan already read, and the ids can have changed in between. The applier would hold the only code in this repository that reasons about server-assigned identifiers, which [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) took pains to keep out of the manifest, and it would do so for the sole benefit of a window measured in one round trip.
+This works, and it never leaves the branch unprotected. The cost is that a write acquires state: the applier has to read the protection to learn its grant record ids, pair each with the role the manifest declares, and send a mixture of edits and `_destroy` entries. That read is a second read of something the plan already read, and the ids can have changed in between. The applier would hold the only code in this repository that reasons about server-assigned identifiers, which [ADR-003](./0003-a-schedule-is-identified-by-its-description.md) took pains to keep out of the manifest, and it would do so for the sole benefit of a window measured in one round trip.
 
 ### Option 3: Unprotect and protect again
 
@@ -87,4 +89,4 @@ An update is one `ChangeUpdate` on the plan, naming the attributes that differ. 
 ## References
 
 - The captured responses and what they showed: `.momomo/ai/gitlab/capture/protected-branches/README.md`.
-- [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md), which settled how a child resource is identified when the manifest holds no id.
+- [ADR-003](./0003-a-schedule-is-identified-by-its-description.md), which settled how a child resource is identified when the manifest holds no id.

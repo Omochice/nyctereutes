@@ -1,4 +1,6 @@
-# ADR-003: A Pipeline Schedule Is Identified by Its Description
+# 3. A Pipeline Schedule Is Identified by Its Description
+
+Date: 2026-08-07
 
 ## Status
 
@@ -6,11 +8,11 @@ Accepted
 
 ## Context
 
-[ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md) stopped reconciling pipeline schedules and left open whether they would be reconciled again, and under what model. `infra import` exports them and `infra validate` checks them, but `infra plan` and `infra apply` ignore them, so a manifest can declare a schedule that nothing acts on. That is a state to pass through, not one to settle in: the schema invites a declaration the tool then disregards.
+[ADR-002](./0002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md) stopped reconciling pipeline schedules and left open whether they would be reconciled again, and under what model. `infra import` exports them and `infra validate` checks them, but `infra plan` and `infra apply` ignore them, so a manifest can declare a schedule that nothing acts on. That is a state to pass through, not one to settle in: the schema invites a declaration the tool then disregards.
 
 ADR-002 gave three reasons the declared-set model did not hold. Two have since changed.
 
-The variables are gone. [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) took them out of the manifest, which removed the per-schedule request, the field GitLab omits by permission inside a 200 response, and the credentials the document was carrying. Most of what made the earlier attempt hard to reason about went with them.
+The variables are gone. [ADR-001](./0001-pipeline-schedule-variables-out-of-the-manifest.md) took them out of the manifest, which removed the per-schedule request, the field GitLab omits by permission inside a 200 response, and the credentials the document was carrying. Most of what made the earlier attempt hard to reason about went with them.
 
 The identity problem has an answer that was already implemented. GitLab addresses a schedule by a server-assigned id no manifest can hold, so a declared schedule is paired with a live one by description, and GitLab does not enforce that descriptions are unique. `rejectDuplicateDescriptions` already refuses such a project, naming both ids so the reader knows which to rename:
 
@@ -120,7 +122,7 @@ This record is carried out, so what follows describes how the tool behaves rathe
 
 1. **A rename destroys and recreates**: editing a description costs the schedule its id, and with it whatever GitLab associates with that id, for a change an operator will read as cosmetic.
 2. **A correct plan can be a refused apply**: a token that reads a schedule it did not create produces a plan it cannot carry out, and 403 is what the operator sees.
-3. **A deletion destroys variables the manifest never held**: [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) took variables out of the document, so a deleted schedule takes variables nothing in the plan would otherwise mention.
+3. **A deletion destroys variables the manifest never held**: [ADR-001](./0001-pipeline-schedule-variables-out-of-the-manifest.md) took variables out of the document, so a deleted schedule takes variables nothing in the plan would otherwise mention.
 4. **A duplicate description blocks a project's schedules entirely**: one pair created by two different people leaves the schedules unmanageable until someone renames one.
 5. **An exported manifest opts a project into removal**: `infra import` writes `pipeline_schedules: []` for a project owning none, so committing that document declares that none may be added, for an operator who only meant to record the project as it stood.
 
@@ -128,13 +130,13 @@ This record is carried out, so what follows describes how the tool behaves rathe
 
 - `doc/cmd/infra.md` states the rename behaviour, the meaning of an empty list in an exported document, and that an omitted `active` declares `true`, so an operator meets each cost there rather than in a plan.
 - The apply error distinguishes a missing role from a schedule created by someone else, because those have different fixes and the role hint alone names a fix that does not apply.
-- Decision 3 of [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) lands with this: a plan deleting a schedule names the variable keys going with it, and the client returns keys without values so no plan can render one.
+- Decision 3 of [ADR-001](./0001-pipeline-schedule-variables-out-of-the-manifest.md) lands with this: a plan deleting a schedule names the variable keys going with it, and the client returns keys without values so no plan can render one.
 - A project refused for duplicate descriptions still has its other settings planned and applied, so the ambiguity costs its schedules rather than the project.
 - Deletions are performed before creations, because an instance caps how many schedules a project may hold; the default limit measured on GitLab 19.2.1 CE is 10, which a project swapping one schedule for another would otherwise hit.
 
 ## Implementation Notes
 
-The reconciliation was written fresh rather than lifted from the discarded branch. Roughly half of that branch was variable diffing and applying, which [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md) leaves nothing to reconcile, and the guards it accumulated were answers to problems that came from the variables.
+The reconciliation was written fresh rather than lifted from the discarded branch. Roughly half of that branch was variable diffing and applying, which [ADR-001](./0001-pipeline-schedule-variables-out-of-the-manifest.md) leaves nothing to reconcile, and the guards it accumulated were answers to problems that came from the variables.
 
 Two defects found while reviewing that branch apply here too, and neither is caused by this decision. One is fixed and one is not. A schedule GitLab reports without an id is now refused on read, because an update or a delete would otherwise be addressed to `pipeline_schedules/0`. `infra apply` still archives a project before writing the settings that follow it, and GitLab makes an archived project read-only, so a manifest that both archives and declares schedules fails on every write after the archive; that is a defect of the apply ordering rather than of this decision, and it is left to the record that fixes it.
 
@@ -142,6 +144,6 @@ The verification this record asked for was carried out against GitLab 19.2.1 CE,
 
 ## References
 
-- [ADR-001](./adr-001-pipeline-schedule-variables-out-of-the-manifest.md), whose third decision this record makes due
-- [ADR-002](./adr-002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md), which deferred the question this record answers
+- [ADR-001](./0001-pipeline-schedule-variables-out-of-the-manifest.md), whose third decision this record makes due
+- [ADR-002](./0002-pipeline-schedules-are-not-reconciled-as-a-declared-set.md), which deferred the question this record answers
 - PR #66, the discarded attempt, and the review findings it produced

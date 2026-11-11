@@ -1,4 +1,6 @@
-# ADR-004: The Manifest Schema Is Derived from the Manifest Types
+# 4. The Manifest Schema Is Derived from the Manifest Types
+
+Date: 2026-08-29
 
 ## Status
 
@@ -10,13 +12,13 @@ The manifest format is stated in one place: the Go types of `internal/infra/mani
 
 That statement only fires once a command parses a file. `infra validate` reports an unknown key, a misspelled enum value or a missing field, and nothing reports them earlier. A document is written blind and its mistakes are learned by running something against it.
 
-The documents are meant to be hand-edited. `infra import` exports a project as a manifest that an operator then commits and maintains, and [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) made that export consequential: an exported `pipeline_schedules: []` declares that the project holds no schedule, so what the operator does to that document decides what apply removes. An editor that knew the rules could report the mistake while the line is being typed, and an editor learns rules from a JSON Schema.
+The documents are meant to be hand-edited. `infra import` exports a project as a manifest that an operator then commits and maintains, and [ADR-003](./0003-a-schedule-is-identified-by-its-description.md) made that export consequential: an exported `pipeline_schedules: []` declares that the project holds no schedule, so what the operator does to that document decides what apply removes. An editor that knew the rules could report the mistake while the line is being typed, and an editor learns rules from a JSON Schema.
 
 A schema is therefore worth having, and there are two ways to get one. Writing it by hand produces a second, independent statement of the same format, which drifts from the first as soon as either changes and gives no sign that it has. Deriving it from the types produces one statement with two readers, and drift stops being possible for everything the type system carries: the field names, the enum values, the rejection of unknown keys, and simple required-ness.
 
 Three rules are not carried by the type system and had to be handled individually. The allowed values of each enum were spelled out as inline arguments to `enumValue` inside `UnmarshalYAML`, reachable only by calling the decoder. The `apiVersion` and `kind` values are pinned by a probe that compares them against exported constants before the document is decoded, and a struct tag cannot name a constant. The rule that `description` is required when `ci_catalog` is true relates two sibling fields, which no Go type expresses.
 
-One rule cannot be expressed in JSON Schema at all. [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) makes a schedule's description its identity, so `validateSchedules` refuses a document that repeats one, and JSON Schema constrains items rather than one property across items. Whatever is derived is therefore a weaker check than the parser and can never become a substitute for it.
+One rule cannot be expressed in JSON Schema at all. [ADR-003](./0003-a-schedule-is-identified-by-its-description.md) makes a schedule's description its identity, so `validateSchedules` refuses a document that repeats one, and JSON Schema constrains items rather than one property across items. Whatever is derived is therefore a weaker check than the parser and can never become a substitute for it.
 
 ## Decision Drivers
 
@@ -145,7 +147,7 @@ This record is carried out, so what follows describes how the tool behaves rathe
 ### Negative
 
 1. **One rule is stated twice**: the catalog prerequisite exists in `validate()` and in `RepositorySpec.JSONSchemaExtend`, and nothing checks that the two agree, so changing one leaves the other stating the old rule silently.
-2. **The schema is a weaker check than the parser**: the uniqueness of a schedule's description, which [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md) makes the identity every plan and apply rests on, cannot be expressed in JSON Schema and is not attempted, so an editor can report a document clean that `infra validate` refuses.
+2. **The schema is a weaker check than the parser**: the uniqueness of a schedule's description, which [ADR-003](./0003-a-schedule-is-identified-by-its-description.md) makes the identity every plan and apply rests on, cannot be expressed in JSON Schema and is not attempted, so an editor can report a document clean that `infra validate` refuses.
 3. **An explicit null is flagged though the parser accepts it**: every optional field is typed concretely by the reflector, so a null written anywhere a value may be omitted is reported as a type error although it decodes as the field being unset. This covers the whole optional surface, `spec` and `topics` and `pipeline_schedules` alongside the scalar fields, and expressing it would mean a nullable union on each of them.
 4. **The lint configuration carries an exclusion for the generator's sake**: `recvcheck` is told to ignore `JSONSchema` and `JSONSchemaExtend`, because the library looks them up on the value type while the decoding methods on the same types need pointer receivers.
 5. **A committed document keeps pointing at the revision that produced it**: nothing rewrites the modeline, so a manifest maintained across releases is edited against the rules of the build that first exported it until someone re-imports or edits the line.
@@ -170,6 +172,6 @@ Verification worth pinning: the committed file matches what the types produce, w
 
 ## References
 
-- [ADR-003](./adr-003-a-schedule-is-identified-by-its-description.md), which makes a schedule's description its identity, the one manifest rule the derived schema cannot express
+- [ADR-003](./0003-a-schedule-is-identified-by-its-description.md), which makes a schedule's description its identity, the one manifest rule the derived schema cannot express
 - `github.com/invopop/jsonschema`, the reflector the schema is generated with, which reaches a type through `JSONSchema` and `JSONSchemaExtend` on the value type
 - The `yaml-language-server` modeline convention, which is how an editor is told which schema applies to a single YAML document
