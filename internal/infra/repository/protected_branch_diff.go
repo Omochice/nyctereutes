@@ -67,6 +67,7 @@ func protectedBranchChange(kind ChangeType, name string, branch ProtectedBranchC
 
 // Repeats the manifest keys, because a struct tag cannot name a constant.
 const (
+	fieldName             = "name"
 	fieldPushAccessLevel  = "push_access_level"
 	fieldMergeAccessLevel = "merge_access_level"
 	fieldAllowForcePush   = "allow_force_push"

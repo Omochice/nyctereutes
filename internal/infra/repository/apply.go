@@ -52,21 +52,17 @@ var errUnexpectedValueType = errors.New("change value has unexpected type")
 // only updates, so a create is reported rather than performed.
 var errCreateUnsupported = errors.New("creating a project is not supported yet")
 
-// Refused rather than left to the scalar PUT, which would send the change to the project endpoint.
-var errProtectedBranchWriteUnsupported = errors.New("applying a protected branch is not supported yet")
-
 // Translates one change into its glab call. A create is reported unsupported;
 // archived is toggled through its own endpoint; every other field is a scalar
 // PUT.
 func (a *Applier) applyChange(ctx context.Context, change Change) error {
-	// Taken first: a schedule is created through its own endpoint while a project
-	// cannot be created at all, and the scalar PUT below would send a schedule's
-	// attributes to the project.
-	if change.Field == fieldPipelineSchedules {
-		return a.applySchedule(ctx, change)
+	// Taken first: a child resource is created through its own endpoint while a project cannot be created at all.
+	// The scalar PUT below would send a child resource's attributes to the project.
+	if write := a.childResourceWriter(change.Field); write != nil {
+		return write(ctx, change)
 	}
-	if err := unsupported(change); err != nil {
-		return err
+	if change.Type == ChangeCreate {
+		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
 	}
 	switch change.Field {
 	case fieldArchived:
@@ -92,15 +88,21 @@ func (a *Applier) applyChange(ctx context.Context, change Change) error {
 	}
 }
 
-func unsupported(change Change) error {
-	if change.Field == fieldProtectedBranches {
-		return fmt.Errorf("%w: %s on %s", errProtectedBranchWriteUnsupported, change.ProtectedBranch.Name, change.Name)
+func (a *Applier) childResourceWriter(field string) func(context.Context, Change) error {
+	switch field {
+	case fieldPipelineSchedules:
+		return a.applySchedule
+	case fieldProtectedBranches:
+		return a.applyProtectedBranch
+	default:
+		return nil
 	}
-	if change.Type == ChangeCreate {
-		return fmt.Errorf("%w: %s", errCreateUnsupported, change.Name)
-	}
-	return nil
 }
+
+const (
+	glabAPI    = "api"
+	glabMethod = "--method"
+)
 
 // Archives or unarchives a project. Unlike other settings the archived state is
 // a POST to a dedicated action endpoint rather than a field on the project.
@@ -109,7 +111,7 @@ func (a *Applier) setArchived(ctx context.Context, project string, archived bool
 	if archived {
 		action = "archive"
 	}
-	_, err := a.writer.Run(ctx, "api", "projects/"+glab.EncodePath(project)+"/"+action, "--method", "POST")
+	_, err := a.writer.Run(ctx, glabAPI, "projects/"+glab.EncodePath(project)+"/"+action, glabMethod, "POST")
 	return wrapWrite(err, project, fieldArchived)
 }
 
@@ -138,7 +140,7 @@ func (a *Applier) setCatalogResource(ctx context.Context, project string, enable
 	if enabled {
 		query, field = catalogResourceCreateMutation, "catalogResourcesCreate"
 	}
-	out, err := a.writer.Run(ctx, "api", "graphql",
+	out, err := a.writer.Run(ctx, glabAPI, "graphql",
 		"-f", "query="+query,
 		"-f", "projectPath="+project)
 	if err != nil {
@@ -225,8 +227,8 @@ func apiParam(field string) string {
 func (a *Applier) putField(ctx context.Context, project, planField, value string) error {
 	_, err := a.writer.Run(
 		ctx,
-		"api", "projects/"+glab.EncodePath(project),
-		"--method", "PUT",
+		glabAPI, "projects/"+glab.EncodePath(project),
+		glabMethod, "PUT",
 		"-f", apiParam(planField)+"="+value,
 	)
 	return wrapWrite(err, project, planField)
@@ -246,8 +248,8 @@ func (a *Applier) applyTopics(ctx context.Context, project string, topics []stri
 	}
 	_, err = a.writer.RunWithStdin(
 		ctx, body,
-		"api", "projects/"+glab.EncodePath(project),
-		"--method", "PUT",
+		glabAPI, "projects/"+glab.EncodePath(project),
+		glabMethod, "PUT",
 		"--header", "Content-Type: application/json",
 		"--input", "-",
 	)
