@@ -20,6 +20,8 @@ type LiveProtectedBranch struct {
 	AllowForcePush    bool               `json:"allow_force_push"`
 	// Nil on a CE build, which omits the field, and non-nil on an Enterprise one even when it holds no grant.
 	UnprotectAccessLevels []LiveBranchAccess `json:"unprotect_access_levels"`
+	// Read although no manifest key names it, because a recreate has to put it back.
+	CodeOwnerApprovalRequired bool `json:"code_owner_approval_required"`
 }
 
 // One grant inside a protected branch's access-level list.
@@ -60,7 +62,21 @@ func (c *Client) FetchProtectedBranches(
 	if err != nil {
 		return nil, fmt.Errorf("read protected branches %s/%s: %w", owner, name, err)
 	}
-	return &ProtectedBranches{Branches: branches, ReportsUnprotectLevels: enterprise}, nil
+	return &ProtectedBranches{
+		Branches:                   branches,
+		ReportsUnprotectLevels:     enterprise,
+		RequiringCodeOwnerApproval: requiringCodeOwnerApproval(live),
+	}, nil
+}
+
+func requiringCodeOwnerApproval(live []LiveProtectedBranch) []string {
+	var names []string
+	for _, branch := range live {
+		if branch.CodeOwnerApprovalRequired {
+			names = append(names, branch.Name)
+		}
+	}
+	return names
 }
 
 // The protections a project holds, together with what the instance was able to say about them.
@@ -69,6 +85,8 @@ type ProtectedBranches struct {
 	// False on a Community Edition build, against which a declared level could never be confirmed.
 	// Read from the edition rather than from the protections above, which a project may not hold yet.
 	ReportsUnprotectLevels bool
+	// Kept beside the branches rather than on them, because a field there would become a manifest key.
+	RequiringCodeOwnerApproval []string
 }
 
 var errNoProtectedBranchPage = errors.New("response carries no protected branch list")

@@ -212,6 +212,33 @@ func TestApplyCarriesAnUnstatedUnprotectLevelThroughARecreate(t *testing.T) {
 	}
 }
 
+// Left off, the recreated protection would stop requiring code owner approval with nothing in the plan to say so.
+func TestApplyKeepsCodeOwnerApprovalThroughARecreate(t *testing.T) {
+	writer := &recordingWriter{}
+	change := branchChange(ChangeUpdate, ProtectedBranchChange{
+		Name: "main",
+		Desired: manifest.ProtectedBranch{
+			Name: "main", PushAccessLevel: roleNoOne, MergeAccessLevel: roleMaintainer,
+		},
+		Live: manifest.ProtectedBranch{
+			Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+		},
+		CodeOwnerApprovalRequired: true,
+	})
+
+	calls := applyBranch(t, writer, change)
+
+	if len(calls) != 2 {
+		t.Fatalf("calls = %+v, want an unprotect and a protect", calls)
+	}
+	want := "api projects/group%2Fproj/protected_branches --method POST " +
+		"-f name=main -f push_access_level=0 -f merge_access_level=40 -f allow_force_push=false " +
+		"-f code_owner_approval_required=true"
+	if got := strings.Join(calls[1].args, " "); got != want {
+		t.Errorf("protect = %q, want %q", got, want)
+	}
+}
+
 func TestApplySendsADeclaredUnprotectLevel(t *testing.T) {
 	writer := &recordingWriter{}
 	change := branchChange(ChangeCreate, ProtectedBranchChange{

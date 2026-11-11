@@ -132,6 +132,29 @@ func TestDiffUpdatesABranchWhoseRoleChanged(t *testing.T) {
 	}
 }
 
+// An update recreates the protection, and GitLab creates one without code owner approval unless the create asks for it.
+func TestDiffCarriesCodeOwnerApprovalIntoAnUpdate(t *testing.T) {
+	live := holdingBranchesOnEnterprise([]manifest.ProtectedBranch{
+		branch("main", roleMaintainer), branch("release/*", roleMaintainer),
+	})
+	live.ProtectedBranches.RequiringCodeOwnerApproval = []string{"main"}
+
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{branch("main", roleNoOne), branch("release/*", roleNoOne)}),
+		live,
+	)
+
+	if len(changes) != 2 {
+		t.Fatalf("changes = %+v, want an update of each branch", changes)
+	}
+	for _, change := range changes {
+		want := change.ProtectedBranch.Name == "main"
+		if got := change.ProtectedBranch.CodeOwnerApprovalRequired; got != want {
+			t.Errorf("%s: code owner approval carried = %t, want %t", change.ProtectedBranch.Name, got, want)
+		}
+	}
+}
+
 func TestDiffPlansNothingForAMatchingBranch(t *testing.T) {
 	declared := []manifest.ProtectedBranch{branch("main", roleMaintainer)}
 
