@@ -3,11 +3,12 @@ package repository
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/Omochice/nyctereutes/internal/glab"
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
@@ -33,30 +34,49 @@ func isProtectedBranchCall(args []string) bool {
 	})
 }
 
-func protectedBranchRunner(listJSON string, record *[]string) glab.RunnerFunc {
-	return func(_ context.Context, args ...string) ([]byte, error) {
-		switch {
-		case len(args) > 1 && args[1] == "graphql":
-			return []byte(graphqlCatalogJSON(false)), nil
-		case isProtectedBranchCall(args):
-			if record != nil {
-				*record = args
-			}
-			return []byte(listJSON), nil
-		default:
-			return []byte(sampleProjectJSON), nil
+type protectedBranchGlab struct {
+	list       string
+	enterprise bool
+	versionErr error
+	called     *[]string
+}
+
+func (g protectedBranchGlab) Run(_ context.Context, args ...string) ([]byte, error) {
+	switch {
+	case len(args) > 1 && args[1] == "graphql":
+		return []byte(graphqlCatalogJSON(false)), nil
+	case len(args) == 2 && args[1] == "version":
+		if g.versionErr != nil {
+			return nil, g.versionErr
 		}
+		return []byte(`{"version":"19.5.3","enterprise":` + strconv.FormatBool(g.enterprise) + `}`), nil
+	case isProtectedBranchCall(args):
+		if g.called != nil {
+			*g.called = args
+		}
+		return []byte(g.list), nil
+	default:
+		return []byte(sampleProjectJSON), nil
 	}
+}
+
+func protectedBranchRunner(listJSON string, record *[]string) protectedBranchGlab {
+	return protectedBranchGlab{list: listJSON, called: record}
 }
 
 func fetchBranches(t *testing.T, listJSON string) []manifest.ProtectedBranch {
 	t.Helper()
-	branches, err := NewClient(protectedBranchRunner(listJSON, nil)).
+	return fetchProtections(t, listJSON).Branches
+}
+
+func fetchProtections(t *testing.T, listJSON string) *ProtectedBranches {
+	t.Helper()
+	read, err := NewClient(protectedBranchRunner(listJSON, nil)).
 		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
 	if err != nil {
 		t.Fatalf("fetch protected branches: %v", err)
 	}
-	return branches
+	return read
 }
 
 // A project holding more protections than one page carries would otherwise be described by its first page alone.
@@ -79,7 +99,7 @@ func TestProtectedBranchesAreDescribedByNameAndRole(t *testing.T) {
 		{Name: "main", PushAccessLevel: "maintainer", MergeAccessLevel: "maintainer"},
 		{Name: "release/1.x", PushAccessLevel: "no_one", MergeAccessLevel: "developer", AllowForcePush: true},
 	}
-	if !slices.Equal(got, want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("branches = %+v, want %+v", got, want)
 	}
 }
@@ -179,5 +199,107 @@ func TestFetchProtectedBranchesRejectsAResponseWithNoPage(t *testing.T) {
 
 	if !errors.Is(err, errNoProtectedBranchPage) {
 		t.Errorf("err = %v, want the empty-response sentinel", err)
+	}
+}
+
+// A CE build omits unprotect_access_levels and an Enterprise one reports it empty for a default protection.
+func TestAnUnreportedUnprotectLevelIsNotDescribed(t *testing.T) {
+	for _, testCase := range []struct{ name, listJSON string }{
+		{
+			name: "community edition omits the field",
+			listJSON: `[{"id":1,"name":"main",
+			  "push_access_levels":[{"id":1,"access_level":40}],
+			  "merge_access_levels":[{"id":1,"access_level":40}]}]`,
+		},
+		{
+			name: "enterprise reports an empty list",
+			listJSON: `[{"id":1,"name":"main",
+			  "push_access_levels":[{"id":1,"access_level":40}],
+			  "merge_access_levels":[{"id":1,"access_level":40}],
+			  "unprotect_access_levels":[]}]`,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			branches := fetchBranches(t, testCase.listJSON)
+			if level := branches[0].UnprotectAccessLevel; level != nil {
+				t.Errorf("unprotect level = %v, want nil (nothing to describe)", *level)
+			}
+		})
+	}
+}
+
+// The manifest holds the role so that reconciling the branch does not change it.
+func TestAnEnterpriseUnprotectLevelIsDescribed(t *testing.T) {
+	const eeJSON = `[{"id":1,"name":"main",
+	  "push_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
+	  "merge_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
+	  "unprotect_access_levels":[{"id":1,"access_level":60,"user_id":null,"group_id":null}],
+	  "code_owner_approval_required":false,"inherited":false}]`
+
+	branches := fetchBranches(t, eeJSON)
+
+	level := branches[0].UnprotectAccessLevel
+	if level == nil || *level != "admin" {
+		t.Errorf("unprotect level = %v, want admin", level)
+	}
+}
+
+// Recreating the protection from a document that dropped the grant would revoke it.
+func TestFetchProtectedBranchesRejectsAnUnprotectGrantNoManifestCanHold(t *testing.T) {
+	const grantedJSON = `[{"id":1,"name":"main",
+	  "push_access_levels":[{"id":1,"access_level":40}],
+	  "merge_access_levels":[{"id":1,"access_level":40}],
+	  "unprotect_access_levels":[{"id":1,"access_level":40,"group_id":3}]}]`
+
+	_, err := NewClient(protectedBranchRunner(grantedJSON, nil)).
+		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+
+	if !errors.Is(err, errIndescribableBranch) {
+		t.Fatalf("err = %v, want an indescribable branch", err)
+	}
+	if !strings.Contains(err.Error(), "unprotect_access_levels") {
+		t.Errorf("error = %q, want it to name the list it read", err)
+	}
+}
+
+// An Enterprise build whose project holds no protection yet would otherwise be taken for a Community one.
+func TestTheReadSaysWhetherTheInstanceReportsUnprotectLevels(t *testing.T) {
+	for _, testCase := range []struct {
+		name, listJSON string
+		enterprise     bool
+	}{
+		{
+			name: "community edition omits the field",
+			listJSON: `[{"id":1,"name":"main",
+			  "push_access_levels":[{"id":1,"access_level":40}],
+			  "merge_access_levels":[{"id":1,"access_level":40}]}]`,
+			enterprise: false,
+		},
+		{
+			name:       "enterprise protecting nothing yet",
+			listJSON:   `[]`,
+			enterprise: true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			read, err := NewClient(protectedBranchGlab{list: testCase.listJSON, enterprise: testCase.enterprise}).
+				FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+			if err != nil {
+				t.Fatalf("fetch protected branches: %v", err)
+			}
+			if read.ReportsUnprotectLevels != testCase.enterprise {
+				t.Errorf("reports unprotect levels = %t, want %t", read.ReportsUnprotectLevels, testCase.enterprise)
+			}
+		})
+	}
+}
+
+// The edition decides what a declared unprotect level means, so it is not guessed.
+func TestFetchProtectedBranchesFailsWhenTheVersionCannotBeRead(t *testing.T) {
+	versionErr := errors.New("version unavailable")
+	_, err := NewClient(protectedBranchGlab{list: protectedBranchListJSON, versionErr: versionErr}).
+		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+	if !errors.Is(err, versionErr) {
+		t.Errorf("err = %v, want the version failure", err)
 	}
 }

@@ -103,19 +103,51 @@ func TestParseDistinguishesOmittedProtectedBranchesFromAnEmptyList(t *testing.T)
 
 // A branch decodes itself.
 // The strict decoding the surrounding document gets does not reach inside it unless the nested decode asks for it too.
-// The two Premium keys GitLab CE never reports are the mistypes most likely to be tried.
-// They must be refused rather than dropped in silence.
+// The key most likely to be tried is the one GitLab reports and this schema does not.
 func TestParseRejectsUnknownKeyInsideAProtectedBranch(t *testing.T) {
-	for _, key := range []string{"unprotect_access_level: maintainer", "code_owner_approval_required: true"} {
-		t.Run(key, func(t *testing.T) {
-			doc := validDoc + `  protected_branches:
+	doc := validDoc + `  protected_branches:
     - name: main
-      ` + key + "\n"
-			_, errs := Parse([]byte(doc))
-			if len(errs) != 1 {
-				t.Fatalf("errs = %v, want one", errs)
-			}
-		})
+      code_owner_approval_required: true
+`
+	_, errs := Parse([]byte(doc))
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want one", errs)
+	}
+}
+
+// A document exported from CE then says nothing about it instead of demanding a value GitLab would never confirm.
+func TestParseDistinguishesAnOmittedUnprotectLevelFromADeclaredOne(t *testing.T) {
+	omitted, errs := Parse([]byte(validDoc + "  protected_branches:\n    - name: main\n"))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want none", errs)
+	}
+	if level := omitted[0].Spec.ProtectedBranches[0].UnprotectAccessLevel; level != nil {
+		t.Errorf("omitted key = %v, want nil (unmanaged)", *level)
+	}
+
+	declared, errs := Parse([]byte(validDoc +
+		"  protected_branches:\n    - name: main\n      unprotect_access_level: admin\n"))
+	if len(errs) > 0 {
+		t.Fatalf("errs = %v, want none", errs)
+	}
+	level := declared[0].Spec.ProtectedBranches[0].UnprotectAccessLevel
+	if level == nil || *level != valueAdmin {
+		t.Errorf("declared key = %v, want admin", level)
+	}
+}
+
+// GitLab answers an unprotect access level of 0 with 400.
+func TestParseRejectsAnUnprotectLevelOfNoOne(t *testing.T) {
+	doc := validDoc + `  protected_branches:
+    - name: main
+      unprotect_access_level: no_one
+`
+	_, errs := Parse([]byte(doc))
+	if len(errs) != 1 {
+		t.Fatalf("errs = %v, want one", errs)
+	}
+	if !strings.Contains(errs[0].Error(), "developer, maintainer, admin") {
+		t.Errorf("error = %q, want it to list the allowed values", errs[0])
 	}
 }
 

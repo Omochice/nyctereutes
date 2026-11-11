@@ -1,0 +1,25 @@
+package repository
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+)
+
+// A Community Edition build leaves whole fields out of its responses, so the edition decides what an omission means.
+type instanceVersion struct {
+	Enterprise bool `json:"enterprise"`
+}
+
+// Asked of the instance rather than inferred from a project's resources, because a project holding none says nothing.
+func (c *Client) isEnterprise(ctx context.Context) (bool, error) {
+	out, err := c.runner.Run(ctx, "api", "version")
+	if err != nil {
+		return false, fmt.Errorf("fetch instance version: %w", err)
+	}
+	var version instanceVersion
+	if err := json.Unmarshal(out, &version); err != nil {
+		return false, fmt.Errorf("parse instance version: %w", err)
+	}
+	return version.Enterprise, nil
+}

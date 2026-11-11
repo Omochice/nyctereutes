@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/Omochice/nyctereutes/cli"
@@ -111,11 +112,12 @@ func scheduleDetailBody(variables map[string]string, id string) []byte {
 //
 // A nil child-collection map turns that read into an unexpected call, which is how a test asserts none is made.
 type fakeInfraGlab struct {
-	projects  map[string]string // "owner/name" -> project JSON
-	catalog   map[string]bool   // "owner/name" -> catalog status, default false
-	schedules map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
-	branches  map[string]string // "owner/name" -> protected branch list JSON; nil forbids the read
-	variables map[string]string // schedule id -> the variables field; absent holds none
+	projects   map[string]string // "owner/name" -> project JSON
+	catalog    map[string]bool   // "owner/name" -> catalog status, default false
+	schedules  map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
+	branches   map[string]string // "owner/name" -> protected branch list JSON; nil forbids the read
+	variables  map[string]string // schedule id -> the variables field; absent holds none
+	enterprise bool              // what GET /version reports; false is a Community Edition build
 }
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
@@ -127,6 +129,9 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	if id, ok := scheduleDetailRead(args); ok {
 		return scheduleDetailBody(f.variables, id), nil
+	}
+	if len(args) == 2 && args[0] == "api" && args[1] == "version" {
+		return []byte(`{"enterprise":` + strconv.FormatBool(f.enterprise) + `}`), nil
 	}
 	return f.project(args)
 }

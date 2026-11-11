@@ -29,7 +29,8 @@ type CurrentState struct {
 	// projects response does not carry them.
 	PipelineSchedules []LiveSchedule
 	// The branch protections the project owns, read from their own endpoint for the same reason.
-	ProtectedBranches []manifest.ProtectedBranch
+	// Nil when they were not read, which is what keeps a project nobody asked about apart from one holding none.
+	ProtectedBranches *ProtectedBranches
 }
 
 // Drives the glab CLI to read GitLab project state.
@@ -229,9 +230,16 @@ func ToManifest(state *CurrentState) *manifest.Repository {
 			MergeRequestsTemplate:                     (*string)(state.MergeRequestsTemplate),
 			Features:                                  toFeatures(state),
 			PipelineSchedules:                         toManifestSchedules(state.PipelineSchedules),
-			ProtectedBranches:                         state.ProtectedBranches,
+			ProtectedBranches:                         state.describedBranches(),
 		},
 	}
+}
+
+func (state *CurrentState) describedBranches() []manifest.ProtectedBranch {
+	if state.ProtectedBranches == nil {
+		return nil
+	}
+	return state.ProtectedBranches.Branches
 }
 
 // Builds the features block, or nil when no access level was reported so the

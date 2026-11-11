@@ -186,3 +186,62 @@ func TestApplyReportsAFailedUnprotectWithoutClaimingTheBranchIsOpen(t *testing.T
 		t.Errorf("error = %q, want it not to claim the protection was lost", results[0].Err)
 	}
 }
+
+// A branch only instance admins could unprotect would otherwise fall to maintainers with nothing in the plan to say so.
+func TestApplyCarriesAnUnstatedUnprotectLevelThroughARecreate(t *testing.T) {
+	writer := &recordingWriter{}
+	live := manifest.ProtectedBranch{
+		Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+		UnprotectAccessLevel: new(manifest.BranchUnprotectAccessLevel("admin")),
+	}
+	change := branchChange(ChangeUpdate, ProtectedBranchChange{
+		Name: "main",
+		Desired: manifest.ProtectedBranch{
+			Name: "main", PushAccessLevel: roleNoOne, MergeAccessLevel: roleMaintainer,
+		},
+		Live: live,
+	})
+
+	calls := applyBranch(t, writer, change)
+
+	if len(calls) != 2 {
+		t.Fatalf("calls = %+v, want an unprotect and a protect", calls)
+	}
+	if !strings.Contains(strings.Join(calls[1].args, " "), "unprotect_access_level=60") {
+		t.Errorf("protect = %q, want it to carry the live unprotect level", calls[1].args)
+	}
+}
+
+func TestApplySendsADeclaredUnprotectLevel(t *testing.T) {
+	writer := &recordingWriter{}
+	change := branchChange(ChangeCreate, ProtectedBranchChange{
+		Name: "main",
+		Desired: manifest.ProtectedBranch{
+			Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+			UnprotectAccessLevel: new(manifest.BranchUnprotectAccessLevel("developer")),
+		},
+	})
+
+	calls := applyBranch(t, writer, change)
+
+	if !strings.Contains(strings.Join(calls[0].args, " "), "unprotect_access_level=30") {
+		t.Errorf("protect = %q, want it to carry the declared unprotect level", calls[0].args)
+	}
+}
+
+// A value GitLab would never report back could not be planned against.
+func TestApplySendsNoUnprotectLevelWhenNobodyStatesOne(t *testing.T) {
+	writer := &recordingWriter{}
+	change := branchChange(ChangeCreate, ProtectedBranchChange{
+		Name: "main",
+		Desired: manifest.ProtectedBranch{
+			Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+		},
+	})
+
+	calls := applyBranch(t, writer, change)
+
+	if strings.Contains(strings.Join(calls[0].args, " "), "unprotect_access_level") {
+		t.Errorf("protect = %q, want no unprotect level sent", calls[0].args)
+	}
+}

@@ -11,13 +11,12 @@ import (
 type ProtectedBranch struct {
 	Name string `yaml:"name" jsonschema:"required"`
 	// All three lack omitempty yet are optional, as on [PipelineSchedule]: UnmarshalYAML supplies a default for each.
-	//
-	// unprotect_access_level and code_owner_approval_required are not keys here.
-	// GitLab CE accepts both on create and never reports them.
-	// A setting that cannot be read back cannot be reconciled.
 	PushAccessLevel  BranchAccessLevel `yaml:"push_access_level"`
 	MergeAccessLevel BranchAccessLevel `yaml:"merge_access_level"`
 	AllowForcePush   bool              `yaml:"allow_force_push"`
+	// Nil rather than a default, because only an Enterprise build reports it: nil leaves whatever the project holds alone.
+	// code_owner_approval_required is not a key, because an Enterprise build refuses the value without a licence.
+	UnprotectAccessLevel *BranchUnprotectAccessLevel `yaml:"unprotect_access_level,omitempty"`
 }
 
 // What GitLab grants when a branch is protected without an access level given.
@@ -73,4 +72,27 @@ func (level BranchAccessLevel) JSONSchema() *jsonschema.Schema {
 
 func (*BranchAccessLevel) allowedValues() []string {
 	return []string{valueNoOne, valueDeveloper, valueMaintainer, valueAdmin}
+}
+
+// Who may lift a branch's protection: "developer", "maintainer" or "admin".
+// Kept apart from [BranchAccessLevel] because "no_one" is absent: GitLab answers an unprotect level of 0 with 400.
+type BranchUnprotectAccessLevel string
+
+// Rejects values outside the unprotect access-level set at decode time.
+func (level *BranchUnprotectAccessLevel) UnmarshalYAML(data []byte) error {
+	value, err := enumValue(data, "unprotect access level", level.allowedValues())
+	if err != nil {
+		return err
+	}
+	*level = BranchUnprotectAccessLevel(value)
+	return nil
+}
+
+// Reports the unprotect access levels to the schema generator, which cannot see through UnmarshalYAML.
+func (level BranchUnprotectAccessLevel) JSONSchema() *jsonschema.Schema {
+	return enumSchema(level.allowedValues())
+}
+
+func (*BranchUnprotectAccessLevel) allowedValues() []string {
+	return []string{valueDeveloper, valueMaintainer, valueAdmin}
 }

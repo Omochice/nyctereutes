@@ -13,12 +13,13 @@ import (
 
 // One protected branch as GitLab reports it.
 // Unlike [LiveSchedule], no id is kept, because GitLab addresses a protection by its name.
-// The Premium fields unprotect_access_levels and code_owner_approval_required are not read, since CE omits them.
 type LiveProtectedBranch struct {
 	Name              string             `json:"name"`
 	PushAccessLevels  []LiveBranchAccess `json:"push_access_levels"`
 	MergeAccessLevels []LiveBranchAccess `json:"merge_access_levels"`
 	AllowForcePush    bool               `json:"allow_force_push"`
+	// Nil on a CE build, which omits the field, and non-nil on an Enterprise one even when it holds no grant.
+	UnprotectAccessLevels []LiveBranchAccess `json:"unprotect_access_levels"`
 }
 
 // One grant inside a protected branch's access-level list.
@@ -38,7 +39,7 @@ type LiveBranchAccess struct {
 // Described here rather than at each caller, so a read fails in the one place a read is made.
 func (c *Client) FetchProtectedBranches(
 	ctx context.Context, owner, name string,
-) ([]manifest.ProtectedBranch, error) {
+) (*ProtectedBranches, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
 		"projects/"+glab.EncodePath(owner+"/"+name)+"/protected_branches")
 	if err != nil {
@@ -55,7 +56,19 @@ func (c *Client) FetchProtectedBranches(
 	if err != nil {
 		return nil, fmt.Errorf("describe protected branches %s/%s: %w", owner, name, err)
 	}
-	return branches, nil
+	enterprise, err := c.isEnterprise(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read protected branches %s/%s: %w", owner, name, err)
+	}
+	return &ProtectedBranches{Branches: branches, ReportsUnprotectLevels: enterprise}, nil
+}
+
+// The protections a project holds, together with what the instance was able to say about them.
+type ProtectedBranches struct {
+	Branches []manifest.ProtectedBranch
+	// False on a Community Edition build, against which a declared level could never be confirmed.
+	// Read from the edition rather than from the protections above, which a project may not hold yet.
+	ReportsUnprotectLevels bool
 }
 
 var errNoProtectedBranchPage = errors.New("response carries no protected branch list")
@@ -63,8 +76,9 @@ var errNoProtectedBranchPage = errors.New("response carries no protected branch 
 var errIndescribableBranch = errors.New("indescribable protected branch")
 
 const (
-	fieldPushAccessLevels  = "push_access_levels"
-	fieldMergeAccessLevels = "merge_access_levels"
+	fieldPushAccessLevels      = "push_access_levels"
+	fieldMergeAccessLevels     = "merge_access_levels"
+	fieldUnprotectAccessLevels = "unprotect_access_levels"
 )
 
 // Refused rather than flattened to the first role.
@@ -80,6 +94,14 @@ func rejectIndescribableBranches(branches []LiveProtectedBranch) error {
 			{field: fieldMergeAccessLevels, grants: branch.MergeAccessLevels},
 		} {
 			if err := rejectIndescribableGrants(branch.Name, list.field, list.grants); err != nil {
+				return err
+			}
+		}
+		// Only this list may hold nothing: Enterprise reports it empty for a protection created with its project.
+		if len(branch.UnprotectAccessLevels) > 0 {
+			if err := rejectIndescribableGrants(
+				branch.Name, fieldUnprotectAccessLevels, branch.UnprotectAccessLevels,
+			); err != nil {
 				return err
 			}
 		}
@@ -185,10 +207,20 @@ func toManifestProtectedBranch(live LiveProtectedBranch) (manifest.ProtectedBran
 	if err != nil {
 		return manifest.ProtectedBranch{}, fmt.Errorf("branch %q %s: %w", live.Name, fieldMergeAccessLevels, err)
 	}
-	return manifest.ProtectedBranch{
+	described := manifest.ProtectedBranch{
 		Name:             live.Name,
 		PushAccessLevel:  push,
 		MergeAccessLevel: merge,
 		AllowForcePush:   live.AllowForcePush,
-	}, nil
+	}
+	// The key stays unset where GitLab states no role, because naming one would report drift no apply could settle.
+	if len(live.UnprotectAccessLevels) > 0 {
+		role, err := branchAccessLevelName(live.UnprotectAccessLevels[0].AccessLevel)
+		if err != nil {
+			return manifest.ProtectedBranch{},
+				fmt.Errorf("branch %q %s: %w", live.Name, fieldUnprotectAccessLevels, err)
+		}
+		described.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel(role))
+	}
+	return described, nil
 }

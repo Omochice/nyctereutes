@@ -76,6 +76,7 @@ func planRepo(
 	}
 	changes := repository.Diff(repo, state)
 	discloseDestroyedVariables(ctx, client, stderr, repo, changes)
+	discloseIgnoredUnprotectLevels(stderr, repo, state)
 	return changes, failures
 }
 
@@ -103,6 +104,17 @@ func discloseDestroyedVariables(
 		}
 		change.Schedule.VariableKeys = keys
 	}
+}
+
+// Only a plan can say this, because whether the instance answers with the field is not knowable from the document.
+func discloseIgnoredUnprotectLevels(stderr io.Writer, repo *manifest.Repository, state *repository.CurrentState) {
+	ignored := repository.UnconfirmableUnprotectLevels(repo, state)
+	if len(ignored) == 0 {
+		return
+	}
+	_, _ = fmt.Fprintf(stderr,
+		"%s/%s: this GitLab reports no unprotect access level, so the declared one is left alone on: %s\n",
+		repo.Metadata.Owner, repo.Metadata.Name, strings.Join(ignored, ", "))
 }
 
 // Reads the live state one declared project is compared against. A failed read
