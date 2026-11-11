@@ -260,6 +260,7 @@
         };
         devShells.default = pkgs.mkShell {
           buildInputs = gitHooks.enabledPackages ++ [
+            pkgs.adrs
             pkgs.go_latest
             pkgs.golangci-lint
             pkgs.nix-update
