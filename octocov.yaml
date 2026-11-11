@@ -24,3 +24,4 @@ report:
 
 comment:
   if: is_pull_request
+  updatePrevious: true
