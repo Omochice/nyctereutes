@@ -31,7 +31,8 @@ type fakeClient struct {
 	mergeFn     func(iid int) error
 }
 
-func (f *fakeClient) ApproveMR(_ context.Context, _ string, iid int) error {
+func (f *fakeClient) ApproveMR(_ context.Context, mr types.MR) error {
+	iid := mr.IID
 	f.mu.Lock()
 	f.approved = append(f.approved, iid)
 	fn := f.approveFn
@@ -44,11 +45,12 @@ func (f *fakeClient) ApproveMR(_ context.Context, _ string, iid int) error {
 	return nil
 }
 
-func (f *fakeClient) MergeMR(_ context.Context, _ string, iid int, method types.MergeMethod, autoMerge bool) error {
+func (f *fakeClient) MergeMR(_ context.Context, mr types.MR, options types.MergeOptions) error {
+	iid := mr.IID
 	f.mu.Lock()
 	f.merged = append(f.merged, iid)
-	f.mergeMethod = append(f.mergeMethod, method)
-	f.mergeAuto = append(f.mergeAuto, autoMerge)
+	f.mergeMethod = append(f.mergeMethod, options.Method)
+	f.mergeAuto = append(f.mergeAuto, options.AutoMerge)
 	fn := f.mergeFn
 	f.mu.Unlock()
 	if fn != nil {

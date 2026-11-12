@@ -39,3 +39,11 @@ const (
 func MergeMethods() []MergeMethod {
 	return []MergeMethod{MergeMethodSquash, MergeMethodMerge, MergeMethodRebase}
 }
+
+// How a merge request is merged.
+// When AutoMerge is true the merge is gated on the pipeline succeeding
+// (GitLab's native "merge when pipeline succeeds"); otherwise it merges immediately.
+type MergeOptions struct {
+	Method    MergeMethod
+	AutoMerge bool
+}

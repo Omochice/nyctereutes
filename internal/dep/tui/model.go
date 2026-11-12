@@ -17,8 +17,8 @@ import (
 // The subset of gitlab.Client the TUI drives. It is an interface so
 // tests can inject a fake that records calls instead of shelling out to glab.
 type Client interface {
-	ApproveMR(ctx context.Context, project string, iid int) error
-	MergeMR(ctx context.Context, project string, iid int, method types.MergeMethod, autoMerge bool) error
+	ApproveMR(ctx context.Context, mr types.MR) error
+	MergeMR(ctx context.Context, mr types.MR, options types.MergeOptions) error
 }
 
 // The action the user applies to the selected MRs.
@@ -525,7 +525,8 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd {
 	// Capture only what the command needs so it does not pin the whole Model
 	// (its MR slices, results and selection map) alive while it runs.
-	client, currentMode, method, autoMerge := m.client, m.mode, m.method, m.requireChecks
+	client, currentMode := m.client, m.mode
+	options := types.MergeOptions{Method: m.method, AutoMerge: m.requireChecks}
 	return func() tea.Msg {
 		semaphore <- struct{}{}
 		defer func() { <-semaphore }()
@@ -533,10 +534,10 @@ func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd
 		ctx := context.Background()
 		var err error
 		if currentMode == modeApprove || currentMode == modeApproveMerge {
-			err = client.ApproveMR(ctx, mergeRequest.Project, mergeRequest.IID)
+			err = client.ApproveMR(ctx, mergeRequest)
 		}
 		if err == nil && (currentMode == modeMerge || currentMode == modeApproveMerge) {
-			err = client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, method, autoMerge)
+			err = client.MergeMR(ctx, mergeRequest, options)
 		}
 		return mrResultMsg{mr: mergeRequest, err: err}
 	}

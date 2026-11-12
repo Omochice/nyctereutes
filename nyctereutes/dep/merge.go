@@ -52,6 +52,6 @@ func (c *mergeCommand) Execute(_ []string) error {
 	client := gitlab.NewClient(c.runner)
 	view := ui.New(c.inout.Stdout, mrs, false)
 	return applyAction(view, mrs, c.DryRun, "merge", func(mr types.MR) error {
-		return client.MergeMR(ctx, mr.Project, mr.IID, c.Method, requireChecks)
+		return client.MergeMR(ctx, mr, types.MergeOptions{Method: c.Method, AutoMerge: requireChecks})
 	}, successDetails...)
 }

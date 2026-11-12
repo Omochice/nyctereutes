@@ -36,7 +36,7 @@ func TestApproveMRSucceeds(t *testing.T) {
 		return nil, nil
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 12); err != nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 12}); err != nil {
 		t.Fatalf("ApproveMR() error = %v", err)
 	}
 	if strings.Join(gotArgs, " ") != "mr approve 12 -R g/proj" {
@@ -49,7 +49,7 @@ func TestApproveMRTreatsUnauthorizedAsSuccess(t *testing.T) {
 		return nil, errStubUnauthorized
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 12); err != nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 12}); err != nil {
 		t.Errorf("ApproveMR() with 401 error = %v, want nil (idempotent)", err)
 	}
 }
@@ -59,7 +59,7 @@ func TestApproveMRDoesNotMistakeIIDDigitsForUnauthorized(t *testing.T) {
 		return nil, errStub500ForMR401
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 401); err == nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 401}); err == nil {
 		t.Error("ApproveMR(!401) with a 500 error = nil, want the failure propagated")
 	}
 }
@@ -69,7 +69,7 @@ func TestApproveMRPropagatesOtherErrors(t *testing.T) {
 		return nil, errStub500
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 12); err == nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 12}); err == nil {
 		t.Error("ApproveMR() with 500 error = nil, want an error")
 	}
 }
@@ -103,7 +103,10 @@ func TestMergeMRAutoMergeArgs(t *testing.T) {
 			})
 
 			client := NewClient(runner)
-			if err := client.MergeMR(context.Background(), "g/proj", 12, testCase.method, testCase.autoMerge); err != nil {
+			if err := client.MergeMR(
+				context.Background(), types.MR{Project: "g/proj", IID: 12},
+				types.MergeOptions{Method: testCase.method, AutoMerge: testCase.autoMerge},
+			); err != nil {
 				t.Fatalf("MergeMR() error = %v", err)
 			}
 			joined := strings.Join(gotArgs, " ")
