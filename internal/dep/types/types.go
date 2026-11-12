@@ -22,3 +22,20 @@ type MR struct {
 	// the structural blocker (for example a conflict).
 	UnmergeableReason string `json:"unmergeable_reason"`
 }
+
+// How GitLab integrates an MR into its target branch.
+// The values are the names the --method flag accepts.
+type MergeMethod string
+
+// The merge methods the dep commands accept.
+const (
+	MergeMethodSquash MergeMethod = "squash"
+	MergeMethodMerge  MergeMethod = "merge"
+	MergeMethodRebase MergeMethod = "rebase"
+)
+
+// Returns every merge method, in the order the TUI cycles through them.
+// A function rather than a package variable so the set cannot be mutated.
+func MergeMethods() []MergeMethod {
+	return []MergeMethod{MergeMethodSquash, MergeMethodMerge, MergeMethodRebase}
+}

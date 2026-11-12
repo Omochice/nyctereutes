@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,7 @@ import (
 // tests can inject a fake that records calls instead of shelling out to glab.
 type Client interface {
 	ApproveMR(ctx context.Context, project string, iid int) error
-	MergeMR(ctx context.Context, project string, iid int, method string, autoMerge bool) error
+	MergeMR(ctx context.Context, project string, iid int, method types.MergeMethod, autoMerge bool) error
 }
 
 // The action the user applies to the selected MRs.
@@ -85,15 +86,8 @@ const (
 	phaseRefreshing
 )
 
-// The merge methods glab accepts, passed through to MergeMR.
-const (
-	methodSquash = "squash"
-	methodMerge  = "merge"
-	methodRebase = "rebase"
-)
-
 // The merge method a freshly built model starts on.
-const defaultMergeMethod = methodSquash
+const defaultMergeMethod = types.MergeMethodSquash
 
 // The most glab calls a single run fires at once. tea.Batch would otherwise
 // spawn one subprocess per selected MR, so a large selection could overwhelm
@@ -131,7 +125,7 @@ type Model struct {
 	selected map[int]bool
 	mode     mode
 	// The merge method applied when running merge or approve & merge; cycled by M.
-	method string
+	method types.MergeMethod
 	// Toggled by c. When true the list shows only CI-passing MRs and merges use
 	// GitLab's auto-merge gate; when false the list shows everything and merges
 	// run immediately. It defaults to false (off).
@@ -459,15 +453,9 @@ func (m Model) cycleSetting(name string) Model {
 
 // Returns the merge method following current in the squash/merge/rebase cycle,
 // wrapping around; an unknown current resets to the first method.
-func nextMergeMethod(current string) string {
-	switch current {
-	case methodSquash:
-		return methodMerge
-	case methodMerge:
-		return methodRebase
-	default:
-		return methodSquash
-	}
+func nextMergeMethod(current types.MergeMethod) types.MergeMethod {
+	methods := types.MergeMethods()
+	return methods[(slices.Index(methods, current)+1)%len(methods)]
 }
 
 // Shifts the cursor by delta, staying within the visible list.

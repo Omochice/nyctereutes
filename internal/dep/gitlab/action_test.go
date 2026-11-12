@@ -8,10 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
-
-const methodMerge = "merge"
 
 // The stub errors mirror what glabError hands back for a failed run,
 // classification sentinel included.
@@ -78,13 +77,22 @@ func TestApproveMRPropagatesOtherErrors(t *testing.T) {
 func TestMergeMRAutoMergeArgs(t *testing.T) {
 	tests := []struct {
 		name      string
-		method    string
+		method    types.MergeMethod
 		autoMerge bool
 		wantFlags []string
 	}{
-		{name: "squash auto-merge", method: "squash", autoMerge: true, wantFlags: []string{"--squash", "--auto-merge"}},
-		{name: "rebase immediate", method: "rebase", autoMerge: false, wantFlags: []string{"--rebase", "--auto-merge=false"}},
-		{name: "merge immediate", method: methodMerge, autoMerge: false, wantFlags: []string{"--auto-merge=false"}},
+		{
+			name: "squash auto-merge", method: types.MergeMethodSquash, autoMerge: true,
+			wantFlags: []string{"--squash", "--auto-merge"},
+		},
+		{
+			name: "rebase immediate", method: types.MergeMethodRebase, autoMerge: false,
+			wantFlags: []string{"--rebase", "--auto-merge=false"},
+		},
+		{
+			name: "merge immediate", method: types.MergeMethodMerge, autoMerge: false,
+			wantFlags: []string{"--auto-merge=false"},
+		},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -107,7 +115,7 @@ func TestMergeMRAutoMergeArgs(t *testing.T) {
 					t.Errorf("merge args = %v, want to contain %q", gotArgs, f)
 				}
 			}
-			if testCase.method == methodMerge && slices.Contains(gotArgs, "--squash") {
+			if testCase.method == types.MergeMethodMerge && slices.Contains(gotArgs, "--squash") {
 				t.Errorf("merge args = %v, should not contain --squash for plain merge", gotArgs)
 			}
 		})

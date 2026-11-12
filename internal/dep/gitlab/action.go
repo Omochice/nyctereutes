@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
@@ -27,14 +28,16 @@ func (c *Client) ApproveMR(ctx context.Context, project string, iid int) error {
 // Merges a merge request via glab. When autoMerge is true the merge is gated on
 // the pipeline succeeding (GitLab's native "merge when pipeline succeeds");
 // otherwise it merges immediately.
-func (c *Client) MergeMR(ctx context.Context, project string, iid int, method string, autoMerge bool) error {
+func (c *Client) MergeMR(ctx context.Context, project string, iid int, method types.MergeMethod, autoMerge bool) error {
 	args := []string{"mr", "merge", strconv.Itoa(iid), "-R", project, "--yes"}
 
 	switch method {
-	case "squash":
+	case types.MergeMethodSquash:
 		args = append(args, "--squash")
-	case "rebase":
+	case types.MergeMethodRebase:
 		args = append(args, "--rebase")
+	case types.MergeMethodMerge:
+		// glab merges plainly when no method flag is given.
 	}
 
 	if autoMerge {
