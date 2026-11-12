@@ -130,6 +130,10 @@ func fetchState(
 		_, _ = fmt.Fprintf(stderr, "%v\n", err)
 		return nil, 1
 	}
+	// GitLab answers a child read of a missing project with the same 404, which would be counted as a failed read.
+	if state.IsNew {
+		return state, 0
+	}
 	// A manifest declaring neither child resource says nothing about them.
 	// Neither read is made, so such a project stays at one request.
 	failures := 0
