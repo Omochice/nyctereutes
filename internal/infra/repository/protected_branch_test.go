@@ -244,6 +244,26 @@ func TestAnEnterpriseUnprotectLevelIsDescribed(t *testing.T) {
 	}
 }
 
+// The manifest has no key for it, so the read is the only place a recreate can learn what to put back.
+func TestTheReadNamesTheBranchesRequiringCodeOwnerApproval(t *testing.T) {
+	const eeJSON = `[{"id":1,"name":"main",
+	  "push_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
+	  "merge_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
+	  "unprotect_access_levels":[{"id":1,"access_level":40,"user_id":null,"group_id":null}],
+	  "code_owner_approval_required":true,"inherited":false},
+	 {"id":2,"name":"release/*",
+	  "push_access_levels":[{"id":2,"access_level":40,"user_id":null,"group_id":null}],
+	  "merge_access_levels":[{"id":2,"access_level":40,"user_id":null,"group_id":null}],
+	  "unprotect_access_levels":[{"id":2,"access_level":40,"user_id":null,"group_id":null}],
+	  "code_owner_approval_required":false,"inherited":false}]`
+
+	got := fetchProtections(t, eeJSON).RequiringCodeOwnerApproval
+
+	if want := []string{"main"}; !slices.Equal(got, want) {
+		t.Errorf("branches requiring code owner approval = %v, want %v", got, want)
+	}
+}
+
 // Recreating the protection from a document that dropped the grant would revoke it.
 func TestFetchProtectedBranchesRejectsAnUnprotectGrantNoManifestCanHold(t *testing.T) {
 	const grantedJSON = `[{"id":1,"name":"main",

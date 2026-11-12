@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,8 @@ type ProtectedBranchChange struct {
 	Name    string
 	Desired manifest.ProtectedBranch
 	Live    manifest.ProtectedBranch
+	// What GitLab reported for the live protection, so that an update can recreate it without losing the setting.
+	CodeOwnerApprovalRequired bool
 }
 
 // Deletions come first for the reason [diffSchedules] gives, and because an update recreates the branch.
@@ -57,9 +60,10 @@ func diffProtectedBranches(name string, desired []manifest.ProtectedBranch, live
 			}))
 		case !describesTheSame(have, want):
 			changes = append(changes, protectedBranchChange(ChangeUpdate, name, ProtectedBranchChange{
-				Name:    want.Name,
-				Desired: want,
-				Live:    have,
+				Name:                      want.Name,
+				Desired:                   want,
+				Live:                      have,
+				CodeOwnerApprovalRequired: slices.Contains(live.RequiringCodeOwnerApproval, want.Name),
 			}))
 		}
 	}

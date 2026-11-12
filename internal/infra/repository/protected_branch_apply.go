@@ -30,7 +30,7 @@ func (a *Applier) applyProtectedBranch(ctx context.Context, change Change) error
 		if err := a.unprotect(ctx, change.Name, field, branch.Name); err != nil {
 			return err
 		}
-		if err := a.protect(ctx, change.Name, field, want); err != nil {
+		if err := a.protect(ctx, change.Name, field, want, carriedCodeOwnerApproval(*branch)...); err != nil {
 			return fmt.Errorf("%w: %w", errBranchLeftUnprotected, err)
 		}
 		return nil
@@ -50,10 +50,22 @@ func carryUnstatedUnprotect(desired, live manifest.ProtectedBranch) manifest.Pro
 	return desired
 }
 
+// Not among the manifest keys, because no document can declare it.
+const fieldCodeOwnerApprovalRequired = "code_owner_approval_required"
+
+// Sent only where GitLab reported the setting as on, rather than as a value on every create.
+// A request to an instance that never reports it then stays exactly what it was.
+func carriedCodeOwnerApproval(branch ProtectedBranchChange) []string {
+	if !branch.CodeOwnerApprovalRequired {
+		return nil
+	}
+	return []string{"-f", fieldCodeOwnerApprovalRequired + "=true"}
+}
+
 // Every stated attribute goes on the request, because a create takes GitLab's default for an omitted one.
 // An unstated unprotect level is left off, because a CE build would report nothing to compare a sent value against.
 func (a *Applier) protect(
-	ctx context.Context, project, field string, branch manifest.ProtectedBranch,
+	ctx context.Context, project, field string, branch manifest.ProtectedBranch, carried ...string,
 ) error {
 	form, err := protectedBranchForm(branch)
 	if err != nil {
@@ -62,7 +74,7 @@ func (a *Applier) protect(
 	args := append([]string{
 		glabAPI, "projects/" + glab.EncodePath(project) + "/protected_branches",
 		glabMethod, "POST",
-	}, form...)
+	}, append(form, carried...)...)
 	_, err = a.writer.Run(ctx, args...)
 	return wrapWrite(err, project, field)
 }
