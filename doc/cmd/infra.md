@@ -23,6 +23,29 @@ The URL names the schema as it stood in the sources the exporting build was made
 
 The schema is derived from the same Go types the commands parse with, so the rules an editor applies and the rules a command applies cannot drift apart. It is a weaker check rather than a replacement for `infra validate`: a rule relating one part of a document to another has no expression in JSON Schema, so a manifest declaring two schedules with the same description passes an editor unremarked and is still refused when it is validated. It is stricter about one thing, because every optional field is typed concretely and an explicit null therefore reads as a wrong type, while the parser accepts a null anywhere a value may be omitted and treats it as the field being unset. A manifest is checked by running `infra validate` on it, and the modeline only moves part of that feedback earlier.
 
+## Topics
+
+A project's topics are declared as a complete set.
+A manifest that omits the `topics` key leaves the live topics alone, and one that carries an empty list removes them all.
+
+A topic has to be declared in the casing GitLab holds it in.
+GitLab keeps a topic as a record shared across its organization, and a name written to a project resolves to the record already holding it, whatever casing was written.
+The casing a project shows is therefore the record's own.
+Only an administrator can change it, through the topics API, and the change shows on every project carrying the topic.
+
+A manifest declaring `Go` where GitLab holds `go` is refused by plan and apply for that reason, in an error naming both spellings.
+No topics update is planned for such a manifest, because the write would succeed and leave `go` in place.
+The refusal costs the project its topics and not the project: its other settings are still planned and applied.
+
+The project itself answers for the topics it carries.
+A declared topic it does not carry yet is looked up through the topics API, one read per such topic, so a manifest adding none makes no extra request.
+A lookup that fails is reported and leaves the topics unplanned, because a failed read is not an organization holding no such topic.
+
+The lookup has three limits.
+The topics API is one GitLab marks as Beta.
+It also answers for the organization the request resolves to, which the project read does not name, so on an instance with more than one organization a project outside that organization is checked against the wrong topics.
+It reads the first hundred topics a search for the name answers, closest first, so a topic listed past them counts as not held and its update is planned as written.
+
 ## Pipeline schedules
 
 A project's pipeline schedules are managed the way its own settings are: `infra import` exports them, `infra validate` checks them, and `infra plan` and `infra apply` create, change and remove them so the project matches what the manifest declares.
