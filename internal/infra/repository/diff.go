@@ -108,7 +108,7 @@ func markLines(text, marker string) string {
 // when GitLab lacks the project, otherwise one update per differing declared
 // field.
 func Diff(desired *manifest.Repository, current *CurrentState) []Change {
-	name := desired.Metadata.Owner + "/" + desired.Metadata.Name
+	name := desired.Metadata.FullPath()
 
 	if current.IsNew {
 		return []Change{{Type: ChangeCreate, Name: name, Field: fieldRepository, NewValue: name}}

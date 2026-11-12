@@ -72,7 +72,7 @@ func fetchBranches(t *testing.T, listJSON string) []manifest.ProtectedBranch {
 func fetchProtections(t *testing.T, listJSON string) *ProtectedBranches {
 	t.Helper()
 	read, err := NewClient(protectedBranchRunner(listJSON, nil)).
-		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+		FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if err != nil {
 		t.Fatalf("fetch protected branches: %v", err)
 	}
@@ -83,7 +83,7 @@ func fetchProtections(t *testing.T, listJSON string) *ProtectedBranches {
 func TestFetchProtectedBranchesFollowsThePages(t *testing.T) {
 	var called []string
 	_, err := NewClient(protectedBranchRunner(protectedBranchListJSON, &called)).
-		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+		FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if err != nil {
 		t.Fatalf("fetch protected branches: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestFetchProtectedBranchesRejectsGrantsNoManifestCanHold(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := NewClient(protectedBranchRunner(testCase.listJSON, nil)).
-				FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+				FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 			if !errors.Is(err, errIndescribableBranch) {
 				t.Fatalf("err = %v, want an indescribable branch", err)
 			}
@@ -182,7 +182,7 @@ func TestDescribingAProtectedBranchRejectsAnUnknownRole(t *testing.T) {
 	  "merge_access_levels":[{"id":1,"access_level":40}]}]`
 
 	_, err := NewClient(protectedBranchRunner(unknownRoleJSON, nil)).
-		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+		FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 
 	if !errors.Is(err, errUnknownBranchAccessLevel) {
 		t.Fatalf("err = %v, want an unknown access level", err)
@@ -195,7 +195,7 @@ func TestDescribingAProtectedBranchRejectsAnUnknownRole(t *testing.T) {
 // Read as an empty list, the document would declare that none may exist, and applying it would unprotect everything.
 func TestFetchProtectedBranchesRejectsAResponseWithNoPage(t *testing.T) {
 	_, err := NewClient(protectedBranchRunner("null", nil)).
-		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+		FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 
 	if !errors.Is(err, errNoProtectedBranchPage) {
 		t.Errorf("err = %v, want the empty-response sentinel", err)
@@ -272,7 +272,7 @@ func TestFetchProtectedBranchesRejectsAnUnprotectGrantNoManifestCanHold(t *testi
 	  "unprotect_access_levels":[{"id":1,"access_level":40,"group_id":3}]}]`
 
 	_, err := NewClient(protectedBranchRunner(grantedJSON, nil)).
-		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+		FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 
 	if !errors.Is(err, errIndescribableBranch) {
 		t.Fatalf("err = %v, want an indescribable branch", err)
@@ -303,7 +303,7 @@ func TestTheReadSaysWhetherTheInstanceReportsUnprotectLevels(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			read, err := NewClient(protectedBranchGlab{list: testCase.listJSON, enterprise: testCase.enterprise}).
-				FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+				FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 			if err != nil {
 				t.Fatalf("fetch protected branches: %v", err)
 			}
@@ -318,7 +318,7 @@ func TestTheReadSaysWhetherTheInstanceReportsUnprotectLevels(t *testing.T) {
 func TestFetchProtectedBranchesFailsWhenTheVersionCannotBeRead(t *testing.T) {
 	versionErr := errors.New("version unavailable")
 	_, err := NewClient(protectedBranchGlab{list: protectedBranchListJSON, versionErr: versionErr}).
-		FetchProtectedBranches(context.Background(), ownerGroup, nameProj)
+		FetchProtectedBranches(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if !errors.Is(err, versionErr) {
 		t.Errorf("err = %v, want the version failure", err)
 	}

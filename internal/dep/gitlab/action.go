@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
 
@@ -16,35 +17,35 @@ import (
 // is reported as success instead of aborting a follow-up merge. A genuinely
 // unauthorized token returns 401 too, but then the follow-up merge fails on its
 // own, so treating it as success here is safe.
-func (c *Client) ApproveMR(ctx context.Context, project string, iid int) error {
-	_, err := c.runner.Run(ctx, "mr", "approve", strconv.Itoa(iid), "-R", project)
+func (c *Client) ApproveMR(ctx context.Context, mergeRequest types.MR) error {
+	_, err := c.runner.Run(ctx, "mr", "approve", strconv.Itoa(mergeRequest.IID), "-R", mergeRequest.Project)
 	if err == nil || errors.Is(err, glab.ErrUnauthorized) {
 		return nil
 	}
-	return fmt.Errorf("failed to approve MR !%d: %w", iid, err)
+	return fmt.Errorf("failed to approve MR !%d: %w", mergeRequest.IID, err)
 }
 
-// Merges a merge request via glab. When autoMerge is true the merge is gated on
-// the pipeline succeeding (GitLab's native "merge when pipeline succeeds");
-// otherwise it merges immediately.
-func (c *Client) MergeMR(ctx context.Context, project string, iid int, method string, autoMerge bool) error {
-	args := []string{"mr", "merge", strconv.Itoa(iid), "-R", project, "--yes"}
+// Merges a merge request via glab as options describe.
+func (c *Client) MergeMR(ctx context.Context, mergeRequest types.MR, options types.MergeOptions) error {
+	args := []string{"mr", "merge", strconv.Itoa(mergeRequest.IID), "-R", mergeRequest.Project, "--yes"}
 
-	switch method {
-	case "squash":
+	switch options.Method {
+	case types.MergeMethodSquash:
 		args = append(args, "--squash")
-	case "rebase":
+	case types.MergeMethodRebase:
 		args = append(args, "--rebase")
+	case types.MergeMethodMerge:
+		// glab merges plainly when no method flag is given.
 	}
 
-	if autoMerge {
+	if options.AutoMerge {
 		args = append(args, "--auto-merge")
 	} else {
 		args = append(args, "--auto-merge=false")
 	}
 
 	if _, err := c.runner.Run(ctx, args...); err != nil {
-		return fmt.Errorf("failed to merge MR !%d: %w", iid, err)
+		return fmt.Errorf("failed to merge MR !%d: %w", mergeRequest.IID, err)
 	}
 	return nil
 }

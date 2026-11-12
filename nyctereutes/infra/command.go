@@ -103,9 +103,7 @@ func discloseDestroyedVariables(
 		if change.Type != repository.ChangeDelete || change.Schedule == nil {
 			continue
 		}
-		keys, err := client.ScheduleVariableKeys(
-			ctx, repo.Metadata.Owner, repo.Metadata.Name, change.Schedule.ID,
-		)
+		keys, err := client.ScheduleVariableKeys(ctx, repo.Metadata, change.Schedule.ID)
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "%v\n", err)
 			continue
@@ -121,8 +119,8 @@ func discloseIgnoredUnprotectLevels(stderr io.Writer, repo *manifest.Repository,
 		return
 	}
 	_, _ = fmt.Fprintf(stderr,
-		"%s/%s: this GitLab reports no unprotect access level, so the declared one is left alone on: %s\n",
-		repo.Metadata.Owner, repo.Metadata.Name, strings.Join(ignored, ", "))
+		"%s: this GitLab reports no unprotect access level, so the declared one is left alone on: %s\n",
+		repo.Metadata.FullPath(), strings.Join(ignored, ", "))
 }
 
 // Reads the live state one declared project is compared against. A failed read
@@ -132,7 +130,7 @@ func discloseIgnoredUnprotectLevels(stderr io.Writer, repo *manifest.Repository,
 func fetchState(
 	ctx context.Context, client *repository.Client, stderr io.Writer, repo *manifest.Repository,
 ) (*repository.CurrentState, int) {
-	state, err := client.FetchRepository(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+	state, err := client.FetchRepository(ctx, repo.Metadata)
 	if err != nil {
 		// The error already carries "fetch project <owner>/<name>" context.
 		_, _ = fmt.Fprintf(stderr, "%v\n", err)
@@ -146,7 +144,7 @@ func fetchState(
 	// Neither read is made, so such a project stays at one request.
 	failures := 0
 	if repo.Spec.PipelineSchedules != nil {
-		schedules, err := client.FetchSchedules(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+		schedules, err := client.FetchSchedules(ctx, repo.Metadata)
 		if err != nil {
 			// The state still goes back.
 			// A project whose schedules cannot be described keeps the settings that can be.
@@ -157,7 +155,7 @@ func fetchState(
 		}
 	}
 	if repo.Spec.ProtectedBranches != nil {
-		branches, err := client.FetchProtectedBranches(ctx, repo.Metadata.Owner, repo.Metadata.Name)
+		branches, err := client.FetchProtectedBranches(ctx, repo.Metadata)
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "%v\n", err)
 			failures++

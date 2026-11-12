@@ -39,7 +39,7 @@ func branch(name string, push manifest.BranchAccessLevel) manifest.ProtectedBran
 	return manifest.ProtectedBranch{
 		Name:             name,
 		PushAccessLevel:  push,
-		MergeAccessLevel: roleMaintainer,
+		MergeAccessLevel: manifest.BranchMaintainer,
 	}
 }
 
@@ -56,7 +56,10 @@ func onlyBranchChange(t *testing.T, changes []Change) Change {
 
 // Without this a project would be stripped of its protections by any document that simply does not mention them.
 func TestDiffLeavesLiveBranchesAloneWhenTheDocumentDeclaresNoKey(t *testing.T) {
-	changes := Diff(declaringBranches(nil), holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}))
+	changes := Diff(
+		declaringBranches(nil),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
+	)
 
 	if len(changes) != 0 {
 		t.Errorf("changes = %+v, want none for an undeclared key", changes)
@@ -65,7 +68,10 @@ func TestDiffLeavesLiveBranchesAloneWhenTheDocumentDeclaresNoKey(t *testing.T) {
 
 // Otherwise the plan would propose to create every branch the document names.
 func TestDiffPlansNothingWhenTheLiveBranchesWereNotRead(t *testing.T) {
-	changes := Diff(declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}), holdingBranches(nil))
+	changes := Diff(
+		declaringBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
+		holdingBranches(nil),
+	)
 
 	if len(changes) != 0 {
 		t.Errorf("changes = %+v, want none when the live state is unknown", changes)
@@ -74,7 +80,7 @@ func TestDiffPlansNothingWhenTheLiveBranchesWereNotRead(t *testing.T) {
 
 func TestDiffCreatesADeclaredBranchTheProjectDoesNotProtect(t *testing.T) {
 	changes := Diff(
-		declaringBranches([]manifest.ProtectedBranch{branch("main", roleNoOne)}),
+		declaringBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchNoOne)}),
 		holdingBranches([]manifest.ProtectedBranch{}),
 	)
 
@@ -95,7 +101,7 @@ func TestDiffCreatesADeclaredBranchTheProjectDoesNotProtect(t *testing.T) {
 func TestDiffRemovesALiveBranchNoDeclarationNames(t *testing.T) {
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{}),
-		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
 	)
 
 	change := onlyBranchChange(t, changes)
@@ -109,12 +115,12 @@ func TestDiffRemovesALiveBranchNoDeclarationNames(t *testing.T) {
 
 // The plan names only the attributes that changed, so the reader is not made to diff two full listings.
 func TestDiffUpdatesABranchWhoseRoleChanged(t *testing.T) {
-	want := branch("main", roleNoOne)
+	want := branch("main", manifest.BranchNoOne)
 	want.AllowForcePush = true
 
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{want}),
-		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
 	)
 
 	change := onlyBranchChange(t, changes)
@@ -135,12 +141,15 @@ func TestDiffUpdatesABranchWhoseRoleChanged(t *testing.T) {
 // An update recreates the protection, and GitLab creates one without code owner approval unless the create asks for it.
 func TestDiffCarriesCodeOwnerApprovalIntoAnUpdate(t *testing.T) {
 	live := holdingBranchesOnEnterprise([]manifest.ProtectedBranch{
-		branch("main", roleMaintainer), branch("release/*", roleMaintainer),
+		branch("main", manifest.BranchMaintainer), branch("release/*", manifest.BranchMaintainer),
 	})
 	live.ProtectedBranches.RequiringCodeOwnerApproval = []string{"main"}
 
 	changes := Diff(
-		declaringBranches([]manifest.ProtectedBranch{branch("main", roleNoOne), branch("release/*", roleNoOne)}),
+		declaringBranches([]manifest.ProtectedBranch{
+			branch("main", manifest.BranchNoOne),
+			branch("release/*", manifest.BranchNoOne),
+		}),
 		live,
 	)
 
@@ -156,7 +165,7 @@ func TestDiffCarriesCodeOwnerApprovalIntoAnUpdate(t *testing.T) {
 }
 
 func TestDiffPlansNothingForAMatchingBranch(t *testing.T) {
-	declared := []manifest.ProtectedBranch{branch("main", roleMaintainer)}
+	declared := []manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}
 
 	changes := Diff(declaringBranches(declared), holdingBranches(declared))
 
@@ -169,8 +178,8 @@ func TestDiffPlansNothingForAMatchingBranch(t *testing.T) {
 // A run that created first would meet a name GitLab still holds and be refused with 409.
 func TestDiffPlansBranchRemovalsBeforeCreations(t *testing.T) {
 	changes := Diff(
-		declaringBranches([]manifest.ProtectedBranch{branch("develop", roleMaintainer)}),
-		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		declaringBranches([]manifest.ProtectedBranch{branch("develop", manifest.BranchMaintainer)}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
 	)
 
 	if len(changes) != 2 {
@@ -183,7 +192,7 @@ func TestDiffPlansBranchRemovalsBeforeCreations(t *testing.T) {
 
 // A wildcard is a name like any other, not a pattern to expand against the live branches.
 func TestDiffPairsAWildcardBranchByItsName(t *testing.T) {
-	declared := []manifest.ProtectedBranch{branch("release/*", roleMaintainer)}
+	declared := []manifest.ProtectedBranch{branch("release/*", manifest.BranchMaintainer)}
 
 	changes := Diff(declaringBranches(declared), holdingBranches(declared))
 
@@ -194,11 +203,11 @@ func TestDiffPairsAWildcardBranchByItsName(t *testing.T) {
 
 // Without this a document exported from a CE build would report perpetual drift once pointed at an Enterprise one.
 func TestDiffLeavesALiveUnprotectLevelAloneWhenTheDocumentIsSilent(t *testing.T) {
-	live := branch("main", roleMaintainer)
+	live := branch("main", manifest.BranchMaintainer)
 	live.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
 
 	changes := Diff(
-		declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		declaringBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
 		holdingBranchesOnEnterprise([]manifest.ProtectedBranch{live}),
 	)
 
@@ -208,9 +217,9 @@ func TestDiffLeavesALiveUnprotectLevelAloneWhenTheDocumentIsSilent(t *testing.T)
 }
 
 func TestDiffUpdatesADeclaredUnprotectLevel(t *testing.T) {
-	want := branch("main", roleMaintainer)
+	want := branch("main", manifest.BranchMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
-	live := branch("main", roleMaintainer)
+	live := branch("main", manifest.BranchMaintainer)
 	live.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))
 
 	changes := Diff(
@@ -227,7 +236,7 @@ func TestDiffUpdatesADeclaredUnprotectLevel(t *testing.T) {
 // An unprotect level nobody wrote takes whatever GitLab grants, which the plan cannot name.
 func TestDiffOmitsAnUnstatedUnprotectLevelFromACreation(t *testing.T) {
 	changes := Diff(
-		declaringBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		declaringBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
 		holdingBranches([]manifest.ProtectedBranch{}),
 	)
 
@@ -240,12 +249,12 @@ func TestDiffOmitsAnUnstatedUnprotectLevelFromACreation(t *testing.T) {
 // The apply would recreate the branch and the next read would report nothing again.
 // The plan would say the same thing forever while reopening the branch each time.
 func TestDiffPlansNothingForAnUnprotectLevelTheInstanceCannotReport(t *testing.T) {
-	want := branch("main", roleMaintainer)
+	want := branch("main", manifest.BranchMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))
 
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{want}),
-		holdingBranches([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		holdingBranches([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
 	)
 
 	if len(changes) != 0 {
@@ -256,12 +265,12 @@ func TestDiffPlansNothingForAnUnprotectLevelTheInstanceCannotReport(t *testing.T
 // An Enterprise build reports an empty unprotect list for a protection created with its project.
 // A declared level there is drift the apply can settle, unlike on a CE build.
 func TestDiffUpdatesAnUnprotectLevelTheInstanceReportsAsUnset(t *testing.T) {
-	want := branch("main", roleMaintainer)
+	want := branch("main", manifest.BranchMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("admin"))
 
 	changes := Diff(
 		declaringBranches([]manifest.ProtectedBranch{want}),
-		holdingBranchesOnEnterprise([]manifest.ProtectedBranch{branch("main", roleMaintainer)}),
+		holdingBranchesOnEnterprise([]manifest.ProtectedBranch{branch("main", manifest.BranchMaintainer)}),
 	)
 
 	change := onlyBranchChange(t, changes)
@@ -271,10 +280,13 @@ func TestDiffUpdatesAnUnprotectLevelTheInstanceReportsAsUnset(t *testing.T) {
 }
 
 func TestUnconfirmableUnprotectLevelsNamesTheBranchesItIgnores(t *testing.T) {
-	want := branch("main", roleMaintainer)
+	want := branch("main", manifest.BranchMaintainer)
 	want.UnprotectAccessLevel = new(manifest.BranchUnprotectAccessLevel("maintainer"))
-	declared := declaringBranches([]manifest.ProtectedBranch{want, branch("develop", roleMaintainer)})
-	live := []manifest.ProtectedBranch{branch("main", roleMaintainer), branch("develop", roleMaintainer)}
+	declared := declaringBranches([]manifest.ProtectedBranch{want, branch("develop", manifest.BranchMaintainer)})
+	live := []manifest.ProtectedBranch{
+		branch("main", manifest.BranchMaintainer),
+		branch("develop", manifest.BranchMaintainer),
+	}
 
 	if got := UnconfirmableUnprotectLevels(declared, holdingBranches(live)); !slices.Equal(got, []string{"main"}) {
 		t.Errorf("ignored = %v, want the branch declaring a level the instance cannot report", got)

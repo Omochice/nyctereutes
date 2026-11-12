@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Omochice/nyctereutes/cli"
 	"github.com/Omochice/nyctereutes/internal/dep/gitlab"
@@ -20,16 +21,16 @@ type mergeCommand struct {
 	inout  *cli.ProcInout
 	runner glab.Runner
 
-	Group  string `long:"group" required:"true" description:"Group key (package@version)"`
-	DryRun bool   `long:"dry-run" description:"Print actions without executing"`
-	Method string `long:"method" default:"squash" description:"Merge method: merge, squash, or rebase"`
+	Group  string            `long:"group" required:"true" description:"Group key (package@version)"`
+	DryRun bool              `long:"dry-run" description:"Print actions without executing"`
+	Method types.MergeMethod `long:"method" default:"squash" description:"Merge method: merge, squash, or rebase"`
 	// RequireChecks is a pointer because go-flags bool flags cannot default to
 	// true; nil means unset, which this command treats as enabled.
 	RequireChecks *bool `long:"require-checks" description:"Auto-merge when the pipeline succeeds (default true)"`
 }
 
 func (c *mergeCommand) Execute(_ []string) error {
-	if c.Method != "merge" && c.Method != "squash" && c.Method != "rebase" {
+	if !slices.Contains(types.MergeMethods(), c.Method) {
 		return fmt.Errorf("%w %q (must be 'merge', 'squash', or 'rebase')", errInvalidMergeMethod, c.Method)
 	}
 
@@ -51,6 +52,6 @@ func (c *mergeCommand) Execute(_ []string) error {
 	client := gitlab.NewClient(c.runner)
 	view := ui.New(c.inout.Stdout, mrs, false)
 	return applyAction(view, mrs, c.DryRun, "merge", func(mr types.MR) error {
-		return client.MergeMR(ctx, mr.Project, mr.IID, c.Method, requireChecks)
+		return client.MergeMR(ctx, mr, types.MergeOptions{Method: c.Method, AutoMerge: requireChecks})
 	}, successDetails...)
 }

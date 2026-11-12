@@ -20,7 +20,7 @@ type ProtectedBranch struct {
 }
 
 // What GitLab grants when a branch is protected without an access level given.
-const defaultBranchAccessLevel = BranchAccessLevel(valueMaintainer)
+const defaultBranchAccessLevel = BranchMaintainer
 
 // Decodes a protected branch through the surrounding decoder, for the reason [PipelineSchedule.UnmarshalYAML] gives.
 func (branch *ProtectedBranch) UnmarshalYAML(unmarshal func(any) error) error {
@@ -44,16 +44,18 @@ func (branch *ProtectedBranch) validate(index int) error {
 	return nil
 }
 
-const (
-	valueNoOne      = "no_one"
-	valueDeveloper  = "developer"
-	valueMaintainer = "maintainer"
-	valueAdmin      = "admin"
-)
-
 // Who may push to or merge into a protected branch: "no_one", "developer", "maintainer" or "admin".
 // Kept apart from [AccessLevel], which says how far a feature is opened up, not which role an operation demands.
 type BranchAccessLevel string
+
+// The roles GitLab can grant on a protected branch.
+// Declared here, beside the type, so the manifest and the live-state mapping cannot drift apart.
+const (
+	BranchNoOne      BranchAccessLevel = "no_one"
+	BranchDeveloper  BranchAccessLevel = "developer"
+	BranchMaintainer BranchAccessLevel = "maintainer"
+	BranchAdmin      BranchAccessLevel = "admin"
+)
 
 // Rejects values outside the branch access-level set at decode time.
 func (level *BranchAccessLevel) UnmarshalYAML(data []byte) error {
@@ -71,7 +73,9 @@ func (level BranchAccessLevel) JSONSchema() *jsonschema.Schema {
 }
 
 func (*BranchAccessLevel) allowedValues() []string {
-	return []string{valueNoOne, valueDeveloper, valueMaintainer, valueAdmin}
+	return []string{
+		string(BranchNoOne), string(BranchDeveloper), string(BranchMaintainer), string(BranchAdmin),
+	}
 }
 
 // Who may lift a branch's protection: "developer", "maintainer" or "admin".
@@ -94,5 +98,5 @@ func (level BranchUnprotectAccessLevel) JSONSchema() *jsonschema.Schema {
 }
 
 func (*BranchUnprotectAccessLevel) allowedValues() []string {
-	return []string{valueDeveloper, valueMaintainer, valueAdmin}
+	return []string{string(BranchDeveloper), string(BranchMaintainer), string(BranchAdmin)}
 }

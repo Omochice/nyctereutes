@@ -49,31 +49,31 @@ func NewClient(runner glab.Runner) *Client {
 // The schedules are not read here: [Client.FetchSchedules] reads them from an
 // endpoint of its own, which can fail independently of the settings. A caller
 // that wants both handles the two failures separately.
-func (c *Client) FetchRepository(ctx context.Context, owner, name string) (*CurrentState, error) {
-	out, err := c.runner.Run(ctx, "api", "projects/"+glab.EncodePath(owner+"/"+name))
+func (c *Client) FetchRepository(ctx context.Context, project manifest.RepositoryMetadata) (*CurrentState, error) {
+	out, err := c.runner.Run(ctx, "api", "projects/"+glab.EncodePath(project.FullPath()))
 	if err != nil {
 		// A classified 404 means the project is absent, not a real failure; the
 		// sentinel, not the error text, keeps an unrelated failure that merely
 		// mentions 404 from being mistaken for a missing project.
 		if errors.Is(err, glab.ErrNotFound) {
-			return &CurrentState{Owner: owner, Name: name, IsNew: true}, nil
+			return &CurrentState{Owner: project.Owner, Name: project.Name, IsNew: true}, nil
 		}
-		return nil, fmt.Errorf("fetch project %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("fetch project %s: %w", project.FullPath(), err)
 	}
 
 	state, err := parseProject(out)
 	if err != nil {
-		return nil, fmt.Errorf("parse project %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("parse project %s: %w", project.FullPath(), err)
 	}
-	state.Owner = owner
-	state.Name = name
+	state.Owner = project.Owner
+	state.Name = project.Name
 
 	// The catalog status lives only in GraphQL, so it is a second call rather
 	// than a field on the REST response parsed above. The schedules are a second
 	// call too and are deliberately not joined to it: that read can fail or be
 	// ambiguous on its own terms, and answering for it here would let a schedule
 	// problem hide every other setting the project drifts in.
-	catalog, err := c.fetchCatalogResource(ctx, owner, name)
+	catalog, err := c.fetchCatalogResource(ctx, project)
 	if err != nil {
 		return nil, err
 	}
@@ -95,12 +95,12 @@ var errCatalogProjectMissing = errors.New("project not visible over GraphQL")
 // Reads whether a project is published to the CI/CD Catalog. A null
 // isCatalogResource (the field is Experiment and may be withheld) reads as
 // false, so such a project is exported and diffed as not a catalog resource.
-func (c *Client) fetchCatalogResource(ctx context.Context, owner, name string) (bool, error) {
+func (c *Client) fetchCatalogResource(ctx context.Context, project manifest.RepositoryMetadata) (bool, error) {
 	out, err := c.runner.Run(ctx, "api", "graphql",
 		"-f", "query="+catalogResourceQuery,
-		"-f", "fullPath="+owner+"/"+name)
+		"-f", "fullPath="+project.FullPath())
 	if err != nil {
-		return false, fmt.Errorf("fetch catalog status %s/%s: %w", owner, name, err)
+		return false, fmt.Errorf("fetch catalog status %s: %w", project.FullPath(), err)
 	}
 
 	var resp struct {
@@ -111,13 +111,13 @@ func (c *Client) fetchCatalogResource(ctx context.Context, owner, name string) (
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(out, &resp); err != nil {
-		return false, fmt.Errorf("parse catalog status %s/%s: %w", owner, name, err)
+		return false, fmt.Errorf("parse catalog status %s: %w", project.FullPath(), err)
 	}
 	// GraphQL returns a null project when it cannot see one the REST fetch just
 	// resolved; treating that as not-a-resource would silently emit a wrong
 	// value, so it is surfaced rather than swallowed.
 	if resp.Data.Project == nil {
-		return false, fmt.Errorf("fetch catalog status %s/%s: %w", owner, name, errCatalogProjectMissing)
+		return false, fmt.Errorf("fetch catalog status %s: %w", project.FullPath(), errCatalogProjectMissing)
 	}
 	return resp.Data.Project.IsCatalogResource != nil && *resp.Data.Project.IsCatalogResource, nil
 }

@@ -77,7 +77,7 @@ func (c *planCommand) planFile(
 			continue
 		}
 		changed++
-		printChanges(c.inout.Stdout, repo.Metadata.Owner+"/"+repo.Metadata.Name, changes, colorize)
+		printChanges(c.inout.Stdout, repo.Metadata.FullPath(), changes, colorize)
 	}
 	return changed, failures
 }

@@ -25,13 +25,14 @@ type fakeClient struct {
 	mu          sync.Mutex
 	approved    []int
 	merged      []int
-	mergeMethod []string
+	mergeMethod []types.MergeMethod
 	mergeAuto   []bool
 	approveFn   func(iid int) error
 	mergeFn     func(iid int) error
 }
 
-func (f *fakeClient) ApproveMR(_ context.Context, _ string, iid int) error {
+func (f *fakeClient) ApproveMR(_ context.Context, mr types.MR) error {
+	iid := mr.IID
 	f.mu.Lock()
 	f.approved = append(f.approved, iid)
 	fn := f.approveFn
@@ -44,11 +45,12 @@ func (f *fakeClient) ApproveMR(_ context.Context, _ string, iid int) error {
 	return nil
 }
 
-func (f *fakeClient) MergeMR(_ context.Context, _ string, iid int, method string, autoMerge bool) error {
+func (f *fakeClient) MergeMR(_ context.Context, mr types.MR, options types.MergeOptions) error {
+	iid := mr.IID
 	f.mu.Lock()
 	f.merged = append(f.merged, iid)
-	f.mergeMethod = append(f.mergeMethod, method)
-	f.mergeAuto = append(f.mergeAuto, autoMerge)
+	f.mergeMethod = append(f.mergeMethod, options.Method)
+	f.mergeAuto = append(f.mergeAuto, options.AutoMerge)
 	fn := f.mergeFn
 	f.mu.Unlock()
 	if fn != nil {
@@ -626,7 +628,7 @@ func TestMergeMethodStartsAtSquashAndCycles(t *testing.T) {
 		t.Fatalf("initial merge method = %q, want squash", model.method)
 	}
 
-	want := []string{methodMerge, methodRebase, methodSquash}
+	want := []types.MergeMethod{types.MergeMethodMerge, types.MergeMethodRebase, types.MergeMethodSquash}
 	for _, wantMethod := range want {
 		model = press(model, keyMergeMethod)
 		if model.method != wantMethod {
@@ -644,19 +646,19 @@ func TestMergeRunsWithSelectedMethod(t *testing.T) {
 	next, cmd := model.Update(key(keyRun))
 	drain(asModel(next), cmd)
 
-	if len(fake.mergeMethod) != 1 || fake.mergeMethod[0] != methodMerge {
+	if len(fake.mergeMethod) != 1 || fake.mergeMethod[0] != types.MergeMethodMerge {
 		t.Errorf("merge methods = %v, want [merge]", fake.mergeMethod)
 	}
 }
 
 func TestListViewShowsMergeMethod(t *testing.T) {
 	model := New(&fakeClient{}, sampleMRs())
-	if !strings.Contains(model.View().Content, defaultMergeMethod) {
+	if !strings.Contains(model.View().Content, string(defaultMergeMethod)) {
 		t.Fatalf("list view should show the default merge method\n%s", model.View().Content)
 	}
 
 	model = press(model, keyMergeMethod) // squash -> merge
-	if !strings.Contains(model.View().Content, methodMerge) {
+	if !strings.Contains(model.View().Content, string(types.MergeMethodMerge)) {
 		t.Errorf("list view should show the cycled merge method\n%s", model.View().Content)
 	}
 }

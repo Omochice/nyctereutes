@@ -136,6 +136,11 @@ type RepositoryMetadata struct {
 	Owner string `yaml:"owner" jsonschema:"required"`
 }
 
+// Spells the project the way GitLab addresses it, so no caller has to join the two halves itself.
+func (m RepositoryMetadata) FullPath() string {
+	return m.Owner + "/" + m.Name
+}
+
 const (
 	valueDisabled = "disabled"
 	valueEnabled  = "enabled"

@@ -47,7 +47,7 @@ func (c *validateCommand) Execute(args []string) error {
 	}
 	_, _ = fmt.Fprintf(c.inout.Stdout, "Valid: %d repositories\n", len(repos))
 	for _, repo := range repos {
-		_, _ = fmt.Fprintf(c.inout.Stdout, "  - %s/%s\n", repo.Metadata.Owner, repo.Metadata.Name)
+		_, _ = fmt.Fprintf(c.inout.Stdout, "  - %s\n", repo.Metadata.FullPath())
 	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
 // Two schedules as the list endpoint reports them, trimmed to the attributes
@@ -57,7 +58,7 @@ func TestFetchSchedulesRejectsDuplicateDescriptions(t *testing.T) {
 	]`
 
 	_, err := NewClient(scheduleRunner(duplicateJSON, nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if err == nil {
 		t.Fatal("FetchSchedules should reject duplicate live descriptions, got nil")
 	}
@@ -87,7 +88,9 @@ func TestFetchRepositoryDoesNotReadSchedules(t *testing.T) {
 		}
 	})
 
-	state, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	state, err := NewClient(runner).FetchRepository(
+		context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj},
+	)
 	if err != nil {
 		t.Fatalf("FetchRepository: %v", err)
 	}
@@ -135,7 +138,7 @@ func TestToManifestSortsSchedulesByDescription(t *testing.T) {
 func TestFetchSchedulesAsksGlabToPaginate(t *testing.T) {
 	var args []string
 	_, err := NewClient(scheduleRunner(scheduleListJSON, &args)).
-		FetchSchedules(context.Background(), "group/sub", "proj")
+		FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: "group/sub", Name: "proj"})
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -157,7 +160,7 @@ func TestFetchSchedulesJoinsEveryPage(t *testing.T) {
 [{"id":2,"description":"weekly","ref":"refs/heads/main","cron":"0 9 * * 1"}]`
 
 	schedules, err := NewClient(scheduleRunner(twoPages, nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -179,7 +182,7 @@ func TestFetchSchedulesRejectsAScheduleWithoutAnID(t *testing.T) {
 	const body = `[{"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
 
 	_, err := NewClient(scheduleRunner(body, nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if !errors.Is(err, errIncompleteLiveSchedule) {
 		t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
 	}
@@ -201,7 +204,7 @@ func TestFetchSchedulesRejectsAScheduleMissingARequiredAttribute(t *testing.T) {
 	} {
 		t.Run(testCase.field, func(t *testing.T) {
 			_, err := NewClient(scheduleRunner(testCase.body, nil)).
-				FetchSchedules(context.Background(), ownerGroup, nameProj)
+				FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 			if !errors.Is(err, errIncompleteLiveSchedule) {
 				t.Fatalf("error = %v, want it to wrap errIncompleteLiveSchedule", err)
 			}
@@ -221,7 +224,7 @@ func TestFetchSchedulesAcceptsAScheduleGitLabReportsInFull(t *testing.T) {
 	const body = `[{"id":7,"description":"nightly","ref":"refs/heads/main","cron":"0 3 * * *"}]`
 
 	schedules, err := NewClient(scheduleRunner(body, nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -240,7 +243,7 @@ func TestFetchSchedulesRefusesAResponseWithoutAList(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewClient(scheduleRunner(body, nil)).
-				FetchSchedules(context.Background(), ownerGroup, nameProj)
+				FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 			if !errors.Is(err, errNoSchedulePage) {
 				t.Errorf("error = %v, want it to wrap errNoSchedulePage", err)
 			}
@@ -252,7 +255,7 @@ func TestFetchSchedulesRefusesAResponseWithoutAList(t *testing.T) {
 // stays a successful read of zero schedules.
 func TestFetchSchedulesReadsAnEmptyListAsNoSchedules(t *testing.T) {
 	schedules, err := NewClient(scheduleRunner("[]", nil)).
-		FetchSchedules(context.Background(), ownerGroup, nameProj)
+		FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj})
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}
@@ -263,7 +266,7 @@ func TestFetchSchedulesReadsAnEmptyListAsNoSchedules(t *testing.T) {
 
 func TestFetchSchedulesParsesEveryAttribute(t *testing.T) {
 	schedules, err := NewClient(scheduleRunner(scheduleListJSON, nil)).
-		FetchSchedules(context.Background(), "group", "proj")
+		FetchSchedules(context.Background(), manifest.RepositoryMetadata{Owner: "group", Name: "proj"})
 	if err != nil {
 		t.Fatalf("FetchSchedules: %v", err)
 	}

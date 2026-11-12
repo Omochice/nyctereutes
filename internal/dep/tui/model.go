@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -16,8 +17,8 @@ import (
 // The subset of gitlab.Client the TUI drives. It is an interface so
 // tests can inject a fake that records calls instead of shelling out to glab.
 type Client interface {
-	ApproveMR(ctx context.Context, project string, iid int) error
-	MergeMR(ctx context.Context, project string, iid int, method string, autoMerge bool) error
+	ApproveMR(ctx context.Context, mr types.MR) error
+	MergeMR(ctx context.Context, mr types.MR, options types.MergeOptions) error
 }
 
 // The action the user applies to the selected MRs.
@@ -85,15 +86,8 @@ const (
 	phaseRefreshing
 )
 
-// The merge methods glab accepts, passed through to MergeMR.
-const (
-	methodSquash = "squash"
-	methodMerge  = "merge"
-	methodRebase = "rebase"
-)
-
 // The merge method a freshly built model starts on.
-const defaultMergeMethod = methodSquash
+const defaultMergeMethod = types.MergeMethodSquash
 
 // The most glab calls a single run fires at once. tea.Batch would otherwise
 // spawn one subprocess per selected MR, so a large selection could overwhelm
@@ -131,7 +125,7 @@ type Model struct {
 	selected map[int]bool
 	mode     mode
 	// The merge method applied when running merge or approve & merge; cycled by M.
-	method string
+	method types.MergeMethod
 	// Toggled by c. When true the list shows only CI-passing MRs and merges use
 	// GitLab's auto-merge gate; when false the list shows everything and merges
 	// run immediately. It defaults to false (off).
@@ -459,15 +453,9 @@ func (m Model) cycleSetting(name string) Model {
 
 // Returns the merge method following current in the squash/merge/rebase cycle,
 // wrapping around; an unknown current resets to the first method.
-func nextMergeMethod(current string) string {
-	switch current {
-	case methodSquash:
-		return methodMerge
-	case methodMerge:
-		return methodRebase
-	default:
-		return methodSquash
-	}
+func nextMergeMethod(current types.MergeMethod) types.MergeMethod {
+	methods := types.MergeMethods()
+	return methods[(slices.Index(methods, current)+1)%len(methods)]
 }
 
 // Shifts the cursor by delta, staying within the visible list.
@@ -537,7 +525,8 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd {
 	// Capture only what the command needs so it does not pin the whole Model
 	// (its MR slices, results and selection map) alive while it runs.
-	client, currentMode, method, autoMerge := m.client, m.mode, m.method, m.requireChecks
+	client, currentMode := m.client, m.mode
+	options := types.MergeOptions{Method: m.method, AutoMerge: m.requireChecks}
 	return func() tea.Msg {
 		semaphore <- struct{}{}
 		defer func() { <-semaphore }()
@@ -545,10 +534,10 @@ func (m Model) actionCmd(mergeRequest types.MR, semaphore chan struct{}) tea.Cmd
 		ctx := context.Background()
 		var err error
 		if currentMode == modeApprove || currentMode == modeApproveMerge {
-			err = client.ApproveMR(ctx, mergeRequest.Project, mergeRequest.IID)
+			err = client.ApproveMR(ctx, mergeRequest)
 		}
 		if err == nil && (currentMode == modeMerge || currentMode == modeApproveMerge) {
-			err = client.MergeMR(ctx, mergeRequest.Project, mergeRequest.IID, method, autoMerge)
+			err = client.MergeMR(ctx, mergeRequest, options)
 		}
 		return mrResultMsg{mr: mergeRequest, err: err}
 	}

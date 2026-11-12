@@ -8,10 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Omochice/nyctereutes/internal/dep/types"
 	"github.com/Omochice/nyctereutes/internal/glab"
 )
-
-const methodMerge = "merge"
 
 // The stub errors mirror what glabError hands back for a failed run,
 // classification sentinel included.
@@ -37,7 +36,7 @@ func TestApproveMRSucceeds(t *testing.T) {
 		return nil, nil
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 12); err != nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 12}); err != nil {
 		t.Fatalf("ApproveMR() error = %v", err)
 	}
 	if strings.Join(gotArgs, " ") != "mr approve 12 -R g/proj" {
@@ -50,7 +49,7 @@ func TestApproveMRTreatsUnauthorizedAsSuccess(t *testing.T) {
 		return nil, errStubUnauthorized
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 12); err != nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 12}); err != nil {
 		t.Errorf("ApproveMR() with 401 error = %v, want nil (idempotent)", err)
 	}
 }
@@ -60,7 +59,7 @@ func TestApproveMRDoesNotMistakeIIDDigitsForUnauthorized(t *testing.T) {
 		return nil, errStub500ForMR401
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 401); err == nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 401}); err == nil {
 		t.Error("ApproveMR(!401) with a 500 error = nil, want the failure propagated")
 	}
 }
@@ -70,7 +69,7 @@ func TestApproveMRPropagatesOtherErrors(t *testing.T) {
 		return nil, errStub500
 	})
 
-	if err := NewClient(runner).ApproveMR(context.Background(), "g/proj", 12); err == nil {
+	if err := NewClient(runner).ApproveMR(context.Background(), types.MR{Project: "g/proj", IID: 12}); err == nil {
 		t.Error("ApproveMR() with 500 error = nil, want an error")
 	}
 }
@@ -78,13 +77,22 @@ func TestApproveMRPropagatesOtherErrors(t *testing.T) {
 func TestMergeMRAutoMergeArgs(t *testing.T) {
 	tests := []struct {
 		name      string
-		method    string
+		method    types.MergeMethod
 		autoMerge bool
 		wantFlags []string
 	}{
-		{name: "squash auto-merge", method: "squash", autoMerge: true, wantFlags: []string{"--squash", "--auto-merge"}},
-		{name: "rebase immediate", method: "rebase", autoMerge: false, wantFlags: []string{"--rebase", "--auto-merge=false"}},
-		{name: "merge immediate", method: methodMerge, autoMerge: false, wantFlags: []string{"--auto-merge=false"}},
+		{
+			name: "squash auto-merge", method: types.MergeMethodSquash, autoMerge: true,
+			wantFlags: []string{"--squash", "--auto-merge"},
+		},
+		{
+			name: "rebase immediate", method: types.MergeMethodRebase, autoMerge: false,
+			wantFlags: []string{"--rebase", "--auto-merge=false"},
+		},
+		{
+			name: "merge immediate", method: types.MergeMethodMerge, autoMerge: false,
+			wantFlags: []string{"--auto-merge=false"},
+		},
 	}
 	for _, testCase := range tests {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -95,7 +103,10 @@ func TestMergeMRAutoMergeArgs(t *testing.T) {
 			})
 
 			client := NewClient(runner)
-			if err := client.MergeMR(context.Background(), "g/proj", 12, testCase.method, testCase.autoMerge); err != nil {
+			if err := client.MergeMR(
+				context.Background(), types.MR{Project: "g/proj", IID: 12},
+				types.MergeOptions{Method: testCase.method, AutoMerge: testCase.autoMerge},
+			); err != nil {
 				t.Fatalf("MergeMR() error = %v", err)
 			}
 			joined := strings.Join(gotArgs, " ")
@@ -107,7 +118,7 @@ func TestMergeMRAutoMergeArgs(t *testing.T) {
 					t.Errorf("merge args = %v, want to contain %q", gotArgs, f)
 				}
 			}
-			if testCase.method == methodMerge && slices.Contains(gotArgs, "--squash") {
+			if testCase.method == types.MergeMethodMerge && slices.Contains(gotArgs, "--squash") {
 				t.Errorf("merge args = %v, should not contain --squash for plain merge", gotArgs)
 			}
 		})

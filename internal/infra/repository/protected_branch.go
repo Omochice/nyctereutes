@@ -40,27 +40,27 @@ type LiveBranchAccess struct {
 // The endpoint pages, confirmed against GitLab CE 19.2.1.
 // Described here rather than at each caller, so a read fails in the one place a read is made.
 func (c *Client) FetchProtectedBranches(
-	ctx context.Context, owner, name string,
+	ctx context.Context, project manifest.RepositoryMetadata,
 ) (*ProtectedBranches, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
-		"projects/"+glab.EncodePath(owner+"/"+name)+"/protected_branches")
+		"projects/"+glab.EncodePath(project.FullPath())+"/protected_branches")
 	if err != nil {
-		return nil, fmt.Errorf("fetch protected branches %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("fetch protected branches %s: %w", project.FullPath(), err)
 	}
 	live, err := decodePages[LiveProtectedBranch](out, errNoProtectedBranchPage)
 	if err != nil {
-		return nil, fmt.Errorf("parse protected branches %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("parse protected branches %s: %w", project.FullPath(), err)
 	}
 	if err := rejectIndescribableBranches(live); err != nil {
-		return nil, fmt.Errorf("read protected branches %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("read protected branches %s: %w", project.FullPath(), err)
 	}
 	branches, err := toManifestProtectedBranches(live)
 	if err != nil {
-		return nil, fmt.Errorf("describe protected branches %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("describe protected branches %s: %w", project.FullPath(), err)
 	}
 	enterprise, err := c.isEnterprise(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("read protected branches %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("read protected branches %s: %w", project.FullPath(), err)
 	}
 	return &ProtectedBranches{
 		Branches:                   branches,
@@ -156,13 +156,6 @@ func rejectIndescribableGrants(branch, field string, grants []LiveBranchAccess) 
 
 var errUnknownBranchAccessLevel = errors.New("unknown branch access level")
 
-const (
-	roleNoOne      manifest.BranchAccessLevel = "no_one"
-	roleDeveloper  manifest.BranchAccessLevel = "developer"
-	roleMaintainer manifest.BranchAccessLevel = "maintainer"
-	roleAdmin      manifest.BranchAccessLevel = "admin"
-)
-
 // The numbers GitLab uses for the roles, confirmed against CE 19.2.1.
 // It describes them as "No one", "Developers + Maintainers", "Maintainers" and "Instance admins".
 const (
@@ -180,10 +173,10 @@ type branchRole struct {
 // One table for both directions, so the export and the write cannot disagree about what a role means.
 func branchRoles() []branchRole {
 	return []branchRole{
-		{name: roleNoOne, number: accessNoOne},
-		{name: roleDeveloper, number: accessDeveloper},
-		{name: roleMaintainer, number: accessMaintainer},
-		{name: roleAdmin, number: accessAdmin},
+		{name: manifest.BranchNoOne, number: accessNoOne},
+		{name: manifest.BranchDeveloper, number: accessDeveloper},
+		{name: manifest.BranchMaintainer, number: accessMaintainer},
+		{name: manifest.BranchAdmin, number: accessAdmin},
 	}
 }
 

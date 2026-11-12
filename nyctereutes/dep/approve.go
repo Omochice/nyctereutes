@@ -30,6 +30,6 @@ func (c *approveCommand) Execute(_ []string) error {
 	client := gitlab.NewClient(c.runner)
 	view := ui.New(c.inout.Stdout, mrs, false)
 	return applyAction(view, mrs, c.DryRun, "approve", func(mr types.MR) error {
-		return client.ApproveMR(ctx, mr.Project, mr.IID)
+		return client.ApproveMR(ctx, mr)
 	})
 }
