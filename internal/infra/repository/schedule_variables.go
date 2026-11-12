@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
 // One schedule as the single-schedule endpoint reports it, read for its
@@ -34,20 +35,20 @@ var errVariablesNotDisclosed = errors.New("pipeline schedule variables were not 
 // The keys come back sorted. GitLab documents no order for them, and a plan an
 // operator reads twice should not shuffle the lines under a removal.
 func (c *Client) ScheduleVariableKeys(
-	ctx context.Context, owner, name string, scheduleID int,
+	ctx context.Context, project manifest.RepositoryMetadata, scheduleID int,
 ) ([]string, error) {
-	endpoint := "projects/" + glab.EncodePath(owner+"/"+name) +
+	endpoint := "projects/" + glab.EncodePath(project.FullPath()) +
 		"/pipeline_schedules/" + strconv.Itoa(scheduleID)
 	out, err := c.runner.Run(ctx, "api", endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("read pipeline schedule %d of %s/%s: %w", scheduleID, owner, name, err)
+		return nil, fmt.Errorf("read pipeline schedule %d of %s: %w", scheduleID, project.FullPath(), err)
 	}
 	var detail scheduleDetail
 	if err := json.Unmarshal(out, &detail); err != nil {
-		return nil, fmt.Errorf("parse pipeline schedule %d of %s/%s: %w", scheduleID, owner, name, err)
+		return nil, fmt.Errorf("parse pipeline schedule %d of %s: %w", scheduleID, project.FullPath(), err)
 	}
 	if detail.Variables == nil {
-		return nil, fmt.Errorf("%w: schedule %d of %s/%s", errVariablesNotDisclosed, scheduleID, owner, name)
+		return nil, fmt.Errorf("%w: schedule %d of %s", errVariablesNotDisclosed, scheduleID, project.FullPath())
 	}
 	keys := make([]string, 0, len(*detail.Variables))
 	for _, variable := range *detail.Variables {

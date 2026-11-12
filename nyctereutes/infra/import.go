@@ -96,12 +96,12 @@ type unreadResources struct {
 func (c *importCommand) document(
 	ctx context.Context, client *repository.Client, target string,
 ) (data []byte, unread unreadResources) {
-	owner, name, ok := splitTarget(target)
+	project, ok := splitTarget(target)
 	if !ok {
 		c.reportf("skip %q: not in <owner/project> form\n", target)
 		return nil, unread
 	}
-	state, err := client.FetchRepository(ctx, owner, name)
+	state, err := client.FetchRepository(ctx, project)
 	if err != nil {
 		// The error already carries "fetch project <owner>/<name>" context.
 		c.reportf("%v\n", err)
@@ -115,14 +115,14 @@ func (c *importCommand) document(
 	// always read; a command that only reconciles some settings need not. A read
 	// that fails costs them alone, because ending the export here would throw
 	// away every setting already read over one child resource.
-	schedules, err := client.FetchSchedules(ctx, owner, name)
+	schedules, err := client.FetchSchedules(ctx, project)
 	if err != nil {
 		c.reportf("%v\n", err)
 		unread.schedules = true
 	} else {
 		state.PipelineSchedules = schedules
 	}
-	branches, err := client.FetchProtectedBranches(ctx, owner, name)
+	branches, err := client.FetchProtectedBranches(ctx, project)
 	if err != nil {
 		c.reportf("%v\n", err)
 		unread.protectedBranches = true
@@ -148,14 +148,14 @@ func (c *importCommand) reportf(format string, msgArgs ...any) {
 // nested group path) and the trailing project name. A leading or doubled slash
 // is rejected so a malformed target is reported as such rather than encoded into
 // a bogus path that GitLab answers with a misleading 404.
-func splitTarget(target string) (owner, name string, ok bool) {
+func splitTarget(target string) (project manifest.RepositoryMetadata, ok bool) {
 	i := strings.LastIndex(target, "/")
 	if i <= 0 || i == len(target)-1 {
-		return "", "", false
+		return manifest.RepositoryMetadata{}, false
 	}
-	owner, name = target[:i], target[i+1:]
-	if strings.HasPrefix(owner, "/") || strings.HasSuffix(owner, "/") {
-		return "", "", false
+	project = manifest.RepositoryMetadata{Owner: target[:i], Name: target[i+1:]}
+	if strings.HasPrefix(project.Owner, "/") || strings.HasSuffix(project.Owner, "/") {
+		return manifest.RepositoryMetadata{}, false
 	}
-	return owner, name, true
+	return project, true
 }

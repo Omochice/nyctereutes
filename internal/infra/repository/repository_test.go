@@ -76,7 +76,7 @@ func TestFetchRepositoryParsesSettings(t *testing.T) {
 	var gotArgs []string
 
 	state, err := NewClient(projectRecordingRunner(&gotArgs)).
-		FetchRepository(context.Background(), "group/sub", "proj")
+		FetchRepository(context.Background(), manifest.RepositoryMetadata{Owner: "group/sub", Name: "proj"})
 	if err != nil {
 		t.Fatalf("FetchRepository: %v", err)
 	}
@@ -118,7 +118,9 @@ func TestFetchRepositoryReadsCatalogResource(t *testing.T) {
 		return []byte(sampleProjectJSON), nil
 	})
 
-	state, err := NewClient(runner).FetchRepository(context.Background(), "group/sub", "proj")
+	state, err := NewClient(runner).FetchRepository(
+		context.Background(), manifest.RepositoryMetadata{Owner: "group/sub", Name: "proj"},
+	)
 	if err != nil {
 		t.Fatalf("FetchRepository: %v", err)
 	}
@@ -141,7 +143,9 @@ func TestFetchRepositoryErrorsOnNullCatalogProject(t *testing.T) {
 		return []byte(sampleProjectJSON), nil
 	})
 
-	_, err := NewClient(runner).FetchRepository(context.Background(), ownerGroup, nameProj)
+	_, err := NewClient(runner).FetchRepository(
+		context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj},
+	)
 	if err == nil {
 		t.Fatal("FetchRepository should error on a null catalog project, got nil")
 	}
@@ -157,7 +161,9 @@ func TestFetchRepositoryNotFoundIsNew(t *testing.T) {
 		return nil, errGlab404
 	})
 
-	state, err := NewClient(runner).FetchRepository(context.Background(), "group", "missing")
+	state, err := NewClient(runner).FetchRepository(
+		context.Background(), manifest.RepositoryMetadata{Owner: "group", Name: "missing"},
+	)
 	if err != nil {
 		t.Fatalf("FetchRepository should not error on 404, got %v", err)
 	}
@@ -176,7 +182,9 @@ func TestFetchRepositoryUnclassifiedErrorSurfaces(t *testing.T) {
 		return nil, unrelated
 	})
 
-	_, err := NewClient(runner).FetchRepository(context.Background(), "group", "proj")
+	_, err := NewClient(runner).FetchRepository(
+		context.Background(), manifest.RepositoryMetadata{Owner: "group", Name: "proj"},
+	)
 	if err == nil {
 		t.Fatal("FetchRepository should surface an unclassified error, got nil")
 	}
@@ -312,7 +320,9 @@ func featureAccessLevels() []featureAccessLevel {
 // projectJSON, and returns the manifest YAML it produces.
 func exportYAML(t *testing.T, projectJSON string) string {
 	t.Helper()
-	state, err := NewClient(fakeRunner(projectJSON, false)).FetchRepository(context.Background(), ownerGroup, nameProj)
+	state, err := NewClient(fakeRunner(projectJSON, false)).FetchRepository(
+		context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj},
+	)
 	if err != nil {
 		t.Fatalf("FetchRepository: %v", err)
 	}

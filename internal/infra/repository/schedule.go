@@ -29,21 +29,21 @@ type LiveSchedule struct {
 //
 // A schedule's variables are not read. They are not part of the manifest, and
 // the only endpoint carrying them answers one schedule at a time.
-func (c *Client) FetchSchedules(ctx context.Context, owner, name string) ([]LiveSchedule, error) {
+func (c *Client) FetchSchedules(ctx context.Context, project manifest.RepositoryMetadata) ([]LiveSchedule, error) {
 	out, err := c.runner.Run(ctx, "api", "--paginate",
-		"projects/"+glab.EncodePath(owner+"/"+name)+"/pipeline_schedules")
+		"projects/"+glab.EncodePath(project.FullPath())+"/pipeline_schedules")
 	if err != nil {
-		return nil, fmt.Errorf("fetch pipeline schedules %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("fetch pipeline schedules %s: %w", project.FullPath(), err)
 	}
 	schedules, err := decodePages[LiveSchedule](out, errNoSchedulePage)
 	if err != nil {
-		return nil, fmt.Errorf("parse pipeline schedules %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("parse pipeline schedules %s: %w", project.FullPath(), err)
 	}
 	if err := rejectIncompleteSchedules(schedules); err != nil {
-		return nil, fmt.Errorf("read pipeline schedules %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("read pipeline schedules %s: %w", project.FullPath(), err)
 	}
 	if err := rejectDuplicateDescriptions(schedules); err != nil {
-		return nil, fmt.Errorf("read pipeline schedules %s/%s: %w", owner, name, err)
+		return nil, fmt.Errorf("read pipeline schedules %s: %w", project.FullPath(), err)
 	}
 	return schedules, nil
 }

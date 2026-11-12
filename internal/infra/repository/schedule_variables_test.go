@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Omochice/nyctereutes/internal/glab"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
 
 // Answers the single-schedule read with body, recording the args it was given.
@@ -30,7 +31,7 @@ func TestScheduleVariableKeysReadsOneScheduleAndReturnsItsKeys(t *testing.T) {
 		`{"key":"DEPLOY_TOKEN","value":"glpat-secret","variable_type":"env_var"}]}`
 
 	keys, err := NewClient(detailRunner(body, &args)).
-		ScheduleVariableKeys(context.Background(), "group/sub", "proj", 7)
+		ScheduleVariableKeys(context.Background(), manifest.RepositoryMetadata{Owner: "group/sub", Name: "proj"}, 7)
 	if err != nil {
 		t.Fatalf("ScheduleVariableKeys: %v", err)
 	}
@@ -50,7 +51,7 @@ func TestScheduleVariableKeysReturnsNoValue(t *testing.T) {
 	body := `{"variables":[{"key":"DEPLOY_TOKEN","value":"` + secret + `","variable_type":"env_var"}]}`
 
 	keys, err := NewClient(detailRunner(body, nil)).
-		ScheduleVariableKeys(context.Background(), ownerGroup, nameProj, 7)
+		ScheduleVariableKeys(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj}, 7)
 	if err != nil {
 		t.Fatalf("ScheduleVariableKeys: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestScheduleVariableKeysReturnsNoValue(t *testing.T) {
 // a failure, so its removal is shown with nothing listed under it.
 func TestScheduleVariableKeysReadsAnEmptyListAsNoVariables(t *testing.T) {
 	keys, err := NewClient(detailRunner(`{"id":7,"variables":[]}`, nil)).
-		ScheduleVariableKeys(context.Background(), ownerGroup, nameProj, 7)
+		ScheduleVariableKeys(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj}, 7)
 	if err != nil {
 		t.Fatalf("ScheduleVariableKeys: %v", err)
 	}
@@ -84,7 +85,7 @@ func TestScheduleVariableKeysReportsAnUndisclosedSet(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewClient(detailRunner(body, nil)).
-				ScheduleVariableKeys(context.Background(), ownerGroup, nameProj, 7)
+				ScheduleVariableKeys(context.Background(), manifest.RepositoryMetadata{Owner: ownerGroup, Name: nameProj}, 7)
 			if !errors.Is(err, errVariablesNotDisclosed) {
 				t.Errorf("error = %v, want it to wrap errVariablesNotDisclosed", err)
 			}
