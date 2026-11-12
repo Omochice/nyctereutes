@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0](https://github.com/Omochice/nyctereutes/compare/v0.6.0...v0.7.0) (2026-11-12)
+
+
+### Features
+
+* apply the protected branches a manifest declares ([#115](https://github.com/Omochice/nyctereutes/issues/115)) ([8f4f514](https://github.com/Omochice/nyctereutes/commit/8f4f5145fddf343420a4be73b752ae1edc86d055))
+* declare who may unprotect a branch where GitLab reports it ([#116](https://github.com/Omochice/nyctereutes/issues/116)) ([9b9d120](https://github.com/Omochice/nyctereutes/commit/9b9d12090910173b0176d4054324653c918194fb))
+* export a project's protected branches with infra import ([#113](https://github.com/Omochice/nyctereutes/issues/113)) ([e982b34](https://github.com/Omochice/nyctereutes/commit/e982b340dc1fbb1aa0b4e1ffe4ab6d91c0c24741))
+* let a manifest declare a project's protected branches ([#112](https://github.com/Omochice/nyctereutes/issues/112)) ([ec53fac](https://github.com/Omochice/nyctereutes/commit/ec53fac62e3ae92a8e0c8a4cbf962aa3b2ba6ec7))
+* plan the drift of protected branches ([#114](https://github.com/Omochice/nyctereutes/issues/114)) ([5cf6243](https://github.com/Omochice/nyctereutes/commit/5cf6243e59716e6888557a8a5b6e19081672a8f5))
+
+
+### Bug Fixes
+
+* **deps:** update module charm.land/lipgloss/v2 to v2.1.0 ([#120](https://github.com/Omochice/nyctereutes/issues/120)) ([d11cc8d](https://github.com/Omochice/nyctereutes/commit/d11cc8d671be4197ecd06e959142c2ad1b65f1ed))
+* keep code owner approval when a branch's role changes ([#126](https://github.com/Omochice/nyctereutes/issues/126)) ([cea40b2](https://github.com/Omochice/nyctereutes/commit/cea40b2bb420ab59a5da4c029c8ac2c31f27dcbc))
+* plan a missing project without reading its child resources ([#125](https://github.com/Omochice/nyctereutes/issues/125)) ([bc83d9d](https://github.com/Omochice/nyctereutes/commit/bc83d9d4a8421057fb1dadabc50b8c18707f3d87))
+
 ## [0.6.0](https://github.com/Omochice/nyctereutes/compare/v0.5.0...v0.6.0) (2026-11-08)
 
 
