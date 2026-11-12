@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -22,6 +23,8 @@ type fakeApplyGlab struct {
 	projects   map[string]string // "owner/name" -> project JSON, absent means 404
 	catalog    map[string]bool   // "owner/name" -> catalog status, default false
 	schedules  map[string]string // "owner/name" -> schedule list JSON; nil forbids the read
+	branches   map[string]string // "owner/name" -> protected branch list JSON; nil forbids the read
+	enterprise bool              // what GET /version reports; false is a Community Edition build
 	variables  map[string]string // schedule id -> the variables field; absent holds none
 	writes     []string          // joined args of each write call, in order
 	writeBody  []string          // parallel to writes: stdin body, "" for none
@@ -43,17 +46,31 @@ func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	if path, ok := catalogRead(args); ok {
 		return catalogBody(f.catalog[path]), nil
 	}
-	// Nor is the schedule list. A nil map leaves it unanswered so a test
-	// asserting that no such read is made sees the call recorded as a write it
-	// did not expect, rather than absorbed.
-	if path, ok := collectionRead(args, "/pipeline_schedules"); ok && f.schedules != nil {
-		return collectionBody(f.schedules, path), nil
+	if body, ok := f.readChild(args); ok {
+		return body, nil
 	}
 	return f.recordWrite(nil, args)
 }
 
 func (f *fakeApplyGlab) RunWithStdin(_ context.Context, body []byte, args ...string) ([]byte, error) {
 	return f.recordWrite(body, args)
+}
+
+// Nor is a child list a write. A nil map leaves it unanswered so a test
+// asserting that no such read is made sees the call recorded as a write it
+// did not expect, rather than absorbed.
+func (f *fakeApplyGlab) readChild(args []string) ([]byte, bool) {
+	if path, ok := collectionRead(args, "/pipeline_schedules"); ok && f.schedules != nil {
+		return collectionBody(f.schedules, path), true
+	}
+	if path, ok := collectionRead(args, "/protected_branches"); ok && f.branches != nil {
+		return collectionBody(f.branches, path), true
+	}
+	// Reading the protections asks for the edition first, and that is a read as well.
+	if len(args) == 2 && args[0] == "api" && args[1] == "version" {
+		return []byte(`{"enterprise":` + strconv.FormatBool(f.enterprise) + `}`), true
+	}
+	return nil, false
 }
 
 // A project read is the two-arg `api projects/<enc>` fetch the importer issues.
