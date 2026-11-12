@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/Omochice/nyctereutes/compare/v0.7.0...v0.7.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* report a topic casing that apply cannot change ([#127](https://github.com/Omochice/nyctereutes/issues/127)) ([6a61fe3](https://github.com/Omochice/nyctereutes/commit/6a61fe37466ecd270faca26ad34a6ec09449beb9))
+
 ## [0.7.0](https://github.com/Omochice/nyctereutes/compare/v0.6.0...v0.7.0) (2026-11-12)
 
 
