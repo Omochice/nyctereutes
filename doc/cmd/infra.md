@@ -64,6 +64,7 @@ A declaration pointed the other way, at an instance that reports nothing, is lef
 
 `code_owner_approval_required` is not a key at all. An Enterprise build reports the field and then refuses to set it without a licence, so it can be neither declared nor reconciled.
 It is still read, because changing a role recreates the protection, and the create sends the setting again for a branch GitLab reported it on.
+The reasoning is recorded in [ADR-007](../adr/0007-code-owner-approval-is-carried-through-a-recreate.md).
 
 A protection GitLab grants to anything the manifest cannot name is refused rather than read as the role beside it. That covers a grant to a user, a group, a custom role or a deploy key, on any of the three access lists, and a protection inherited from a group. A deploy key with push access is the one such shape a project on the free tier can reach, and a document written from a flattened read would revoke that grant the moment it was applied. The refusal costs the project its protections rather than the project: its other settings are still planned and applied.
 
