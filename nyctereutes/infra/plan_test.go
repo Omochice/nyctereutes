@@ -571,3 +571,97 @@ func TestInfraPlanSaysADeclaredUnprotectLevelIsBeingIgnored(t *testing.T) {
 		t.Errorf("an unconfirmable level must not be planned as drift\n%s", stdout)
 	}
 }
+
+// Declares the topic projJSON carries and one it does not.
+const planAddsTopicManifest = planManifest + "  topics: [go, Rust]\n"
+
+func assertPlannedTheRestButNoTopics(t *testing.T, stdout string) {
+	t.Helper()
+	if !strings.Contains(stdout, "visibility") {
+		t.Errorf("stdout does not still carry the project drift\n%s", stdout)
+	}
+	if strings.Contains(stdout, "topics") {
+		t.Errorf("stdout plans a topics change\n%s", stdout)
+	}
+}
+
+func TestInfraPlanRefusesATopicCasingGitLabDoesNotHoldAndPlansTheRest(t *testing.T) {
+	tests := []struct {
+		name     string
+		manifest string
+		topics   map[string]string
+		declared string
+		held     string
+	}{
+		{"a topic the project carries", planManifest + "  topics: [Go]\n", nil, `"Go"`, `"go"`},
+		{"a topic the organization holds", planAddsTopicManifest, map[string]string{"rust": "rust"}, `"Rust"`, `"rust"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := writeManifest(t, t.TempDir(), "a.yaml", test.manifest)
+			runner := &fakeInfraGlab{
+				projects: map[string]string{targetGroupProj: projJSON},
+				topics:   test.topics,
+			}
+
+			exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+			if exit != 1 {
+				t.Errorf("exit = %d, want 1 for a casing the project cannot take", exit)
+			}
+			for _, want := range []string{targetGroupProj, test.declared, test.held} {
+				if !strings.Contains(stderr, want) {
+					t.Errorf("stderr missing %s\n%s", want, stderr)
+				}
+			}
+			assertPlannedTheRestButNoTopics(t, stdout)
+		})
+	}
+}
+
+func TestInfraPlanShowsAnAddedTopicTheOrganizationDoesNotHold(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planAddsTopicManifest)
+	runner := &fakeInfraGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		topics:   map[string]string{},
+	}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0\n%s", exit, stderr)
+	}
+	for _, want := range []string{"topics", "Rust"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q\n%s", want, stdout)
+		}
+	}
+}
+
+// The fake holds no topics map, so a lookup would fail the plan.
+func TestInfraPlanLooksUpNoTopicForADocumentAddingNone(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", matchingManifest)
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, _, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 0 {
+		t.Errorf("exit = %d, want 0 for a plan needing no lookup\n%s", exit, stderr)
+	}
+}
+
+// The fake holds no topics map, so the lookup fails.
+func TestInfraPlanStillPlansAProjectWhoseAddedTopicCannotBeLookedUp(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planAddsTopicManifest)
+	runner := &fakeInfraGlab{projects: map[string]string{targetGroupProj: projJSON}}
+
+	exit, stdout, stderr := runWithRunner(runner, "infra", "plan", path)
+
+	if exit != 1 {
+		t.Errorf("exit = %d, want 1 when the lookup fails", exit)
+	}
+	if !strings.Contains(stderr, `"Rust"`) {
+		t.Errorf("stderr does not name the topic that could not be looked up\n%s", stderr)
+	}
+	assertPlannedTheRestButNoTopics(t, stdout)
+}

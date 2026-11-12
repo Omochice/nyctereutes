@@ -74,6 +74,31 @@ func collectionBody(bodies map[string]string, project string) []byte {
 	return []byte("[]")
 }
 
+// Reports whether args is the search CheckTopicCasing issues, returning the
+// name it asks about.
+func topicRead(args []string) (name string, ok bool) {
+	if len(args) != 2 || args[0] != "api" {
+		return "", false
+	}
+	query, found := strings.CutPrefix(args[1], "topics?")
+	if !found {
+		return "", false
+	}
+	values, err := url.ParseQuery(query)
+	if err != nil {
+		return "", false
+	}
+	return values.Get("search"), true
+}
+
+func topicBody(topics map[string]string, name string) []byte {
+	held, ok := topics[strings.ToLower(name)]
+	if !ok {
+		return []byte("[]")
+	}
+	return fmt.Appendf(nil, `[{"name":%q}]`, held)
+}
+
 // Reports whether args is the single-schedule read the disclosure of destroyed
 // variables issues, returning the schedule id it addresses. It has the same
 // two-argument shape as a project read, so a fake must try this one first or
@@ -118,6 +143,7 @@ type fakeInfraGlab struct {
 	branches   map[string]string // "owner/name" -> protected branch list JSON; nil forbids the read
 	variables  map[string]string // schedule id -> the variables field; absent holds none
 	enterprise bool              // what GET /version reports; false is a Community Edition build
+	topics     map[string]string // lower-cased name -> held spelling; nil forbids the lookup
 }
 
 func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
@@ -126,6 +152,9 @@ func (f *fakeInfraGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	if body, ok := f.collection(args); ok {
 		return body, nil
+	}
+	if name, ok := topicRead(args); ok && f.topics != nil {
+		return topicBody(f.topics, name), nil
 	}
 	if id, ok := scheduleDetailRead(args); ok {
 		return scheduleDetailBody(f.variables, id), nil
