@@ -74,6 +74,14 @@ func planRepo(
 	if state == nil {
 		return nil, failures
 	}
+	// Refused topics are planned as omitted, which leaves the live ones alone.
+	if err := client.CheckTopicCasing(ctx, repo, state); err != nil {
+		_, _ = fmt.Fprintf(stderr, "%v\n", err)
+		failures++
+		silent := *repo
+		silent.Spec.Topics = nil
+		repo = &silent
+	}
 	changes := repository.Diff(repo, state)
 	discloseDestroyedVariables(ctx, client, stderr, repo, changes)
 	discloseIgnoredUnprotectLevels(stderr, repo, state)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -26,6 +27,7 @@ type fakeApplyGlab struct {
 	branches   map[string]string // "owner/name" -> protected branch list JSON; nil forbids the read
 	enterprise bool              // what GET /version reports; false is a Community Edition build
 	variables  map[string]string // schedule id -> the variables field; absent holds none
+	topics     map[string]string // lower-cased name -> held spelling; nil forbids the lookup
 	writes     []string          // joined args of each write call, in order
 	writeBody  []string          // parallel to writes: stdin body, "" for none
 	failWrites map[string]bool   // "owner/name" whose writes fail
@@ -48,6 +50,9 @@ func (f *fakeApplyGlab) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	if body, ok := f.readChild(args); ok {
 		return body, nil
+	}
+	if name, ok := topicRead(args); ok && f.topics != nil {
+		return topicBody(f.topics, name), nil
 	}
 	return f.recordWrite(nil, args)
 }
@@ -459,5 +464,58 @@ func TestInfraApplyRefusesDuplicateScheduleDescriptions(t *testing.T) {
 	}
 	if len(runner.writes) != 1 || !strings.Contains(runner.writes[0], "-f visibility=internal") {
 		t.Errorf("writes = %q, want just the project setting", runner.writes)
+	}
+}
+
+func TestInfraApplyWritesNoTopicInACasingGitLabDoesNotHoldButAppliesRest(t *testing.T) {
+	tests := []struct {
+		name     string
+		manifest string
+		topics   map[string]string
+		declared string
+		held     string
+	}{
+		{"a topic the project carries", planManifest + "  topics: [Go]\n", nil, `"Go"`, `"go"`},
+		{"a topic the organization holds", planAddsTopicManifest, map[string]string{"rust": "rust"}, `"Rust"`, `"rust"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := writeManifest(t, t.TempDir(), "a.yaml", test.manifest)
+			runner := &fakeApplyGlab{
+				projects: map[string]string{targetGroupProj: projJSON},
+				topics:   test.topics,
+			}
+
+			exit, _, stderr := runInfraApply("", runner, "infra", "apply", "--auto-approve", path)
+
+			if exit != 1 {
+				t.Errorf("exit = %d, want 1 for a casing the project cannot take", exit)
+			}
+			for _, want := range []string{targetGroupProj, test.declared, test.held} {
+				if !strings.Contains(stderr, want) {
+					t.Errorf("stderr missing %s\n%s", want, stderr)
+				}
+			}
+			if len(runner.writes) != 1 {
+				t.Errorf("writes = %v, want the visibility change alone", runner.writes)
+			}
+		})
+	}
+}
+
+func TestInfraApplyWritesAnAddedTopicTheOrganizationDoesNotHold(t *testing.T) {
+	path := writeManifest(t, t.TempDir(), "a.yaml", planAddsTopicManifest)
+	runner := &fakeApplyGlab{
+		projects: map[string]string{targetGroupProj: projJSON},
+		topics:   map[string]string{},
+	}
+
+	exit, _, stderr := runInfraApply("", runner, "infra", "apply", "--auto-approve", path)
+
+	if exit != 0 {
+		t.Fatalf("exit = %d, want 0\n%s", exit, stderr)
+	}
+	if !slices.Contains(runner.writeBody, `{"topics":["go","Rust"]}`) {
+		t.Errorf("write bodies = %q, want the declared topics written", runner.writeBody)
 	}
 }
