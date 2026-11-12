@@ -31,8 +31,8 @@ func TestApplyProtectsADeclaredBranch(t *testing.T) {
 		Name: "main",
 		Desired: manifest.ProtectedBranch{
 			Name:             "main",
-			PushAccessLevel:  roleNoOne,
-			MergeAccessLevel: roleDeveloper,
+			PushAccessLevel:  manifest.BranchNoOne,
+			MergeAccessLevel: manifest.BranchDeveloper,
 			AllowForcePush:   true,
 		},
 	})
@@ -55,10 +55,10 @@ func TestApplyReprotectsABranchWhoseRoleChanged(t *testing.T) {
 	change := branchChange(ChangeUpdate, ProtectedBranchChange{
 		Name: "main",
 		Desired: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleNoOne, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchNoOne, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 		Live: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchMaintainer, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 	})
 
@@ -108,10 +108,10 @@ func TestApplyReprotectsAWildcardByItsName(t *testing.T) {
 	change := branchChange(ChangeUpdate, ProtectedBranchChange{
 		Name: "release/*",
 		Desired: manifest.ProtectedBranch{
-			Name: "release/*", PushAccessLevel: roleDeveloper, MergeAccessLevel: roleMaintainer,
+			Name: "release/*", PushAccessLevel: manifest.BranchDeveloper, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 		Live: manifest.ProtectedBranch{
-			Name: "release/*", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+			Name: "release/*", PushAccessLevel: manifest.BranchMaintainer, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 	})
 
@@ -158,7 +158,7 @@ func TestApplyReportsABranchLeftUnprotectedByAFailedReprotect(t *testing.T) {
 	change := branchChange(ChangeUpdate, ProtectedBranchChange{
 		Name: "main",
 		Desired: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleNoOne, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchNoOne, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 	})
 
@@ -191,13 +191,13 @@ func TestApplyReportsAFailedUnprotectWithoutClaimingTheBranchIsOpen(t *testing.T
 func TestApplyCarriesAnUnstatedUnprotectLevelThroughARecreate(t *testing.T) {
 	writer := &recordingWriter{}
 	live := manifest.ProtectedBranch{
-		Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+		Name: "main", PushAccessLevel: manifest.BranchMaintainer, MergeAccessLevel: manifest.BranchMaintainer,
 		UnprotectAccessLevel: new(manifest.BranchUnprotectAccessLevel("admin")),
 	}
 	change := branchChange(ChangeUpdate, ProtectedBranchChange{
 		Name: "main",
 		Desired: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleNoOne, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchNoOne, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 		Live: live,
 	})
@@ -218,10 +218,10 @@ func TestApplyKeepsCodeOwnerApprovalThroughARecreate(t *testing.T) {
 	change := branchChange(ChangeUpdate, ProtectedBranchChange{
 		Name: "main",
 		Desired: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleNoOne, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchNoOne, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 		Live: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchMaintainer, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 		CodeOwnerApprovalRequired: true,
 	})
@@ -244,7 +244,7 @@ func TestApplySendsADeclaredUnprotectLevel(t *testing.T) {
 	change := branchChange(ChangeCreate, ProtectedBranchChange{
 		Name: "main",
 		Desired: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchMaintainer, MergeAccessLevel: manifest.BranchMaintainer,
 			UnprotectAccessLevel: new(manifest.BranchUnprotectAccessLevel("developer")),
 		},
 	})
@@ -262,7 +262,7 @@ func TestApplySendsNoUnprotectLevelWhenNobodyStatesOne(t *testing.T) {
 	change := branchChange(ChangeCreate, ProtectedBranchChange{
 		Name: "main",
 		Desired: manifest.ProtectedBranch{
-			Name: "main", PushAccessLevel: roleMaintainer, MergeAccessLevel: roleMaintainer,
+			Name: "main", PushAccessLevel: manifest.BranchMaintainer, MergeAccessLevel: manifest.BranchMaintainer,
 		},
 	})
 

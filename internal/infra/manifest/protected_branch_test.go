@@ -51,11 +51,11 @@ func TestParseFillsOmittedProtectedBranchAttributesWithGitLabDefaults(t *testing
 		t.Fatalf("errs = %v, want none", errs)
 	}
 	branch := repos[0].Spec.ProtectedBranches[0]
-	if branch.PushAccessLevel != valueMaintainer {
-		t.Errorf("push_access_level = %q, want %q", branch.PushAccessLevel, valueMaintainer)
+	if branch.PushAccessLevel != BranchMaintainer {
+		t.Errorf("push_access_level = %q, want %q", branch.PushAccessLevel, BranchMaintainer)
 	}
-	if branch.MergeAccessLevel != valueMaintainer {
-		t.Errorf("merge_access_level = %q, want %q", branch.MergeAccessLevel, valueMaintainer)
+	if branch.MergeAccessLevel != BranchMaintainer {
+		t.Errorf("merge_access_level = %q, want %q", branch.MergeAccessLevel, BranchMaintainer)
 	}
 	if branch.AllowForcePush {
 		t.Error("allow_force_push = true, want false")
@@ -131,7 +131,7 @@ func TestParseDistinguishesAnOmittedUnprotectLevelFromADeclaredOne(t *testing.T)
 		t.Fatalf("errs = %v, want none", errs)
 	}
 	level := declared[0].Spec.ProtectedBranches[0].UnprotectAccessLevel
-	if level == nil || *level != valueAdmin {
+	if level == nil || *level != BranchUnprotectAccessLevel(BranchAdmin) {
 		t.Errorf("declared key = %v, want admin", level)
 	}
 }
@@ -221,8 +221,8 @@ func TestMarshalKeepsABranchNobodyMayPushTo(t *testing.T) {
 	doc := fullRepository()
 	doc.Spec.ProtectedBranches = []ProtectedBranch{{
 		Name:             "main",
-		PushAccessLevel:  valueNoOne,
-		MergeAccessLevel: valueMaintainer,
+		PushAccessLevel:  BranchNoOne,
+		MergeAccessLevel: BranchMaintainer,
 	}}
 
 	out, err := Marshal(doc)
@@ -233,7 +233,7 @@ func TestMarshalKeepsABranchNobodyMayPushTo(t *testing.T) {
 	if len(errs) > 0 {
 		t.Fatalf("errs = %v, want none", errs)
 	}
-	if got := repos[0].Spec.ProtectedBranches[0].PushAccessLevel; got != valueNoOne {
-		t.Errorf("push_access_level = %q, want %q", got, valueNoOne)
+	if got := repos[0].Spec.ProtectedBranches[0].PushAccessLevel; got != BranchNoOne {
+		t.Errorf("push_access_level = %q, want %q", got, BranchNoOne)
 	}
 }

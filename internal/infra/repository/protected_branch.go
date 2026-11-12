@@ -156,13 +156,6 @@ func rejectIndescribableGrants(branch, field string, grants []LiveBranchAccess) 
 
 var errUnknownBranchAccessLevel = errors.New("unknown branch access level")
 
-const (
-	roleNoOne      manifest.BranchAccessLevel = "no_one"
-	roleDeveloper  manifest.BranchAccessLevel = "developer"
-	roleMaintainer manifest.BranchAccessLevel = "maintainer"
-	roleAdmin      manifest.BranchAccessLevel = "admin"
-)
-
 // The numbers GitLab uses for the roles, confirmed against CE 19.2.1.
 // It describes them as "No one", "Developers + Maintainers", "Maintainers" and "Instance admins".
 const (
@@ -180,10 +173,10 @@ type branchRole struct {
 // One table for both directions, so the export and the write cannot disagree about what a role means.
 func branchRoles() []branchRole {
 	return []branchRole{
-		{name: roleNoOne, number: accessNoOne},
-		{name: roleDeveloper, number: accessDeveloper},
-		{name: roleMaintainer, number: accessMaintainer},
-		{name: roleAdmin, number: accessAdmin},
+		{name: manifest.BranchNoOne, number: accessNoOne},
+		{name: manifest.BranchDeveloper, number: accessDeveloper},
+		{name: manifest.BranchMaintainer, number: accessMaintainer},
+		{name: manifest.BranchAdmin, number: accessAdmin},
 	}
 }
 
