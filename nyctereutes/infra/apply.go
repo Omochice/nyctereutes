@@ -93,7 +93,7 @@ func (c *applyCommand) buildPlans(
 					continue
 				}
 				plans = append(plans, repoPlan{
-					name:    repo.Metadata.Owner + "/" + repo.Metadata.Name,
+					name:    repo.Metadata.FullPath(),
 					changes: changes,
 				})
 			}

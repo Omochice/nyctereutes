@@ -44,8 +44,8 @@ func (c *Client) CheckTopicCasing(
 		casingErr = fmt.Errorf("%w: %s", errTopicCasing, strings.Join(mismatches, "; "))
 	}
 	if err := errors.Join(casingErr, readErr); err != nil {
-		return fmt.Errorf("check %s %s/%s: %w",
-			fieldTopics, desired.Metadata.Owner, desired.Metadata.Name, err)
+		return fmt.Errorf("check %s %s: %w",
+			fieldTopics, desired.Metadata.FullPath(), err)
 	}
 	return nil
 }

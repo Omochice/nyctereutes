@@ -121,8 +121,8 @@ func discloseIgnoredUnprotectLevels(stderr io.Writer, repo *manifest.Repository,
 		return
 	}
 	_, _ = fmt.Fprintf(stderr,
-		"%s/%s: this GitLab reports no unprotect access level, so the declared one is left alone on: %s\n",
-		repo.Metadata.Owner, repo.Metadata.Name, strings.Join(ignored, ", "))
+		"%s: this GitLab reports no unprotect access level, so the declared one is left alone on: %s\n",
+		repo.Metadata.FullPath(), strings.Join(ignored, ", "))
 }
 
 // Reads the live state one declared project is compared against. A failed read
