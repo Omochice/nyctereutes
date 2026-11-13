@@ -2,6 +2,8 @@ package infra
 
 import (
 	"bytes"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -75,5 +77,45 @@ func TestMarkerColor(t *testing.T) {
 func TestStyleLineVerbatimWhenColorizeOff(t *testing.T) {
 	if got := styleLine("    - a", false); strings.Contains(got, ansiEscape) {
 		t.Errorf("styleLine(colorize=false) leaked an ANSI escape: %q", got)
+	}
+}
+
+var coloredSpan = regexp.MustCompile(`\x1b\[38;5;(\d+)m([^\x1b]*)\x1b\[0?m`)
+
+type span struct {
+	color string
+	text  string
+}
+
+func coloredSpans(output string) []span {
+	matches := coloredSpan.FindAllStringSubmatch(output, -1)
+	spans := make([]span, 0, len(matches))
+	for _, match := range matches {
+		spans = append(spans, span{color: match[1], text: match[2]})
+	}
+	return spans
+}
+
+func renderChanges(changes []repository.Change, colorize bool) string {
+	var buf bytes.Buffer
+	printChanges(&buf, "group/proj", changes, colorize)
+	return buf.String()
+}
+
+// A one-line update is not washed in the update color: each side of the arrow
+// takes the color a multi-line block gives its removed and added lines.
+func TestPrintChangesOneLineUpdateColorsEachSide(t *testing.T) {
+	changes := []repository.Change{
+		{Type: repository.ChangeUpdate, Field: "description", OldValue: "old", NewValue: "new"},
+	}
+	got := coloredSpans(renderChanges(changes, true))
+	want := []span{
+		{color: color.Yellow, text: "~ description:"},
+		{color: color.Red, text: "old"},
+		{color: color.Gray, text: "→"},
+		{color: color.Green, text: "new"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("colored spans = %q, want %q", got, want)
 	}
 }
