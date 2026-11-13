@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
@@ -142,38 +141,38 @@ func stated(value string) string {
 	return value
 }
 
-func (b *ProtectedBranchChange) line(kind ChangeType) string {
+func (b *ProtectedBranchChange) lines(kind ChangeType) []Line {
 	header := fmt.Sprintf("%s %q", protectedBranchPrefix, b.Name)
 	switch kind {
 	case ChangeCreate:
 		declared := protectedBranchAttributes(b.Desired)
-		lines := make([]string, 0, len(declared)+1)
-		lines = append(lines, "+ "+header)
+		lines := make([]Line, 0, len(declared)+1)
+		lines = append(lines, Line{Lead: "+ " + header})
 		for _, want := range declared {
 			// The create takes whatever GitLab grants for an unstated attribute, which the plan cannot name.
 			if want.value == "" {
 				continue
 			}
-			lines = append(lines, fmt.Sprintf("    + %s: %s", want.field, want.value))
+			lines = append(lines, Line{Lead: fmt.Sprintf("    + %s: %s", want.field, want.value)})
 		}
-		return strings.Join(lines, "\n")
+		return lines
 	case ChangeUpdate:
 		live := protectedBranchAttributes(b.Live)
-		lines := make([]string, 0, len(live)+1)
-		lines = append(lines, "~ "+header)
+		lines := make([]Line, 0, len(live)+1)
+		lines = append(lines, Line{Lead: "~ " + header})
 		for index, want := range protectedBranchAttributes(b.Desired) {
 			// Silence about an attribute is not a demand that it be cleared.
 			if want.value == "" {
 				continue
 			}
 			if live[index].value != want.value {
-				lines = append(lines, fmt.Sprintf("    ~ %s: %s → %s", want.field, stated(live[index].value), want.value))
+				lines = append(lines, Line{Lead: fmt.Sprintf("    ~ %s: %s → %s", want.field, stated(live[index].value), want.value)})
 			}
 		}
-		return strings.Join(lines, "\n")
+		return lines
 	case ChangeDelete:
-		return "- " + header
+		return []Line{{Lead: "- " + header}}
 	default:
-		return ""
+		return nil
 	}
 }

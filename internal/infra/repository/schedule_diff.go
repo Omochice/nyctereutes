@@ -3,7 +3,6 @@ package repository
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 )
@@ -109,35 +108,35 @@ func scheduleAttributes(schedule manifest.PipelineSchedule) []scheduleAttribute 
 // Renders the change as the lines a plan shows for it. A creation lists every
 // attribute because none of them exists yet, an update only those that differ,
 // and a deletion none, naming instead the variable keys going with the schedule.
-func (s *ScheduleChange) line(kind ChangeType) string {
+func (s *ScheduleChange) lines(kind ChangeType) []Line {
 	header := fmt.Sprintf("%s %q", schedulePrefix, s.Description)
 	switch kind {
 	case ChangeCreate:
 		declared := scheduleAttributes(s.Desired)
-		lines := make([]string, 0, len(declared)+1)
-		lines = append(lines, "+ "+header)
+		lines := make([]Line, 0, len(declared)+1)
+		lines = append(lines, Line{Lead: "+ " + header})
 		for _, want := range declared {
-			lines = append(lines, fmt.Sprintf("    + %s: %s", want.field, want.value))
+			lines = append(lines, Line{Lead: fmt.Sprintf("    + %s: %s", want.field, want.value)})
 		}
-		return strings.Join(lines, "\n")
+		return lines
 	case ChangeUpdate:
 		live := scheduleAttributes(s.Live)
-		lines := make([]string, 0, len(live)+1)
-		lines = append(lines, "~ "+header)
+		lines := make([]Line, 0, len(live)+1)
+		lines = append(lines, Line{Lead: "~ " + header})
 		for index, want := range scheduleAttributes(s.Desired) {
 			if live[index].value != want.value {
-				lines = append(lines, fmt.Sprintf("    ~ %s: %s → %s", want.field, live[index].value, want.value))
+				lines = append(lines, Line{Lead: fmt.Sprintf("    ~ %s: %s → %s", want.field, live[index].value, want.value)})
 			}
 		}
-		return strings.Join(lines, "\n")
+		return lines
 	case ChangeDelete:
-		lines := make([]string, 0, len(s.VariableKeys)+1)
-		lines = append(lines, "- "+header)
+		lines := make([]Line, 0, len(s.VariableKeys)+1)
+		lines = append(lines, Line{Lead: "- " + header})
 		for _, key := range s.VariableKeys {
-			lines = append(lines, "    - variable: "+key)
+			lines = append(lines, Line{Lead: "    - variable: " + key})
 		}
-		return strings.Join(lines, "\n")
+		return lines
 	default:
-		return ""
+		return nil
 	}
 }

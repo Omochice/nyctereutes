@@ -61,47 +61,84 @@ type Change struct {
 	ProtectedBranch *ProtectedBranchChange
 }
 
-// Renders one plan line. The project header already carries the name, so
-// neither a create nor an update line repeats it.
+// One line of a [Change] as a plan prints it.
+type Line struct {
+	// The whole line, or only what leads the two values of a one-line update.
+	Lead string
+	// Nil unless the line is a one-line update.
+	Transition *Transition
+}
+
+// The two values a one-line update moves between.
+type Transition struct {
+	Old string
+	New string
+}
+
+// Renders the line as plain text.
+func (l Line) String() string {
+	if l.Transition == nil {
+		return l.Lead
+	}
+	return fmt.Sprintf("%s %s → %s", l.Lead, l.Transition.Old, l.Transition.New)
+}
+
+// Renders the change as plain text.
 func (c Change) String() string {
+	lines := c.Lines()
+	texts := make([]string, len(lines))
+	for index, line := range lines {
+		texts[index] = line.String()
+	}
+	return strings.Join(texts, "\n")
+}
+
+// Renders the change as the lines a plan shows for it.
+// The project header already carries the name, so neither a create nor an
+// update line repeats it.
+func (c Change) Lines() []Line {
 	if c.Schedule != nil {
-		return c.Schedule.line(c.Type)
+		return c.Schedule.lines(c.Type)
 	}
 	if c.ProtectedBranch != nil {
-		return c.ProtectedBranch.line(c.Type)
+		return c.ProtectedBranch.lines(c.Type)
 	}
 	switch c.Type {
 	case ChangeCreate:
-		return "+ new repository"
+		return []Line{{Lead: "+ new repository"}}
 	case ChangeUpdate:
 		old := fmt.Sprintf("%v", c.OldValue)
 		next := fmt.Sprintf("%v", c.NewValue)
+		header := fmt.Sprintf("~ %s:", c.Field)
 		// A single-line arrow buries a multi-line template's newlines, so such a
 		// value is shown as a marked block instead.
 		if strings.Contains(old, "\n") || strings.Contains(next, "\n") {
-			return fmt.Sprintf("~ %s:\n%s\n%s", c.Field, markLines(old, "-"), markLines(next, "+"))
+			lines := []Line{{Lead: header}}
+			lines = append(lines, markLines(old, "-")...)
+			return append(lines, markLines(next, "+")...)
 		}
-		return fmt.Sprintf("~ %s: %v → %v", c.Field, c.OldValue, c.NewValue)
+		return []Line{{Lead: header, Transition: &Transition{Old: old, New: next}}}
 	case ChangeDelete:
 		// Only a child resource is deleted, and one renders through its own type.
-		return ""
+		return nil
 	default:
-		return ""
+		return nil
 	}
 }
 
 // markLines prefixes every line of text with a diff marker, indented so the
 // block sits under its field header. An empty line carries the bare marker.
-func markLines(text, marker string) string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
+func markLines(text, marker string) []Line {
+	texts := strings.Split(text, "\n")
+	lines := make([]Line, len(texts))
+	for i, line := range texts {
 		if line == "" {
-			lines[i] = "    " + marker
+			lines[i] = Line{Lead: "    " + marker}
 		} else {
-			lines[i] = "    " + marker + " " + line
+			lines[i] = Line{Lead: "    " + marker + " " + line}
 		}
 	}
-	return strings.Join(lines, "\n")
+	return lines
 }
 
 // Reports how the live project differs from the declared manifest: a create
