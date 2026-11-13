@@ -222,14 +222,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // Implements tea.Model.
-// Every screen is cut to the terminal height because bubbletea's inline
-// renderer redraws the whole screen on every frame once a frame is taller
-// than the terminal, flooding the scrollback.
-// The alternate screen is used because an inline frame that reaches the top
-// row leaves a copy of itself in the scrollback of terminals that save what
-// an erase removes, each time the frame changes height.
+// The alternate screen is used because bubbletea's inline renderer handles a
+// tall frame badly in two ways.
+// A frame taller than the terminal is redrawn in full on every tick, flooding
+// the scrollback.
+// A frame that reaches the top row leaves a copy of itself in the scrollback
+// of terminals that save what an erase removes, each time it changes height.
+// On the alternate screen the renderer cuts a frame to the terminal itself.
 func (m Model) View() tea.View {
-	view := tea.NewView(fitHeight(m.screen(), m.height))
+	view := tea.NewView(m.screen())
 	view.AltScreen = true
 	return view
 }
@@ -722,7 +723,7 @@ func (m Model) resultLines() []string {
 // Counts how many results lines fit between the Done: line and the footer.
 // The footer takes the separator, the key hint, and the empty line bubbletea
 // counts after the trailing newline.
-// At least one line is kept, and fitHeight cuts the rest in a terminal too
+// At least one line is kept, and the renderer cuts the rest in a terminal too
 // short for even that.
 //
 // Returns false while the terminal height is still unknown.
@@ -765,7 +766,7 @@ func (m Model) renderList() string {
 // The footer takes the separator, the status line, the empty line bubbletea
 // counts after the trailing newline, and every line of the error, which can
 // span several lines because glab errors do.
-// At least one row is kept so the cursor row stays visible, and fitHeight
+// At least one row is kept so the cursor row stays visible, and the renderer
 // cuts the rest in a terminal too short for even that.
 //
 // Returns false while the terminal height is still unknown.

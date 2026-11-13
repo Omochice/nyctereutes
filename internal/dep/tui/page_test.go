@@ -2,12 +2,37 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
+
+func frameHeight(content string) int {
+	return strings.Count(content, "\n") + 1
+}
+
+func manyMRs(count int) []types.MR {
+	mrs := make([]types.MR, 0, count)
+	for index := range count {
+		mrs = append(mrs, types.MR{
+			IID:      index + 1,
+			Project:  "group/p",
+			Title:    fmt.Sprintf("Bump dep%d", index),
+			CIStatus: "success",
+		})
+	}
+	return mrs
+}
+
+func resize(model Model, height int) Model {
+	next, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: height})
+	return asModel(next)
+}
 
 func TestPageBounds(t *testing.T) {
 	tests := []struct {
@@ -131,12 +156,12 @@ func TestSelectionOnLaterPageMarksItsRow(t *testing.T) {
 	}
 }
 
-func TestListInTinyTerminalFitsWithoutPanic(t *testing.T) {
-	model := resize(New(&fakeClient{}, manyMRs(5)), 2)
+func TestListInTinyTerminalStillShowsTheCursorRow(t *testing.T) {
+	model := press(resize(New(&fakeClient{}, manyMRs(5)), 2), keyDown, keyDown)
 
 	view := model.View().Content
-	if frameHeight(view) > 2 {
-		t.Errorf("frame height = %d, want at most 2\n%s", frameHeight(view), view)
+	if line, _ := rowLine(view, "3"); !strings.HasPrefix(line, ">") {
+		t.Errorf("row for !3 = %q, want it shown with the cursor\n%s", line, view)
 	}
 }
 
