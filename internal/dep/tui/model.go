@@ -147,13 +147,11 @@ type Model struct {
 	phase   phase
 	pending int            // MR actions still in flight during phaseExecuting
 	results []actionResult // outcomes shown in phaseComplete
-	// The first results line shown on the complete screen.
 	// Unlike the list, the results have no cursor to derive the scroll
 	// position from, so it is kept as state.
 	resultsOffset int
 	helping       bool // true while the help overlay is shown
-	// The terminal height from the latest tea.WindowSizeMsg; zero until the
-	// first one arrives.
+	// Zero until bubbletea reports the terminal size.
 	height int
 }
 
@@ -223,13 +221,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // Implements tea.Model.
-// The alternate screen is used because bubbletea's inline renderer handles a
-// tall frame badly in two ways.
-// A frame taller than the terminal is redrawn in full on every tick, flooding
-// the scrollback.
-// A frame that reaches the top row leaves a copy of itself in the scrollback
-// of terminals that save what an erase removes, each time it changes height.
-// On the alternate screen the renderer cuts a frame to the terminal itself.
+// The alternate screen keeps a frame as tall as the terminal away from
+// bubbletea's inline renderer, which redraws one on every tick and leaves
+// copies of it in the scrollback.
 func (m Model) View() tea.View {
 	view := tea.NewView(m.screen())
 	view.AltScreen = true
@@ -332,9 +326,8 @@ func (m Model) exitKey(name string) (tea.Model, tea.Cmd) {
 	return m.quitOr(name)
 }
 
-// Moves the results window one line down on j or up on k.
-// It steps from the clamped offset rather than the stored one, so after a
-// resize lowers the largest valid offset a single k already scrolls.
+// Steps from the clamped offset rather than the stored one, so after a resize
+// lowers the largest valid offset a single k already scrolls.
 func (m Model) scrollResults(name string) Model {
 	total, capacity := len(m.resultLines()), m.resultsCapacity()
 	start, _ := windowBounds(m.resultsOffset, total, capacity)
@@ -695,7 +688,6 @@ func (m Model) renderResults() string {
 	return builder.String()
 }
 
-// Lays out the results one terminal line per element.
 // A failure's glab error spans several lines, so an entry is split into
 // every line it occupies on screen rather than kept as one element.
 func (m Model) resultLines() []string {
@@ -725,9 +717,8 @@ func (m Model) resultsCapacity() int {
 // draws every line.
 const unbounded = math.MaxInt
 
-// Counts the lines left for a screen's body once it has taken its own.
-// At least one is kept so the cursor row stays visible, and the renderer cuts
-// the rest in a terminal too short for even that.
+// At least one line is kept so the cursor row stays visible, and the renderer
+// cuts the rest in a terminal too short for even that.
 func (m Model) bodyCapacity(taken int) int {
 	if m.height <= 0 {
 		return unbounded
