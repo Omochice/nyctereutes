@@ -211,20 +211,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// Implements tea.Model. The help overlay and the executing/complete phases
-// each own a screen; every other state shows the list.
+// Implements tea.Model.
 func (m Model) View() tea.View {
+	return tea.NewView(m.screen())
+}
+
+// The help overlay and the executing/complete phases each own a screen;
+// every other state shows the list.
+func (m Model) screen() string {
 	switch {
 	case m.helping:
-		return tea.NewView(helpText)
+		return helpText
 	case m.phase == phaseRefreshing:
-		return tea.NewView("Refreshing...\n")
+		return "Refreshing...\n"
 	case m.phase == phaseExecuting:
-		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
+		return fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending)
 	case m.phase == phaseComplete:
-		return tea.NewView(m.renderResults())
+		return m.renderResults()
 	default:
-		return tea.NewView(m.renderList())
+		return m.renderList()
 	}
 }
 
