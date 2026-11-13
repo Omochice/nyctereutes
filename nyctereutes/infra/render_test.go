@@ -63,7 +63,7 @@ func TestMarkerColor(t *testing.T) {
 		"+ new repository":     color.Green,
 		"    + c":              color.Green,
 		"    - a":              color.Red,
-		"~ description: x → y": color.Yellow,
+		"~ description:":       color.Yellow,
 		"  ~ merge_template:":  color.Yellow,
 		"plain text no marker": "",
 	}
@@ -75,7 +75,7 @@ func TestMarkerColor(t *testing.T) {
 }
 
 func TestStyleLineVerbatimWhenColorizeOff(t *testing.T) {
-	if got := styleLine("    - a", false); strings.Contains(got, ansiEscape) {
+	if got := styleLine(repository.Line{Lead: "    - a"}, false); strings.Contains(got, ansiEscape) {
 		t.Errorf("styleLine(colorize=false) leaked an ANSI escape: %q", got)
 	}
 }
