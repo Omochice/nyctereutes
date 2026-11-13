@@ -147,6 +147,9 @@ type Model struct {
 	pending int            // MR actions still in flight during phaseExecuting
 	results []actionResult // outcomes shown in phaseComplete
 	helping bool           // true while the help overlay is shown
+	// The terminal height from the latest tea.WindowSizeMsg; zero until the
+	// first one arrives.
+	height int
 }
 
 // Customizes a Model at construction, injecting the optional dependencies that
@@ -206,14 +209,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.recordRefresh(typed), nil
 	case tea.KeyPressMsg:
 		return m.handleKey(typed)
+	case tea.WindowSizeMsg:
+		m.height = typed.Height
+		return m, nil
 	default:
 		return m, nil
 	}
 }
 
 // Implements tea.Model.
+// Every screen is cut to the terminal height because bubbletea's inline
+// renderer redraws the whole screen on every frame once a frame is taller
+// than the terminal, flooding the scrollback.
 func (m Model) View() tea.View {
-	return tea.NewView(m.screen())
+	return tea.NewView(fitHeight(m.screen(), m.height))
 }
 
 // The help overlay and the executing/complete phases each own a screen;
