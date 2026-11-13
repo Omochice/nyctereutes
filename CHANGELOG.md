@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/Omochice/nyctereutes/compare/v0.7.1...v0.7.2) (2026-11-13)
+
+
+### Bug Fixes
+
+* fit the dep view to the terminal height ([#130](https://github.com/Omochice/nyctereutes/issues/130)) ([182fe07](https://github.com/Omochice/nyctereutes/commit/182fe07682ce97ab5fc8f5922f397b5c4761ae5d))
+
 ## [0.7.1](https://github.com/Omochice/nyctereutes/compare/v0.7.0...v0.7.1) (2026-11-12)
 
 
