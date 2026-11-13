@@ -166,7 +166,10 @@ func (b *ProtectedBranchChange) lines(kind ChangeType) []Line {
 				continue
 			}
 			if live[index].value != want.value {
-				lines = append(lines, Line{Lead: fmt.Sprintf("    ~ %s: %s → %s", want.field, stated(live[index].value), want.value)})
+				lines = append(lines, Line{
+					Lead:       fmt.Sprintf("    ~ %s:", want.field),
+					Transition: &Transition{Old: stated(live[index].value), New: want.value},
+				})
 			}
 		}
 		return lines
