@@ -165,3 +165,19 @@ func TestPrintChangesProtectedBranchAttributeUpdateColorsEachSide(t *testing.T) 
 		t.Errorf("colored spans = %q, want %q", got, want)
 	}
 }
+
+// An empty value has nothing to color, so no red sequence is written for it.
+func TestPrintChangesColorsTheNewValueOfAnUpdateFromEmpty(t *testing.T) {
+	changes := []repository.Change{
+		{Type: repository.ChangeUpdate, Field: "description", OldValue: "", NewValue: "new"},
+	}
+	got := coloredSpans(renderChanges(changes, true))
+	want := []span{
+		{color: color.Yellow, text: "~ description:"},
+		{color: color.Gray, text: "→"},
+		{color: color.Green, text: "new"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("colored spans = %q, want %q", got, want)
+	}
+}
