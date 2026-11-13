@@ -142,3 +142,26 @@ func TestPrintChangesScheduleAttributeUpdateColorsEachSide(t *testing.T) {
 		t.Errorf("colored spans = %q, want %q", got, want)
 	}
 }
+
+// An unstated live level reads as "(none)", which is still the old side.
+func TestPrintChangesProtectedBranchAttributeUpdateColorsEachSide(t *testing.T) {
+	admin := manifest.BranchUnprotectAccessLevel("admin")
+	changes := []repository.Change{{
+		Type: repository.ChangeUpdate,
+		ProtectedBranch: &repository.ProtectedBranchChange{
+			Name:    "main",
+			Desired: manifest.ProtectedBranch{UnprotectAccessLevel: &admin},
+		},
+	}}
+	got := coloredSpans(renderChanges(changes, true))
+	want := []span{
+		{color: color.Yellow, text: `~ protected_branch "main"`},
+		{color: color.Yellow, text: "    ~ unprotect_access_level:"},
+		{color: color.Red, text: "(none)"},
+		{color: color.Gray, text: "→"},
+		{color: color.Green, text: "admin"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("colored spans = %q, want %q", got, want)
+	}
+}
