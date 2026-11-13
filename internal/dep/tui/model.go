@@ -714,10 +714,10 @@ func (m Model) resultLines() []string {
 	return lines
 }
 
-// The results screen keeps the Done: line, the separator, the key hint, and
-// the empty line bubbletea counts after the trailing newline for itself.
+// The results screen keeps the Done: line, the separator and the key hint for
+// itself.
 func (m Model) resultsCapacity() int {
-	const frameLines = 4
+	const frameLines = 3
 	return m.bodyCapacity(frameLines)
 }
 
@@ -759,11 +759,10 @@ func (m Model) renderList() string {
 	return builder.String()
 }
 
-// The list footer keeps the separator, the status line, the empty line
-// bubbletea counts after the trailing newline, and every line of the error,
-// which can span several lines because glab errors do.
+// The list footer keeps the separator, the status line, and every line of the
+// error, which can span several lines because glab errors do.
 func (m Model) rowCapacity() int {
-	const footerLines = 3
+	const footerLines = 2
 	errorLines := 0
 	if m.errMsg != "" {
 		errorLines = strings.Count(m.errMsg, "\n") + 1
