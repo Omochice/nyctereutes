@@ -106,8 +106,6 @@ func renderChanges(changes []repository.Change, colorize bool) string {
 	return buf.String()
 }
 
-// A one-line update is not washed in the update color: each side of the arrow
-// takes the color a multi-line block gives its removed and added lines.
 func TestPrintChangesOneLineUpdateColorsEachSide(t *testing.T) {
 	changes := []repository.Change{
 		{Type: repository.ChangeUpdate, Field: "description", OldValue: "old", NewValue: "new"},
@@ -146,7 +144,6 @@ func TestPrintChangesScheduleAttributeUpdateColorsEachSide(t *testing.T) {
 	}
 }
 
-// An unstated live level reads as "(none)", which is still the old side.
 func TestPrintChangesProtectedBranchAttributeUpdateColorsEachSide(t *testing.T) {
 	admin := manifest.BranchUnprotectAccessLevel("admin")
 	changes := []repository.Change{{
@@ -169,8 +166,7 @@ func TestPrintChangesProtectedBranchAttributeUpdateColorsEachSide(t *testing.T) 
 	}
 }
 
-// An empty value has nothing to color, so no red sequence is written for it.
-func TestPrintChangesColorsTheNewValueOfAnUpdateFromEmpty(t *testing.T) {
+func TestPrintChangesWritesNoColorAroundAnEmptyValue(t *testing.T) {
 	changes := []repository.Change{
 		{Type: repository.ChangeUpdate, Field: "description", OldValue: "", NewValue: "new"},
 	}
@@ -185,8 +181,6 @@ func TestPrintChangesColorsTheNewValueOfAnUpdateFromEmpty(t *testing.T) {
 	}
 }
 
-// The boundary between the two values comes from the change, not from the
-// first arrow in the text, which a free-text value may hold.
 func TestPrintChangesSplitsAValueHoldingAnArrowAtTheRealBoundary(t *testing.T) {
 	changes := []repository.Change{
 		{Type: repository.ChangeUpdate, Field: "description", OldValue: "a → b", NewValue: "c"},
@@ -203,8 +197,6 @@ func TestPrintChangesSplitsAValueHoldingAnArrowAtTheRealBoundary(t *testing.T) {
 	}
 }
 
-// Color only wraps the text: with its escape sequences removed, a colored plan
-// reads exactly as the plain one does.
 func TestPrintChangesColorLeavesTheTextUnchanged(t *testing.T) {
 	admin := manifest.BranchUnprotectAccessLevel("admin")
 	cases := map[string]repository.Change{
