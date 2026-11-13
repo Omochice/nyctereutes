@@ -125,7 +125,10 @@ func (s *ScheduleChange) lines(kind ChangeType) []Line {
 		lines = append(lines, Line{Lead: "~ " + header})
 		for index, want := range scheduleAttributes(s.Desired) {
 			if live[index].value != want.value {
-				lines = append(lines, Line{Lead: fmt.Sprintf("    ~ %s: %s → %s", want.field, live[index].value, want.value)})
+				lines = append(lines, Line{
+					Lead:       fmt.Sprintf("    ~ %s:", want.field),
+					Transition: &Transition{Old: live[index].value, New: want.value},
+				})
 			}
 		}
 		return lines
