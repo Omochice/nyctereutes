@@ -647,6 +647,19 @@ const helpText = `Keybindings
 func (m Model) renderResults() string {
 	var builder strings.Builder
 	builder.WriteString("Done:\n")
+	for _, line := range m.resultLines() {
+		builder.WriteString(line)
+		builder.WriteByte('\n')
+	}
+	builder.WriteString("\n(enter: back to list, q: quit)\n")
+	return builder.String()
+}
+
+// Lays out the results one terminal line per element.
+// A failure's glab error spans several lines, so an entry is split into
+// every line it occupies on screen rather than kept as one element.
+func (m Model) resultLines() []string {
+	lines := make([]string, 0, len(m.results))
 	for _, result := range m.results {
 		mark := "✓"
 		detail := ""
@@ -654,11 +667,11 @@ func (m Model) renderResults() string {
 			mark = "✗"
 			detail = ": " + result.err.Error()
 		}
-		fmt.Fprintf(&builder, "%s %s !%d - %s%s\n",
+		entry := fmt.Sprintf("%s %s !%d - %s%s",
 			mark, pathShorten(result.mr.Project), result.mr.IID, result.mr.Title, detail)
+		lines = append(lines, strings.Split(entry, "\n")...)
 	}
-	builder.WriteString("\n(enter: back to list, q: quit)\n")
-	return builder.String()
+	return lines
 }
 
 func (m Model) renderList() string {
