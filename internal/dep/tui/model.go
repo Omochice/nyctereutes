@@ -225,8 +225,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // Every screen is cut to the terminal height because bubbletea's inline
 // renderer redraws the whole screen on every frame once a frame is taller
 // than the terminal, flooding the scrollback.
+// The alternate screen is used because an inline frame that reaches the top
+// row leaves a copy of itself in the scrollback of terminals that save what
+// an erase removes, each time the frame changes height.
 func (m Model) View() tea.View {
-	return tea.NewView(fitHeight(m.screen(), m.height))
+	view := tea.NewView(fitHeight(m.screen(), m.height))
+	view.AltScreen = true
+	return view
 }
 
 // The help overlay and the executing/complete phases each own a screen;
