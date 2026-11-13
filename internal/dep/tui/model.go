@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -146,7 +147,12 @@ type Model struct {
 	phase   phase
 	pending int            // MR actions still in flight during phaseExecuting
 	results []actionResult // outcomes shown in phaseComplete
-	helping bool           // true while the help overlay is shown
+	// Unlike the list, the results have no cursor to derive the scroll
+	// position from, so it is kept as state.
+	resultsOffset int
+	helping       bool // true while the help overlay is shown
+	// Zero until bubbletea reports the terminal size.
+	height int
 }
 
 // Customizes a Model at construction, injecting the optional dependencies that
@@ -206,25 +212,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.recordRefresh(typed), nil
 	case tea.KeyPressMsg:
 		return m.handleKey(typed)
+	case tea.WindowSizeMsg:
+		m.height = typed.Height
+		return m, nil
 	default:
 		return m, nil
 	}
 }
 
-// Implements tea.Model. The help overlay and the executing/complete phases
-// each own a screen; every other state shows the list.
+// Implements tea.Model.
+// The alternate screen keeps a frame as tall as the terminal away from
+// bubbletea's inline renderer, which redraws one on every tick and leaves
+// copies of it in the scrollback.
 func (m Model) View() tea.View {
+	view := tea.NewView(m.screen())
+	view.AltScreen = true
+	return view
+}
+
+// The help overlay and the executing/complete phases each own a screen;
+// every other state shows the list.
+func (m Model) screen() string {
 	switch {
 	case m.helping:
-		return tea.NewView(helpText)
+		return helpText
 	case m.phase == phaseRefreshing:
-		return tea.NewView("Refreshing...\n")
+		return "Refreshing...\n"
 	case m.phase == phaseExecuting:
-		return tea.NewView(fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending))
+		return fmt.Sprintf("Executing %s on %d MR(s)...\n", m.modeLabel(), m.pending)
 	case m.phase == phaseComplete:
-		return tea.NewView(m.renderResults())
+		return m.renderResults()
 	default:
-		return tea.NewView(m.renderList())
+		return m.renderList()
 	}
 }
 
@@ -291,15 +310,34 @@ func (m Model) handleKey(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 // Handles keys on the non-list screens (help, executing, complete): the
-// complete screen returns to the list on enter/esc, and q quits from any of
-// them.
+// complete screen returns to the list on enter/esc and scrolls on j/k, and q
+// quits from any of them.
 //
 //nolint:ireturn // matches handleKey's tea.Model return.
 func (m Model) exitKey(name string) (tea.Model, tea.Cmd) {
-	if m.phase == phaseComplete && (name == keyEnter || name == keyEscape) {
-		return m.backToList(), nil
+	if m.phase == phaseComplete {
+		switch name {
+		case keyEnter, keyEscape:
+			return m.backToList(), nil
+		case keyDown, keyUp:
+			return m.scrollResults(name), nil
+		}
 	}
 	return m.quitOr(name)
+}
+
+// Steps from the clamped offset rather than the stored one, so after a resize
+// lowers the largest valid offset a single k already scrolls.
+func (m Model) scrollResults(name string) Model {
+	total, capacity := len(m.resultLines()), m.resultsCapacity()
+	start, _ := windowBounds(m.resultsOffset, total, capacity)
+	if name == keyDown {
+		start++
+	} else {
+		start--
+	}
+	m.resultsOffset, _ = windowBounds(start, total, capacity)
+	return m
 }
 
 // Returns to the list from the complete screen, discarding the finished run's
@@ -307,6 +345,7 @@ func (m Model) exitKey(name string) (tea.Model, tea.Cmd) {
 func (m Model) backToList() Model {
 	m.phase = phaseList
 	m.results = nil
+	m.resultsOffset = 0
 	m.pending = 0
 	m.selected = make(map[int]bool)
 	m.cursor = 0
@@ -508,6 +547,7 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 	m.phase = phaseExecuting
 	m.pending = len(selected)
 	m.results = nil
+	m.resultsOffset = 0
 
 	// A shared buffered channel caps how many of the batched commands hit glab
 	// at once; the rest block on send until a slot frees.
@@ -631,8 +671,27 @@ const helpText = `Keybindings
 `
 
 func (m Model) renderResults() string {
+	lines := m.resultLines()
+	start, end := windowBounds(m.resultsOffset, len(lines), m.resultsCapacity())
 	var builder strings.Builder
 	builder.WriteString("Done:\n")
+	for _, line := range lines[start:end] {
+		builder.WriteString(line)
+		builder.WriteByte('\n')
+	}
+	if end-start < len(lines) {
+		fmt.Fprintf(&builder, "lines %d-%d of %d\n(j/k: scroll, enter: back to list, q: quit)\n",
+			start+1, end, len(lines))
+	} else {
+		builder.WriteString("\n(enter: back to list, q: quit)\n")
+	}
+	return builder.String()
+}
+
+// A failure's glab error spans several lines, so an entry is split into
+// every line it occupies on screen rather than kept as one element.
+func (m Model) resultLines() []string {
+	lines := make([]string, 0, len(m.results))
 	for _, result := range m.results {
 		mark := "✓"
 		detail := ""
@@ -640,18 +699,44 @@ func (m Model) renderResults() string {
 			mark = "✗"
 			detail = ": " + result.err.Error()
 		}
-		fmt.Fprintf(&builder, "%s %s !%d - %s%s\n",
+		entry := fmt.Sprintf("%s %s !%d - %s%s",
 			mark, pathShorten(result.mr.Project), result.mr.IID, result.mr.Title, detail)
+		lines = append(lines, strings.Split(entry, "\n")...)
 	}
-	builder.WriteString("\n(enter: back to list, q: quit)\n")
-	return builder.String()
+	return lines
+}
+
+// The results screen keeps the Done: line, the separator and the key hint for
+// itself.
+func (m Model) resultsCapacity() int {
+	const frameLines = 3
+	return m.bodyCapacity(frameLines)
+}
+
+// The capacity of a screen whose terminal height is not known yet, so that it
+// draws every line.
+const unbounded = math.MaxInt
+
+// At least one line is kept so the cursor row stays visible, and the renderer
+// cuts the rest in a terminal too short for even that.
+func (m Model) bodyCapacity(taken int) int {
+	if m.height <= 0 {
+		return unbounded
+	}
+	return max(m.height-taken, 1)
 }
 
 func (m Model) renderList() string {
 	var builder strings.Builder
-	for index, mergeRequest := range m.visible() {
-		builder.WriteString(m.renderRow(index, mergeRequest))
+	visible := m.visible()
+	total := len(visible)
+	start, end := pageBounds(m.cursor, total, m.rowCapacity())
+	for index := start; index < end; index++ {
+		builder.WriteString(m.renderRow(index, visible[index]))
 		builder.WriteByte('\n')
+	}
+	if end-start < total {
+		fmt.Fprintf(&builder, "rows %d-%d of %d", start+1, end, total)
 	}
 	if m.searching {
 		fmt.Fprintf(&builder, "\nsearch: %s\n", m.searchBuf)
@@ -663,6 +748,17 @@ func (m Model) renderList() string {
 		fmt.Fprintf(&builder, "error: %s\n", m.errMsg)
 	}
 	return builder.String()
+}
+
+// The list footer keeps the separator, the status line, and every line of the
+// error, which can span several lines because glab errors do.
+func (m Model) rowCapacity() int {
+	const footerLines = 2
+	errorLines := 0
+	if m.errMsg != "" {
+		errorLines = strings.Count(m.errMsg, "\n") + 1
+	}
+	return m.bodyCapacity(footerLines + errorLines)
 }
 
 // Renders the active group filter for the status line, or nothing.

@@ -592,6 +592,21 @@ func TestHelpToggles(t *testing.T) {
 	}
 }
 
+func TestEveryScreenUsesTheAlternateScreen(t *testing.T) {
+	list := New(&fakeClient{}, sampleMRs())
+	ran, cmd := press(list, keySpace).Update(key(keyRun))
+	for name, model := range map[string]Model{
+		"list":      list,
+		"help":      press(list, keyHelp),
+		"executing": asModel(ran),
+		"complete":  drain(asModel(ran), cmd),
+	} {
+		if !model.View().AltScreen {
+			t.Errorf("%s screen is drawn inline, want the alternate screen", name)
+		}
+	}
+}
+
 func TestQuitKeys(t *testing.T) {
 	for _, keyName := range []string{keyQuit, keyInterrupt} {
 		t.Run(keyName, func(t *testing.T) {

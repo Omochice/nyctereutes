@@ -1,0 +1,302 @@
+package tui
+
+import (
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/Omochice/nyctereutes/internal/dep/types"
+)
+
+func assertFits(t *testing.T, view string, height int) {
+	t.Helper()
+	if got := lipgloss.Height(strings.TrimSuffix(view, "\n")); got > height {
+		t.Errorf("frame lines = %d, want at most %d\n%s", got, height, view)
+	}
+}
+
+func manyMRs(count int) []types.MR {
+	mrs := make([]types.MR, 0, count)
+	for index := range count {
+		mrs = append(mrs, types.MR{
+			IID:      index + 1,
+			Project:  "group/p",
+			Title:    fmt.Sprintf("Bump dep%d", index),
+			CIStatus: "success",
+		})
+	}
+	return mrs
+}
+
+func resize(model Model, height int) Model {
+	next, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: height})
+	return asModel(next)
+}
+
+func TestPageBounds(t *testing.T) {
+	tests := []struct {
+		name                    string
+		cursor, total, capacity int
+		wantStart, wantEnd      int
+	}{
+		{name: "first page", cursor: 5, total: 40, capacity: 13, wantStart: 0, wantEnd: 13},
+		{name: "middle page", cursor: 13, total: 40, capacity: 13, wantStart: 13, wantEnd: 26},
+		{name: "last page aligned to the end", cursor: 39, total: 40, capacity: 13, wantStart: 27, wantEnd: 40},
+		{name: "total that fits", cursor: 2, total: 3, capacity: 13, wantStart: 0, wantEnd: 3},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			start, end := pageBounds(test.cursor, test.total, test.capacity)
+			if start != test.wantStart || end != test.wantEnd {
+				t.Errorf("pageBounds(%d, %d, %d) = (%d, %d), want (%d, %d)",
+					test.cursor, test.total, test.capacity, start, end, test.wantStart, test.wantEnd)
+			}
+		})
+	}
+}
+
+func rowLine(view string, iid string) (string, bool) {
+	for line := range strings.SplitSeq(view, "\n") {
+		if strings.Contains(line, " !"+iid+" - ") {
+			return line, true
+		}
+	}
+	return "", false
+}
+
+func TestPagedListKeepsCursorAndStatusLineOnScreen(t *testing.T) {
+	model := resize(New(&fakeClient{}, manyMRs(40)), 16)
+
+	view := model.View().Content
+	assertFits(t, view, 16)
+	if line, ok := rowLine(view, "1"); !ok || !strings.HasPrefix(line, ">") {
+		t.Errorf("cursor row !1 should be shown with the cursor\n%s", view)
+	}
+	if !strings.Contains(view, "mode:") {
+		t.Errorf("status line should be shown\n%s", view)
+	}
+	if !strings.Contains(view, "rows 1-14 of 40") {
+		t.Errorf("separator should show the page position\n%s", view)
+	}
+}
+
+func TestPagedListFollowsCursorToNextPage(t *testing.T) {
+	model := resize(New(&fakeClient{}, manyMRs(40)), 16)
+	for range 14 {
+		model = press(model, keyDown)
+	}
+
+	view := model.View().Content
+	if line, ok := rowLine(view, "15"); !ok || !strings.HasPrefix(line, ">") {
+		t.Errorf("cursor row !15 should be shown with the cursor\n%s", view)
+	}
+	if _, ok := rowLine(view, "1"); ok {
+		t.Errorf("row !1 should be off the page\n%s", view)
+	}
+	if !strings.Contains(view, "rows 15-28 of 40") {
+		t.Errorf("separator should show the second page\n%s", view)
+	}
+}
+
+func TestFittingListRendersSameAfterResize(t *testing.T) {
+	model := New(&fakeClient{}, sampleMRs())
+	before := model.View().Content
+
+	after := resize(model, 16).View().Content
+	if after != before {
+		t.Errorf("a fitting list changed after resize\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
+func TestPagedListKeepsStatusAndErrorOnScreen(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "single line", err: errExternal},
+		{name: "multi line", err: errors.New("glab failed\nsecond line\nthird line")},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			model := New(&fakeClient{}, manyMRs(40), WithOpen(func(types.MR) error { return test.err }))
+			model = resize(model, 16)
+			next, cmd := model.Update(key(keyOpen))
+			model = drain(asModel(next), cmd)
+
+			view := model.View().Content
+			assertFits(t, view, 16)
+			if !strings.Contains(view, "mode:") {
+				t.Errorf("status line should be shown\n%s", view)
+			}
+			if !strings.Contains(view, "error: "+test.err.Error()) {
+				t.Errorf("the whole error should be shown\n%s", view)
+			}
+		})
+	}
+}
+
+func TestSelectionOnLaterPageMarksItsRow(t *testing.T) {
+	model := resize(New(&fakeClient{}, manyMRs(40)), 16)
+	for range 20 {
+		model = press(model, keyDown)
+	}
+	model = press(model, keySpace)
+
+	view := model.View().Content
+	if line, ok := rowLine(view, "21"); !ok || !strings.Contains(line, "[x]") {
+		t.Errorf("row !21 should be shown selected\n%s", view)
+	}
+	if got := selectedIIDs(model); !slices.Equal(got, []int{21}) {
+		t.Errorf("selected = %v, want [21]", got)
+	}
+}
+
+func TestListInTinyTerminalStillShowsTheCursorRow(t *testing.T) {
+	model := press(resize(New(&fakeClient{}, manyMRs(5)), 2), keyDown, keyDown)
+
+	view := model.View().Content
+	if line, _ := rowLine(view, "3"); !strings.HasPrefix(line, ">") {
+		t.Errorf("row for !3 = %q, want it shown with the cursor\n%s", line, view)
+	}
+}
+
+func TestWindowBounds(t *testing.T) {
+	tests := []struct {
+		name                    string
+		offset, total, capacity int
+		wantStart, wantEnd      int
+	}{
+		{name: "offset zero", offset: 0, total: 20, capacity: 6, wantStart: 0, wantEnd: 6},
+		{name: "middle offset", offset: 5, total: 20, capacity: 6, wantStart: 5, wantEnd: 11},
+		{name: "offset past the end is clamped", offset: 30, total: 20, capacity: 6, wantStart: 14, wantEnd: 20},
+		{name: "negative offset is clamped", offset: -1, total: 20, capacity: 6, wantStart: 0, wantEnd: 6},
+		{name: "total that fits", offset: 3, total: 3, capacity: 6, wantStart: 0, wantEnd: 3},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			start, end := windowBounds(test.offset, test.total, test.capacity)
+			if start != test.wantStart || end != test.wantEnd {
+				t.Errorf("windowBounds(%d, %d, %d) = (%d, %d), want (%d, %d)",
+					test.offset, test.total, test.capacity, start, end, test.wantStart, test.wantEnd)
+			}
+		})
+	}
+}
+
+func runAll(model Model) Model {
+	model = press(model, keySelectAll)
+	next, cmd := model.Update(key(keyRun))
+	return drain(asModel(next), cmd)
+}
+
+func completeScreen(client Client, count, height int) Model {
+	return resize(runAll(New(client, manyMRs(count))), height)
+}
+
+func TestScrollableResultsFitTerminal(t *testing.T) {
+	model := completeScreen(&fakeClient{}, 20, 10)
+
+	view := model.View().Content
+	assertFits(t, view, 10)
+	for _, want := range []string{"Done:", "lines 1-7 of 20", "(j/k: scroll, enter: back to list, q: quit)"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("results view should contain %q\n%s", want, view)
+		}
+	}
+}
+
+func TestResultsScrollWithJAndK(t *testing.T) {
+	top := completeScreen(&fakeClient{}, 20, 10)
+
+	down := press(top, keyDown).View().Content
+	if _, ok := rowLine(down, "8"); !ok {
+		t.Errorf("j should reveal !8\n%s", down)
+	}
+	if _, ok := rowLine(down, "1"); ok {
+		t.Errorf("j should hide !1\n%s", down)
+	}
+	if back := press(top, keyDown, keyUp).View().Content; back != top.View().Content {
+		t.Errorf("k should scroll back to the top\n%s", back)
+	}
+	if atTop := press(top, keyUp).View().Content; atTop != top.View().Content {
+		t.Errorf("k at the top should do nothing\n%s", atTop)
+	}
+
+	bottom := scrolledToBottom(t)
+	if past := press(bottom, keyDown).View().Content; past != bottom.View().Content {
+		t.Errorf("j at the bottom should do nothing\n%s", past)
+	}
+}
+
+func TestMultiLineFailureCountsAsSeveralBodyLines(t *testing.T) {
+	failing := &fakeClient{approveFn: func(int) error { return errors.New("glab failed\nsecond line\nthird line") }}
+	model := completeScreen(failing, 5, 12)
+
+	view := model.View().Content
+	assertFits(t, view, 12)
+	if !strings.Contains(view, "lines 1-9 of 15") {
+		t.Errorf("each error line should count as a body line\n%s", view)
+	}
+}
+
+func TestFittingResultsRenderSameAfterResizeAndJ(t *testing.T) {
+	model := runAll(New(&fakeClient{}, sampleMRs()))
+	before := model.View().Content
+
+	resized := resize(model, 16)
+	if after := resized.View().Content; after != before {
+		t.Errorf("fitting results changed after resize\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	if scrolled := press(resized, keyDown).View().Content; scrolled != before {
+		t.Errorf("j should not change fitting results\n%s", scrolled)
+	}
+}
+
+func TestResultsStartFromTopAfterNextRun(t *testing.T) {
+	model := press(completeScreen(&fakeClient{}, 20, 10), keyDown, keyDown, keyDown, keyEnter)
+	model = runAll(model)
+
+	if view := model.View().Content; !strings.Contains(view, "lines 1-7 of 20") {
+		t.Errorf("a new run should show its results from the top\n%s", view)
+	}
+}
+
+func scrolledToBottom(t *testing.T) Model {
+	t.Helper()
+	model := completeScreen(&fakeClient{}, 20, 10)
+	for range 13 {
+		model = press(model, keyDown)
+	}
+	if !strings.Contains(model.View().Content, "lines 14-20 of 20") {
+		t.Fatalf("13 presses of j should reach the bottom\n%s", model.View().Content)
+	}
+	return model
+}
+
+func TestResultsWindowStaysFullAfterGrowingPastOffset(t *testing.T) {
+	model := resize(scrolledToBottom(t), 16)
+
+	view := model.View().Content
+	assertFits(t, view, 16)
+	if !strings.Contains(view, "lines 8-20 of 20") {
+		t.Errorf("a grown terminal should still show a full window\n%s", view)
+	}
+	if up := press(model, keyUp).View().Content; !strings.Contains(up, "lines 7-19 of 20") {
+		t.Errorf("one k after growing should scroll up one line\n%s", up)
+	}
+}
+
+func TestResultsKeepOffsetAfterShrink(t *testing.T) {
+	model := resize(scrolledToBottom(t), 7)
+
+	view := model.View().Content
+	assertFits(t, view, 7)
+	if !strings.Contains(view, "lines 14-17 of 20") {
+		t.Errorf("a shrunk terminal should keep the first shown line\n%s", view)
+	}
+}
