@@ -43,7 +43,7 @@ func styleLine(line repository.Line, colorize bool) string {
 }
 
 func paint(code, text string) string {
-	if code == "" {
+	if code == "" || text == "" {
 		return text
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(code)).Render(text)
