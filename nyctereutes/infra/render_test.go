@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Omochice/nyctereutes/internal/color"
+	"github.com/Omochice/nyctereutes/internal/infra/manifest"
 	"github.com/Omochice/nyctereutes/internal/infra/repository"
 )
 
@@ -114,6 +115,28 @@ func TestPrintChangesOneLineUpdateColorsEachSide(t *testing.T) {
 		{color: color.Red, text: "old"},
 		{color: color.Gray, text: "→"},
 		{color: color.Green, text: "new"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("colored spans = %q, want %q", got, want)
+	}
+}
+
+func TestPrintChangesScheduleAttributeUpdateColorsEachSide(t *testing.T) {
+	changes := []repository.Change{{
+		Type: repository.ChangeUpdate,
+		Schedule: &repository.ScheduleChange{
+			Description: "nightly",
+			Desired:     manifest.PipelineSchedule{Cron: "0 4 * * *"},
+			Live:        manifest.PipelineSchedule{Cron: "0 3 * * *"},
+		},
+	}}
+	got := coloredSpans(renderChanges(changes, true))
+	want := []span{
+		{color: color.Yellow, text: `~ pipeline_schedule "nightly"`},
+		{color: color.Yellow, text: "    ~ cron:"},
+		{color: color.Red, text: "0 3 * * *"},
+		{color: color.Gray, text: "→"},
+		{color: color.Green, text: "0 4 * * *"},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("colored spans = %q, want %q", got, want)
