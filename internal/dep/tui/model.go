@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -335,11 +336,7 @@ func (m Model) exitKey(name string) (tea.Model, tea.Cmd) {
 // It steps from the clamped offset rather than the stored one, so after a
 // resize lowers the largest valid offset a single k already scrolls.
 func (m Model) scrollResults(name string) Model {
-	capacity, known := m.resultsCapacity()
-	if !known {
-		return m
-	}
-	total := len(m.resultLines())
+	total, capacity := len(m.resultLines()), m.resultsCapacity()
 	start, _ := windowBounds(m.resultsOffset, total, capacity)
 	if name == keyDown {
 		start++
@@ -682,10 +679,7 @@ const helpText = `Keybindings
 
 func (m Model) renderResults() string {
 	lines := m.resultLines()
-	start, end := 0, len(lines)
-	if capacity, known := m.resultsCapacity(); known {
-		start, end = windowBounds(m.resultsOffset, len(lines), capacity)
-	}
+	start, end := windowBounds(m.resultsOffset, len(lines), m.resultsCapacity())
 	var builder strings.Builder
 	builder.WriteString("Done:\n")
 	for _, line := range lines[start:end] {
@@ -720,29 +714,32 @@ func (m Model) resultLines() []string {
 	return lines
 }
 
-// Counts how many results lines fit between the Done: line and the footer.
-// The footer takes the separator, the key hint, and the empty line bubbletea
-// counts after the trailing newline.
-// At least one line is kept, and the renderer cuts the rest in a terminal too
-// short for even that.
-//
-// Returns false while the terminal height is still unknown.
-func (m Model) resultsCapacity() (int, bool) {
-	if m.height <= 0 {
-		return 0, false
-	}
+// The results screen keeps the Done: line, the separator, the key hint, and
+// the empty line bubbletea counts after the trailing newline for itself.
+func (m Model) resultsCapacity() int {
 	const frameLines = 4
-	return max(m.height-frameLines, 1), true
+	return m.bodyCapacity(frameLines)
+}
+
+// The capacity of a screen whose terminal height is not known yet, so that it
+// draws every line.
+const unbounded = math.MaxInt
+
+// Counts the lines left for a screen's body once it has taken its own.
+// At least one is kept so the cursor row stays visible, and the renderer cuts
+// the rest in a terminal too short for even that.
+func (m Model) bodyCapacity(taken int) int {
+	if m.height <= 0 {
+		return unbounded
+	}
+	return max(m.height-taken, 1)
 }
 
 func (m Model) renderList() string {
 	var builder strings.Builder
 	visible := m.visible()
 	total := len(visible)
-	start, end := 0, total
-	if capacity, known := m.rowCapacity(); known {
-		start, end = pageBounds(m.cursor, total, capacity)
-	}
+	start, end := pageBounds(m.cursor, total, m.rowCapacity())
 	for index := start; index < end; index++ {
 		builder.WriteString(m.renderRow(index, visible[index]))
 		builder.WriteByte('\n')
@@ -762,24 +759,16 @@ func (m Model) renderList() string {
 	return builder.String()
 }
 
-// Counts how many MR rows fit above the list footer in the terminal.
-// The footer takes the separator, the status line, the empty line bubbletea
-// counts after the trailing newline, and every line of the error, which can
-// span several lines because glab errors do.
-// At least one row is kept so the cursor row stays visible, and the renderer
-// cuts the rest in a terminal too short for even that.
-//
-// Returns false while the terminal height is still unknown.
-func (m Model) rowCapacity() (int, bool) {
-	if m.height <= 0 {
-		return 0, false
-	}
+// The list footer keeps the separator, the status line, the empty line
+// bubbletea counts after the trailing newline, and every line of the error,
+// which can span several lines because glab errors do.
+func (m Model) rowCapacity() int {
 	const footerLines = 3
 	errorLines := 0
 	if m.errMsg != "" {
 		errorLines = strings.Count(m.errMsg, "\n") + 1
 	}
-	return max(m.height-footerLines-errorLines, 1), true
+	return m.bodyCapacity(footerLines + errorLines)
 }
 
 // Renders the active group filter for the status line, or nothing.
