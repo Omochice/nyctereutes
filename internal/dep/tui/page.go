@@ -16,3 +16,17 @@ func pageBounds(cursor, total, capacity int) (int, int) {
 	start := min((cursor/capacity)*capacity, total-capacity)
 	return start, start + capacity
 }
+
+// Chooses the half-open range [start, end) of the at most capacity lines
+// shown from a scroll offset into total lines.
+// The offset is clamped instead of trusted, because a resize can shrink the
+// largest valid offset after it was set.
+//
+// Returns 0 and total when every line fits in capacity.
+func windowBounds(offset, total, capacity int) (int, int) {
+	if total <= capacity {
+		return 0, total
+	}
+	start := min(max(offset, 0), total-capacity)
+	return start, start + capacity
+}

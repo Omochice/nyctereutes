@@ -146,7 +146,11 @@ type Model struct {
 	phase   phase
 	pending int            // MR actions still in flight during phaseExecuting
 	results []actionResult // outcomes shown in phaseComplete
-	helping bool           // true while the help overlay is shown
+	// The first results line shown on the complete screen.
+	// Unlike the list, the results have no cursor to derive the scroll
+	// position from, so it is kept as state.
+	resultsOffset int
+	helping       bool // true while the help overlay is shown
 	// The terminal height from the latest tea.WindowSizeMsg; zero until the
 	// first one arrives.
 	height int
@@ -305,15 +309,39 @@ func (m Model) handleKey(keyMsg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 // Handles keys on the non-list screens (help, executing, complete): the
-// complete screen returns to the list on enter/esc, and q quits from any of
-// them.
+// complete screen returns to the list on enter/esc and scrolls on j/k, and q
+// quits from any of them.
 //
 //nolint:ireturn // matches handleKey's tea.Model return.
 func (m Model) exitKey(name string) (tea.Model, tea.Cmd) {
-	if m.phase == phaseComplete && (name == keyEnter || name == keyEscape) {
-		return m.backToList(), nil
+	if m.phase == phaseComplete {
+		switch name {
+		case keyEnter, keyEscape:
+			return m.backToList(), nil
+		case keyDown, keyUp:
+			return m.scrollResults(name), nil
+		}
 	}
 	return m.quitOr(name)
+}
+
+// Moves the results window one line down on j or up on k.
+// It steps from the clamped offset rather than the stored one, so after a
+// resize lowers the largest valid offset a single k already scrolls.
+func (m Model) scrollResults(name string) Model {
+	capacity, known := m.resultsCapacity()
+	if !known {
+		return m
+	}
+	total := len(m.resultLines())
+	start, _ := windowBounds(m.resultsOffset, total, capacity)
+	if name == keyDown {
+		start++
+	} else {
+		start--
+	}
+	m.resultsOffset, _ = windowBounds(start, total, capacity)
+	return m
 }
 
 // Returns to the list from the complete screen, discarding the finished run's
@@ -321,6 +349,7 @@ func (m Model) exitKey(name string) (tea.Model, tea.Cmd) {
 func (m Model) backToList() Model {
 	m.phase = phaseList
 	m.results = nil
+	m.resultsOffset = 0
 	m.pending = 0
 	m.selected = make(map[int]bool)
 	m.cursor = 0
@@ -522,6 +551,7 @@ func (m Model) startExecution() (Model, tea.Cmd) {
 	m.phase = phaseExecuting
 	m.pending = len(selected)
 	m.results = nil
+	m.resultsOffset = 0
 
 	// A shared buffered channel caps how many of the batched commands hit glab
 	// at once; the rest block on send until a slot frees.
@@ -645,13 +675,23 @@ const helpText = `Keybindings
 `
 
 func (m Model) renderResults() string {
+	lines := m.resultLines()
+	start, end := 0, len(lines)
+	if capacity, known := m.resultsCapacity(); known {
+		start, end = windowBounds(m.resultsOffset, len(lines), capacity)
+	}
 	var builder strings.Builder
 	builder.WriteString("Done:\n")
-	for _, line := range m.resultLines() {
+	for _, line := range lines[start:end] {
 		builder.WriteString(line)
 		builder.WriteByte('\n')
 	}
-	builder.WriteString("\n(enter: back to list, q: quit)\n")
+	if end-start < len(lines) {
+		fmt.Fprintf(&builder, "lines %d-%d of %d\n(j/k: scroll, enter: back to list, q: quit)\n",
+			start+1, end, len(lines))
+	} else {
+		builder.WriteString("\n(enter: back to list, q: quit)\n")
+	}
 	return builder.String()
 }
 
@@ -672,6 +712,21 @@ func (m Model) resultLines() []string {
 		lines = append(lines, strings.Split(entry, "\n")...)
 	}
 	return lines
+}
+
+// Counts how many results lines fit between the Done: line and the footer.
+// The footer takes the separator, the key hint, and the empty line bubbletea
+// counts after the trailing newline.
+// At least one line is kept, and fitHeight cuts the rest in a terminal too
+// short for even that.
+//
+// Returns false while the terminal height is still unknown.
+func (m Model) resultsCapacity() (int, bool) {
+	if m.height <= 0 {
+		return 0, false
+	}
+	const frameLines = 4
+	return max(m.height-frameLines, 1), true
 }
 
 func (m Model) renderList() string {
