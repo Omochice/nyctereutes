@@ -81,7 +81,10 @@ func TestStyleLineVerbatimWhenColorizeOff(t *testing.T) {
 	}
 }
 
-var coloredSpan = regexp.MustCompile(`\x1b\[38;5;(\d+)m([^\x1b]*)\x1b\[0?m`)
+var (
+	coloredSpan = regexp.MustCompile(`\x1b\[38;5;(\d+)m([^\x1b]*)\x1b\[0?m`)
+	anySGR      = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+)
 
 type span struct {
 	color string
@@ -179,5 +182,76 @@ func TestPrintChangesColorsTheNewValueOfAnUpdateFromEmpty(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("colored spans = %q, want %q", got, want)
+	}
+}
+
+// The boundary between the two values comes from the change, not from the
+// first arrow in the text, which a free-text value may hold.
+func TestPrintChangesSplitsAValueHoldingAnArrowAtTheRealBoundary(t *testing.T) {
+	changes := []repository.Change{
+		{Type: repository.ChangeUpdate, Field: "description", OldValue: "a → b", NewValue: "c"},
+	}
+	got := coloredSpans(renderChanges(changes, true))
+	want := []span{
+		{color: color.Yellow, text: "~ description:"},
+		{color: color.Red, text: "a → b"},
+		{color: color.Gray, text: "→"},
+		{color: color.Green, text: "c"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("colored spans = %q, want %q", got, want)
+	}
+}
+
+// Color only wraps the text: with its escape sequences removed, a colored plan
+// reads exactly as the plain one does.
+func TestPrintChangesColorLeavesTheTextUnchanged(t *testing.T) {
+	admin := manifest.BranchUnprotectAccessLevel("admin")
+	cases := map[string]repository.Change{
+		"field update": {
+			Type: repository.ChangeUpdate, Field: "description", OldValue: "old", NewValue: "new",
+		},
+		"value holding an arrow": {
+			Type: repository.ChangeUpdate, Field: "description", OldValue: "a → b", NewValue: "c",
+		},
+		"update from empty": {
+			Type: repository.ChangeUpdate, Field: "description", OldValue: "", NewValue: "new",
+		},
+		"multi-line block": {
+			Type: repository.ChangeUpdate, Field: "merge_commit_template", OldValue: "a\n\nb", NewValue: "c",
+		},
+		"new repository": {Type: repository.ChangeCreate},
+		"schedule update": {
+			Type: repository.ChangeUpdate,
+			Schedule: &repository.ScheduleChange{
+				Description: "nightly",
+				Desired:     manifest.PipelineSchedule{Cron: "0 4 * * *"},
+				Live:        manifest.PipelineSchedule{Cron: "0 3 * * *"},
+			},
+		},
+		"schedule removal": {
+			Type:     repository.ChangeDelete,
+			Schedule: &repository.ScheduleChange{Description: "nightly", VariableKeys: []string{"TOKEN"}},
+		},
+		"protected branch update": {
+			Type: repository.ChangeUpdate,
+			ProtectedBranch: &repository.ProtectedBranchChange{
+				Name:    "main",
+				Desired: manifest.ProtectedBranch{UnprotectAccessLevel: &admin},
+			},
+		},
+	}
+	for name, change := range cases {
+		t.Run(name, func(t *testing.T) {
+			changes := []repository.Change{change}
+			colored := renderChanges(changes, true)
+			if !strings.Contains(colored, ansiEscape) {
+				t.Fatalf("colored output = %q, want it to carry color", colored)
+			}
+			plain := renderChanges(changes, false)
+			if got := anySGR.ReplaceAllString(colored, ""); got != plain {
+				t.Errorf("colored output without its escapes = %q, want %q", got, plain)
+			}
+		})
 	}
 }
