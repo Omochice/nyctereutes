@@ -8,12 +8,16 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/Omochice/nyctereutes/internal/dep/types"
 )
 
-func frameHeight(content string) int {
-	return strings.Count(content, "\n") + 1
+func assertFits(t *testing.T, view string, height int) {
+	t.Helper()
+	if got := lipgloss.Height(view); got > height {
+		t.Errorf("frame height = %d, want at most %d\n%s", got, height, view)
+	}
 }
 
 func manyMRs(count int) []types.MR {
@@ -69,9 +73,7 @@ func TestPagedListKeepsCursorAndStatusLineOnScreen(t *testing.T) {
 	model := resize(New(&fakeClient{}, manyMRs(40)), 16)
 
 	view := model.View().Content
-	if frameHeight(view) > 16 {
-		t.Errorf("frame height = %d, want at most 16\n%s", frameHeight(view), view)
-	}
+	assertFits(t, view, 16)
 	if line, ok := rowLine(view, "1"); !ok || !strings.HasPrefix(line, ">") {
 		t.Errorf("cursor row !1 should be shown with the cursor\n%s", view)
 	}
@@ -127,9 +129,7 @@ func TestPagedListKeepsStatusAndErrorOnScreen(t *testing.T) {
 			model = drain(asModel(next), cmd)
 
 			view := model.View().Content
-			if frameHeight(view) > 16 {
-				t.Errorf("frame height = %d, want at most 16\n%s", frameHeight(view), view)
-			}
+			assertFits(t, view, 16)
 			if !strings.Contains(view, "mode:") {
 				t.Errorf("status line should be shown\n%s", view)
 			}
@@ -202,9 +202,7 @@ func TestScrollableResultsFitTerminal(t *testing.T) {
 	model := completeScreen(&fakeClient{}, 20, 10)
 
 	view := model.View().Content
-	if frameHeight(view) > 10 {
-		t.Errorf("frame height = %d, want at most 10\n%s", frameHeight(view), view)
-	}
+	assertFits(t, view, 10)
 	for _, want := range []string{"Done:", "lines 1-6 of 20", "(j/k: scroll, enter: back to list, q: quit)"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("results view should contain %q\n%s", want, view)
@@ -229,13 +227,7 @@ func TestResultsScrollWithJAndK(t *testing.T) {
 		t.Errorf("k at the top should do nothing\n%s", atTop)
 	}
 
-	bottom := top
-	for range 14 {
-		bottom = press(bottom, keyDown)
-	}
-	if !strings.Contains(bottom.View().Content, "lines 15-20 of 20") {
-		t.Fatalf("14 presses of j should reach the bottom\n%s", bottom.View().Content)
-	}
+	bottom := scrolledToBottom(t)
 	if past := press(bottom, keyDown).View().Content; past != bottom.View().Content {
 		t.Errorf("j at the bottom should do nothing\n%s", past)
 	}
@@ -246,9 +238,7 @@ func TestMultiLineFailureCountsAsSeveralBodyLines(t *testing.T) {
 	model := completeScreen(failing, 5, 12)
 
 	view := model.View().Content
-	if frameHeight(view) > 12 {
-		t.Errorf("frame height = %d, want at most 12\n%s", frameHeight(view), view)
-	}
+	assertFits(t, view, 12)
 	if !strings.Contains(view, "lines 1-8 of 15") {
 		t.Errorf("each error line should count as a body line\n%s", view)
 	}
@@ -292,9 +282,7 @@ func TestResultsWindowStaysFullAfterGrowingPastOffset(t *testing.T) {
 	model := resize(scrolledToBottom(t), 16)
 
 	view := model.View().Content
-	if frameHeight(view) > 16 {
-		t.Errorf("frame height = %d, want at most 16\n%s", frameHeight(view), view)
-	}
+	assertFits(t, view, 16)
 	if !strings.Contains(view, "lines 9-20 of 20") {
 		t.Errorf("a grown terminal should still show a full window\n%s", view)
 	}
@@ -307,9 +295,7 @@ func TestResultsKeepOffsetAfterShrink(t *testing.T) {
 	model := resize(scrolledToBottom(t), 7)
 
 	view := model.View().Content
-	if frameHeight(view) > 7 {
-		t.Errorf("frame height = %d, want at most 7\n%s", frameHeight(view), view)
-	}
+	assertFits(t, view, 7)
 	if !strings.Contains(view, "lines 15-17 of 20") {
 		t.Errorf("a shrunk terminal should keep the first shown line\n%s", view)
 	}
