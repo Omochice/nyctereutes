@@ -38,6 +38,9 @@ result-*
 # Ignore automatically generated direnv output
 .direnv
 
+# Ignore personal direnv additions
+.envrc.local
+
 # Ignore the pre-commit config the git-hooks dev shell generates
 .pre-commit-config.yaml
 
