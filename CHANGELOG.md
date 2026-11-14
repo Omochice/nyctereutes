@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/Omochice/nyctereutes/compare/v0.7.2...v0.8.0) (2026-11-14)
+
+
+### Features
+
+* color the old and new value of a one-line plan update ([#132](https://github.com/Omochice/nyctereutes/issues/132)) ([f54ffb3](https://github.com/Omochice/nyctereutes/commit/f54ffb34f431086dc08d436323664a1b14e26730))
+
 ## [0.7.2](https://github.com/Omochice/nyctereutes/compare/v0.7.1...v0.7.2) (2026-11-13)
 
 
