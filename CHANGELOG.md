@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/Omochice/nyctereutes/compare/v0.8.0...v0.8.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** update module charm.land/lipgloss/v2 to v2.1.1 ([#135](https://github.com/Omochice/nyctereutes/issues/135)) ([d2b7bd1](https://github.com/Omochice/nyctereutes/commit/d2b7bd12995d0c521020ee738db6a1a11f7da314))
+
 ## [0.8.0](https://github.com/Omochice/nyctereutes/compare/v0.7.2...v0.8.0) (2026-11-14)
 
 
